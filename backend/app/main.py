@@ -1,11 +1,28 @@
+from uuid import uuid4
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 from sqlalchemy import text
 
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.database import engine
 from app.core.rate_limit import InMemoryRateLimitMiddleware
+
+
+class RequestContextMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        request_id = request.headers.get("x-request-id", str(uuid4()))
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if settings.app_env == "production":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
 
 
 def create_app() -> FastAPI:
@@ -19,9 +36,10 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
     )
+    app.add_middleware(RequestContextMiddleware)
     app.add_middleware(InMemoryRateLimitMiddleware, requests_per_minute=120)
     app.include_router(api_router)
 

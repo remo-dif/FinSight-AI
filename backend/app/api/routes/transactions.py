@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import date
+
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -13,9 +15,20 @@ router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 @router.get("", response_model=list[TransactionResponse])
 def list_transactions(
-    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    return TransactionRepository(db).list_for_user(user.id)
+    return TransactionRepository(db).list_for_user(
+        user.id,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.post("", response_model=list[TransactionResponse])
@@ -32,6 +45,10 @@ def create_transactions(
 
 
 @router.get("/summary/{month}", response_model=MonthlySummary)
-def monthly_summary(month: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def monthly_summary(
+    month: str = Path(pattern=r"^\d{4}-\d{2}$"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     analytics = FinanceAnalyticsService(TransactionRepository(db))
     return analytics.get_monthly_summary(user.id, month)

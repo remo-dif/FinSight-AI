@@ -10,7 +10,7 @@ from app.services.llm import LLMService
 from app.services.rag import RagService
 
 
-ToolRunner = Callable[[AgentState], dict]
+ToolRunner = Callable[["OrchestratorAgent", AgentState], dict[str, Any]]
 
 
 class OrchestratorAgent:

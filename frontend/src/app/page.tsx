@@ -1,8 +1,6 @@
-import { AlertTriangle, ArrowDownUp, CalendarClock, WalletCards } from "lucide-react";
 import { ChatPanel } from "@/components/assistant/chat-panel";
-import { MetricCard } from "@/components/dashboard/metric-card";
-import { SpendingChart } from "@/components/dashboard/spending-chart";
-import { TransactionsTable } from "@/components/dashboard/transactions-table";
+import { AuthPanel } from "@/components/auth/auth-panel";
+import { DashboardWorkspace } from "@/components/dashboard/dashboard-workspace";
 import { UploadPanel } from "@/components/uploads/upload-panel";
 
 export default function Home() {
@@ -37,19 +35,11 @@ export default function Home() {
             <h2 id="dashboard-heading" className="text-lg font-semibold">Dashboard</h2>
             <p className="mt-1 text-sm text-muted">A quick read on cash flow, spend patterns, and items needing review.</p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard label="Net Cash Flow" value="$2,495" detail="+8.3% vs last month" icon={ArrowDownUp} tone="success" />
-            <MetricCard label="Spending" value="$1,705" detail="72% of target" icon={WalletCards} tone="accent" />
-            <MetricCard label="Anomalies" value="2" detail="Needs review" icon={AlertTriangle} tone="danger" />
-            <MetricCard label="Recurring" value="7" detail="$312 monthly" icon={CalendarClock} tone="warning" />
-          </div>
-          <div className="grid items-start gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-            <SpendingChart />
-            <TransactionsTable />
-          </div>
+          <DashboardWorkspace />
         </section>
 
         <aside className="space-y-4 lg:pt-[76px]" aria-label="Assistant and uploads">
+          <AuthPanel />
           <section id="assistant" aria-labelledby="assistant-heading">
             <ChatPanel />
           </section>

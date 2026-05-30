@@ -9,8 +9,10 @@ ReviewStatus = Literal["accepted", "rejected"]
 class AgentState(TypedDict, total=False):
     user_id: UUID
     message: str
+    _agent: Any
     intent: AgentIntent
     tool_results: dict[str, Any]
+    rag_results: list[Any]
     agent_outputs: dict[str, str]
     review_status: ReviewStatus
     review: str

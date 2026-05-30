@@ -1,7 +1,7 @@
-import { demoTransactions } from "@/lib/api";
+import { demoTransactions, Transaction } from "@/lib/api";
 import { Panel } from "@/components/ui/panel";
 
-export function TransactionsTable() {
+export function TransactionsTable({ transactions = demoTransactions }: { transactions?: Transaction[] }) {
   return (
     <Panel aria-labelledby="recent-transactions-heading">
       <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
@@ -9,7 +9,7 @@ export function TransactionsTable() {
           <h2 id="recent-transactions-heading" className="text-lg font-semibold">Recent Transactions</h2>
           <p className="text-sm text-muted">Normalized feed with AI categories</p>
         </div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted">{demoTransactions.length} items</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">{transactions.length} items</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[620px] border-collapse text-sm">
@@ -23,7 +23,7 @@ export function TransactionsTable() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {demoTransactions.map((transaction) => (
+            {transactions.map((transaction) => (
               <tr key={transaction.id} className="transition hover:bg-background">
                 <td className="whitespace-nowrap px-2 py-3 text-muted">{transaction.posted_at}</td>
                 <th className="px-2 py-3 text-left font-semibold" scope="row">{transaction.merchant}</th>

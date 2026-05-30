@@ -25,6 +25,19 @@ export type ChatResponse = {
   tool_results: Record<string, unknown>;
 };
 
+export type TokenResponse = {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+};
+
+export type UserResponse = {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+};
+
 type ApiFetchInit = RequestInit & {
   requireAuth?: boolean;
 };
@@ -111,6 +124,35 @@ export function sendChatMessage({ message, sessionId }: ChatRequest): Promise<Ch
     }),
     requireAuth: true
   });
+}
+
+export function login(email: string, password: string): Promise<TokenResponse> {
+  return apiFetch<TokenResponse>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password })
+  });
+}
+
+export function register(email: string, password: string, fullName: string): Promise<UserResponse> {
+  return apiFetch<UserResponse>("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ email, password, full_name: fullName })
+  });
+}
+
+export function refreshSession(refreshToken: string): Promise<TokenResponse> {
+  return apiFetch<TokenResponse>("/api/auth/refresh", {
+    method: "POST",
+    body: JSON.stringify({ refresh_token: refreshToken })
+  });
+}
+
+export function fetchMonthlySummary(month: string): Promise<MonthlySummary> {
+  return apiFetch<MonthlySummary>(`/api/transactions/summary/${month}`, { requireAuth: true });
+}
+
+export function fetchTransactions(limit = 50): Promise<Transaction[]> {
+  return apiFetch<Transaction[]>(`/api/transactions?limit=${limit}`, { requireAuth: true });
 }
 
 export type UploadResponse = {

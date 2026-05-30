@@ -27,13 +27,14 @@ class TransactionRepository:
         start_date: date | None = None,
         end_date: date | None = None,
         limit: int = 200,
+        offset: int = 0,
     ) -> list[Transaction]:
         query: Select[tuple[Transaction]] = select(Transaction).where(Transaction.user_id == user_id)
         if start_date:
             query = query.where(Transaction.posted_at >= start_date)
         if end_date:
             query = query.where(Transaction.posted_at <= end_date)
-        query = query.order_by(Transaction.posted_at.desc()).limit(limit)
+        query = query.order_by(Transaction.posted_at.desc()).offset(offset).limit(limit)
         return list(self.db.scalars(query))
 
     def monthly_summary(self, user_id: UUID, month: str) -> dict[str, Decimal]:
