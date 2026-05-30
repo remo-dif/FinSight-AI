@@ -12,6 +12,8 @@ from app.repositories.transactions import TransactionRepository
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.analytics import FinanceAnalyticsService
 from app.services.audit import AuditService
+from app.services.llm import LLMService
+from app.services.rag import RagService
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -35,7 +37,9 @@ def chat(payload: ChatRequest, user: User = Depends(get_current_user), db: Sessi
         db.refresh(session)
 
     tools = FinanceToolLayer(FinanceAnalyticsService(TransactionRepository(db)))
-    state = OrchestratorAgent(tools).run({"user_id": user.id, "message": payload.message})
+    rag_service = RagService(db)
+    llm_service = LLMService()
+    state = OrchestratorAgent(tools, rag_service, llm_service).run({"user_id": user.id, "message": payload.message})
 
     db.add_all(
         [
