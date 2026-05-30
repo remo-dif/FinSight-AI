@@ -34,8 +34,8 @@ playwright-report/
 test-results/
 
 # Runtime data
-uploads/
-backend/uploads/
+/uploads/
+/backend/uploads/
 frontend-dev*.log
 
 # Logs
