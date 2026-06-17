@@ -73,6 +73,37 @@ function extractErrorMessage(body: unknown, fallback: string) {
   return fallback;
 }
 
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = useSessionStore.getState().refreshToken;
+  if (!refreshToken) return null;
+
+  const response = await fetch(`${API_URL}/api/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: refreshToken })
+  });
+  if (!response.ok) {
+    useSessionStore.getState().clearSession();
+    return null;
+  }
+
+  const data = (await response.json()) as TokenResponse;
+  useSessionStore.getState().setTokens(data.access_token, data.refresh_token);
+  return data.access_token;
+}
+
+async function requestWithToken(path: string, init: ApiFetchInit | undefined, token: string | null) {
+  const isFormData = init?.body instanceof FormData;
+  return fetch(`${API_URL}${path}`, {
+    ...init,
+    headers: {
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers ?? {})
+    }
+  });
+}
+
 export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
   const token = useSessionStore.getState().accessToken;
   if (init?.requireAuth && !token) {
@@ -82,17 +113,15 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
     );
   }
 
-  const isFormData = init?.body instanceof FormData;
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, {
-      ...init,
-      headers: {
-        ...(isFormData ? {} : { "Content-Type": "application/json" }),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(init?.headers ?? {})
+    response = await requestWithToken(path, init, token);
+    if (response.status === 401 && token) {
+      const refreshedToken = await refreshAccessToken();
+      if (refreshedToken) {
+        response = await requestWithToken(path, init, refreshedToken);
       }
-    });
+    }
   } catch {
     throw new ApiError("Unable to reach the finance API. Check that the backend is running, then try again.");
   }
