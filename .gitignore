@@ -36,6 +36,13 @@ test-results/
 # Runtime data
 /uploads/
 /backend/uploads/
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+*.sqlite-shm
+*.sqlite-wal
 frontend-dev*.log
 
 # Logs
