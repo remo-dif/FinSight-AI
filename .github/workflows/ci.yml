@@ -80,11 +80,22 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: finsight-ai-backend:ci
-          format: sarif
-          output: trivy-backend.sarif
+          format: table
+          scanners: vuln
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
+      - name: Generate backend Trivy report
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        if: always()
+        with:
+          image-ref: finsight-ai-backend:ci
+          format: sarif
+          output: trivy-backend.sarif
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"
       - name: Upload backend Trivy report
         uses: actions/upload-artifact@v4
         if: always()
@@ -94,13 +105,25 @@ jobs:
           if-no-files-found: ignore
       - name: Scan frontend image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        if: always()
+        with:
+          image-ref: finsight-ai-frontend:ci
+          format: table
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Generate frontend Trivy report
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        if: always()
         with:
           image-ref: finsight-ai-frontend:ci
           format: sarif
           output: trivy-frontend.sarif
+          scanners: vuln
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: "1"
+          exit-code: "0"
       - name: Upload frontend Trivy report
         uses: actions/upload-artifact@v4
         if: always()
