@@ -27,6 +27,10 @@ jobs:
         working-directory: backend
     env:
       TEST_DATABASE_URL: postgresql+psycopg://finance:finance@localhost:5432/finance_ai
+      DATABASE_URL: postgresql+psycopg://finance:finance@localhost:5432/finance_ai
+      JWT_SECRET_KEY: ci-access-secret-not-for-production-1234567890
+      JWT_REFRESH_SECRET_KEY: ci-refresh-secret-not-for-production-12345678
+      OPENAI_API_KEY: ci-placeholder-openai-key
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -40,8 +44,6 @@ jobs:
           alembic upgrade head
           alembic downgrade base
           alembic upgrade head
-        env:
-          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
       - run: pytest
 
   frontend:

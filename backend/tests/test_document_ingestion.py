@@ -49,7 +49,8 @@ async def test_save_upload_rejects_mismatched_extension_and_content_type():
 
 
 @pytest.mark.asyncio
-async def test_embed_texts_uses_local_embedding_without_api_key():
+async def test_embed_texts_uses_local_embedding_without_api_key(monkeypatch):
+    monkeypatch.setattr("app.services.document_ingestion.settings.openai_api_key", None)
     service = DocumentIngestionService()
 
     embeddings = await service.embed_texts(["rent payment", "grocery store"])
