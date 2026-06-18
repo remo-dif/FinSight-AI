@@ -10,7 +10,10 @@ from sqlalchemy import text
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.database import engine
+from app.core.logging import configure_logging
 from app.core.rate_limit import InMemoryRateLimitMiddleware
+
+configure_logging()
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
@@ -40,7 +43,10 @@ def create_app() -> FastAPI:
         allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
     )
     app.add_middleware(RequestContextMiddleware)
-    app.add_middleware(InMemoryRateLimitMiddleware, requests_per_minute=120)
+    app.add_middleware(
+        InMemoryRateLimitMiddleware,
+        requests_per_minute=settings.rate_limit_per_minute,
+    )
     app.include_router(api_router)
 
     @app.get("/health", tags=["system"])
