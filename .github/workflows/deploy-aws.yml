@@ -1,0 +1,127 @@
+name: deploy-aws
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      image_sha:
+        description: Commit SHA already published to GHCR
+        required: true
+        type: string
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    if: >-
+      vars.AWS_DEPLOY_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'master'))
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      ECS_BACKEND_SERVICE: ${{ vars.ECS_BACKEND_SERVICE }}
+      ECS_FRONTEND_SERVICE: ${{ vars.ECS_FRONTEND_SERVICE }}
+      ECS_BACKEND_TASK_FAMILY: ${{ vars.ECS_BACKEND_TASK_FAMILY }}
+      ECS_FRONTEND_TASK_FAMILY: ${{ vars.ECS_FRONTEND_TASK_FAMILY }}
+      ECS_BACKEND_CONTAINER: ${{ vars.ECS_BACKEND_CONTAINER }}
+      ECS_FRONTEND_CONTAINER: ${{ vars.ECS_FRONTEND_CONTAINER }}
+      IMAGE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.image_sha || github.event.workflow_run.head_sha }}
+      BACKEND_IMAGE: ghcr.io/remo-dif/finsight-ai-backend
+      FRONTEND_IMAGE: ghcr.io/remo-dif/finsight-ai-frontend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.IMAGE_SHA }}
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          required=(
+            AWS_ROLE_ARN AWS_REGION ECS_CLUSTER ECS_BACKEND_SERVICE ECS_FRONTEND_SERVICE
+            ECS_BACKEND_TASK_FAMILY ECS_FRONTEND_TASK_FAMILY
+            ECS_BACKEND_CONTAINER ECS_FRONTEND_CONTAINER IMAGE_SHA
+          )
+          for name in "${required[@]}"; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required GitHub production variable: $name" >&2
+              exit 1
+            fi
+          done
+      - name: Configure AWS credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6.2.0
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy immutable images to ECS
+        shell: bash
+        run: |
+          deploy_service() {
+            local family="$1"
+            local service="$2"
+            local container="$3"
+            local image="$4"
+            local current="${family}-current.json"
+            local rendered="${family}-rendered.json"
+
+            aws ecs describe-task-definition \
+              --task-definition "$family" \
+              --query taskDefinition \
+              --output json > "$current"
+
+            jq --arg container "$container" --arg image "$image" '
+              if any(.containerDefinitions[]; .name == $container) then
+                (.containerDefinitions[] | select(.name == $container) | .image) = $image
+                | del(
+                    .taskDefinitionArn,
+                    .revision,
+                    .status,
+                    .requiresAttributes,
+                    .compatibilities,
+                    .registeredAt,
+                    .registeredBy
+                  )
+              else
+                error("Container not found in task definition: " + $container)
+              end
+            ' "$current" > "$rendered"
+
+            local task_definition
+            task_definition=$(aws ecs register-task-definition \
+              --cli-input-json "file://$rendered" \
+              --query taskDefinition.taskDefinitionArn \
+              --output text)
+
+            aws ecs update-service \
+              --cluster "$ECS_CLUSTER" \
+              --service "$service" \
+              --task-definition "$task_definition" \
+              --force-new-deployment > /dev/null
+          }
+
+          deploy_service \
+            "$ECS_BACKEND_TASK_FAMILY" \
+            "$ECS_BACKEND_SERVICE" \
+            "$ECS_BACKEND_CONTAINER" \
+            "$BACKEND_IMAGE:$IMAGE_SHA"
+
+          deploy_service \
+            "$ECS_FRONTEND_TASK_FAMILY" \
+            "$ECS_FRONTEND_SERVICE" \
+            "$ECS_FRONTEND_CONTAINER" \
+            "$FRONTEND_IMAGE:$IMAGE_SHA"
+
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_BACKEND_SERVICE" "$ECS_FRONTEND_SERVICE"
