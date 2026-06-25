@@ -5,11 +5,11 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import app.models  # noqa: F401
-from app.api.routes.auth import login, logout, refresh
+from app.api.routes.auth import login, logout, refresh, register
 from app.core.database import Base
 from app.core.security import hash_password
 from app.models.user import RefreshToken, User
-from app.schemas.auth import LoginRequest, RefreshTokenRequest
+from app.schemas.auth import LoginRequest, RefreshTokenRequest, RegisterRequest, UserResponse
 
 
 @pytest.fixture()
@@ -40,6 +40,24 @@ def create_user(db: Session) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+
+def test_register_response_schema_accepts_user_uuid(db: Session):
+    user = register(
+        RegisterRequest(
+            email="new-user@example.com",
+            password="correct horse battery staple",
+            full_name="New User",
+        ),
+        db,
+    )
+
+    response = UserResponse.model_validate(user, from_attributes=True)
+
+    assert response.id == user.id
+    assert response.email == "new-user@example.com"
+    assert response.full_name == "New User"
+    assert response.role == "user"
 
 
 def test_login_persists_hashed_refresh_token(db: Session):
