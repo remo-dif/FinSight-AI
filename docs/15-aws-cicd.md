@@ -54,6 +54,15 @@ HTTPS is not enabled yet. The next production hardening step is adding either an
 and HTTPS listener on the ALB for a custom domain, or CloudFront in front of the ALB for a
 temporary HTTPS endpoint.
 
+Production cutover should block on this HTTPS checklist:
+
+- Request and validate an ACM certificate in `eu-north-1`.
+- Add an ALB HTTPS `443` listener using a TLS 1.2+ security policy.
+- Move application routing rules to the HTTPS listener.
+- Replace the HTTP `80` listener default action with a `301` redirect to HTTPS.
+- Update `PUBLIC_APP_URL`, `ALLOWED_ORIGINS`, and any frontend API origin to the HTTPS domain.
+- Smoke test `https://DOMAIN/readyz` and `https://DOMAIN/`.
+
 ## GHCR Images
 
 After backend tests, frontend tests, Docker builds, and Trivy scans pass on `master`, CI publishes:
@@ -142,6 +151,7 @@ The role needs only the permissions required to:
 
 - Read and register the configured ECS task-definition families.
 - Update and describe the two ECS services.
+- Run and describe one-off migration tasks for the backend task definition.
 - Pass the ECS task execution and task roles with `iam:PassRole`.
 
 ## Application Secrets

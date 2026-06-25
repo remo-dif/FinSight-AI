@@ -14,7 +14,7 @@ from uuid import UUID, uuid4
 import pdfplumber
 from fastapi import HTTPException, UploadFile, status
 from openai import AsyncOpenAI
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -28,6 +28,9 @@ from app.services.rag import LOCAL_EMBEDDING_MODEL
 
 _TOKEN_RE = re.compile(r"\S+")
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+MAX_PDF_PAGES = 25
+MAX_IMAGE_PIXELS = 20_000_000
+Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 
 @dataclass(frozen=True)
@@ -272,11 +275,30 @@ class DocumentIngestionService:
     def _extract_document_text_sync(self, path: Path) -> str:
         suffix = path.suffix.lower()
         if suffix == ".pdf":
-            with pdfplumber.open(path) as pdf:
+            try:
+                pdf = pdfplumber.open(path)
+            except Exception as exc:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "PDF could not be parsed") from exc
+            with pdf:
+                if len(pdf.pages) > MAX_PDF_PAGES:
+                    raise HTTPException(
+                        status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        f"PDF has too many pages; maximum is {MAX_PDF_PAGES}",
+                    )
                 return "\n".join(page.extract_text() or "" for page in pdf.pages)
         if suffix in {".png", ".jpg", ".jpeg"}:
-            with Image.open(path) as image:
-                return f"Image uploaded: {image.width}x{image.height}. OCR runtime available via pytesseract."
+            try:
+                with Image.open(path) as image:
+                    width, height = image.size
+                    image.verify()
+            except (UnidentifiedImageError, OSError) as exc:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "Image could not be parsed") from exc
+            if width * height > MAX_IMAGE_PIXELS:
+                raise HTTPException(
+                    status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    f"Image has too many pixels; maximum is {MAX_IMAGE_PIXELS}",
+                )
+            return f"Image uploaded: {width}x{height}. OCR runtime available via pytesseract."
         return ""
 
     def _normalize_text(self, value: str) -> str:

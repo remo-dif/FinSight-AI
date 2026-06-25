@@ -1,5 +1,7 @@
 import pytest
 from fastapi import HTTPException
+from starlette.responses import Response
+from app.core.security import as_aware_utc, utc_now
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -65,6 +67,7 @@ def test_login_persists_hashed_refresh_token(db: Session):
 
     response = login(
         LoginRequest(email=user.email, password="correct horse battery staple"),
+        Response(),
         db,
     )
 
@@ -79,15 +82,28 @@ def test_login_persists_hashed_refresh_token(db: Session):
     assert stored.revoked_at is None
 
 
+def test_login_uses_configured_refresh_token_lifetime(db: Session, monkeypatch):
+    monkeypatch.setattr("app.core.security.settings.refresh_token_days", 7)
+    user = create_user(db)
+
+    login(LoginRequest(email=user.email, password="correct horse battery staple"), Response(), db)
+
+    stored = db.scalar(select(RefreshToken).where(RefreshToken.user_id == user.id))
+    assert stored is not None
+    remaining = as_aware_utc(stored.expires_at) - utc_now()
+    assert 6 <= remaining.days <= 7
+
+
 def test_refresh_rotates_and_revokes_previous_refresh_token(db: Session):
     user = create_user(db)
     login_response = login(
         LoginRequest(email=user.email, password="correct horse battery staple"),
+        Response(),
         db,
     )
     original = db.scalar(select(RefreshToken).where(RefreshToken.user_id == user.id))
 
-    rotated = refresh(RefreshTokenRequest(refresh_token=login_response.refresh_token), db)
+    rotated = refresh(RefreshTokenRequest(refresh_token=login_response.refresh_token), Response(), db)
 
     db.refresh(original)
     replacement = db.scalar(
@@ -100,7 +116,7 @@ def test_refresh_rotates_and_revokes_previous_refresh_token(db: Session):
     assert replacement.revoked_at is None
 
     with pytest.raises(HTTPException) as exc:
-        refresh(RefreshTokenRequest(refresh_token=login_response.refresh_token), db)
+        refresh(RefreshTokenRequest(refresh_token=login_response.refresh_token), Response(), db)
     assert exc.value.status_code == 401
 
 
@@ -108,15 +124,16 @@ def test_logout_revokes_refresh_token(db: Session):
     user = create_user(db)
     login_response = login(
         LoginRequest(email=user.email, password="correct horse battery staple"),
+        Response(),
         db,
     )
 
-    response = logout(RefreshTokenRequest(refresh_token=login_response.refresh_token), db)
+    response = logout(RefreshTokenRequest(refresh_token=login_response.refresh_token), Response(), db)
 
     stored = db.scalar(select(RefreshToken).where(RefreshToken.user_id == user.id))
     assert response.status_code == 204
     assert stored.revoked_at is not None
 
     with pytest.raises(HTTPException) as exc:
-        refresh(RefreshTokenRequest(refresh_token=login_response.refresh_token), db)
+        refresh(RefreshTokenRequest(refresh_token=login_response.refresh_token), Response(), db)
     assert exc.value.status_code == 401

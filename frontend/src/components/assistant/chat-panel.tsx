@@ -20,12 +20,12 @@ export function ChatPanel() {
   const statusId = useId();
   const chatSessionId = useSessionStore((state) => state.chatSessionId);
   const setChatSessionId = useSessionStore((state) => state.setChatSessionId);
-  const [input, setInput] = useState("Show my unusual spending this month");
+  const [input, setInput] = useState("Summarize the evidence for the highest-risk alert");
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
       content:
-        "Ask for case summaries, suspicious transaction patterns, merchant history, or evidence from uploaded documents. Answers are grounded through approved tools."
+        "Ask for alert summaries, suspicious transaction patterns, entity history, or evidence from uploaded documents. Answers are grounded through approved tools."
     }
   ]);
 
@@ -106,7 +106,7 @@ export function ChatPanel() {
         {chat.isPending ? (
           <div className="flex max-w-[85%] items-center gap-2 rounded-lg border border-border bg-background p-3 text-sm leading-6 text-muted" role="status">
             <LoaderCircle aria-hidden className="h-4 w-4 animate-spin text-accent" />
-            Asking the finance tools...
+            Asking the investigation tools...
           </div>
         ) : null}
       </div>

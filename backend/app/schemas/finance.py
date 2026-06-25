@@ -8,11 +8,11 @@ from pydantic import BaseModel, ConfigDict, Field
 class TransactionCreate(BaseModel):
     posted_at: date
     merchant: str = Field(min_length=1, max_length=200)
-    description: str = ""
+    description: str = Field(default="", max_length=2000)
     amount: Decimal
     currency: str = Field(default="USD", min_length=3, max_length=3)
-    category: str = "Uncategorized"
-    source: str = "manual"
+    category: str = Field(default="Uncategorized", min_length=1, max_length=80)
+    source: str = Field(default="manual", min_length=1, max_length=40)
 
 
 class TransactionResponse(TransactionCreate):

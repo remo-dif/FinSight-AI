@@ -1,7 +1,6 @@
 # FinSight-AI
 
-Production-grade SaaS portfolio project for a multimodal AI personal finance and fraud
-investigation assistant.
+Production-grade SaaS portfolio project for an AI-assisted fraud investigation workspace.
 
 ## What Is Included
 
@@ -15,6 +14,7 @@ investigation assistant.
 ## Recent Updates
 
 - Redesigned the first screen as an operational fraud-investigation workspace instead of a generic finance dashboard.
+- Hardened the product direction around fraud analyst triage, evidence review, AI-grounded investigation, and auditable case decisions.
 - Added compact case-review UI sections for operations overview, alert queue, risk drivers, entity graph, evidence timeline, case decisioning, analyst session, investigation copilot, and evidence ingestion.
 - Updated Playwright end-to-end coverage to assert the redesigned workspace.
 - Changed production frontend API routing to same-origin requests so deployed browsers call `/api/...` through the Application Load Balancer instead of `localhost:8000`.

@@ -67,10 +67,11 @@ def token_hash_matches(token: str, stored_hash: str) -> bool:
 def create_persisted_refresh_token(
     user_id: UUID,
     db: Session,
-    expires_delta: timedelta = timedelta(days=30),
+    expires_delta: timedelta | None = None,
 ) -> str:
     jti = str(uuid4())
-    token = create_token(user_id, TokenType.REFRESH, expires_delta, jti=jti)
+    lifetime = expires_delta or timedelta(days=settings.refresh_token_days)
+    token = create_token(user_id, TokenType.REFRESH, lifetime, jti=jti)
     payload = jwt.decode(token, settings.jwt_refresh_secret_key, algorithms=[settings.jwt_algorithm])
     refresh_token = RefreshToken(
         user_id=user_id,

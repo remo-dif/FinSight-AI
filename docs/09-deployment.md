@@ -18,5 +18,5 @@
 - Run database migrations.
 - Verify secrets and CORS origins.
 - Run CI checks.
-- Run smoke tests against `/health`.
+- Run smoke tests against `/readyz` for backend readiness and `/` for the frontend.
 - Verify upload and chat flows with non-sensitive sample data.

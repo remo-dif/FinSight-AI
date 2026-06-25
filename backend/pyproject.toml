@@ -1,7 +1,7 @@
 [project]
-name = "personal-finance-ai-backend"
+name = "finsight-ai-backend"
 version = "0.1.0"
-description = "FastAPI backend for a multimodal personal finance AI assistant"
+description = "FastAPI backend for an AI-assisted fraud investigation workspace"
 requires-python = ">=3.12"
 dependencies = [
   "alembic>=1.13.3",

@@ -30,7 +30,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="Personal Finance AI Assistant API",
+        title="FinSight AI Fraud Operations API",
         version="0.1.0",
         docs_url="/docs" if settings.app_env != "production" else None,
         redoc_url=None,

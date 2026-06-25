@@ -74,13 +74,11 @@ function extractErrorMessage(body: unknown, fallback: string) {
 }
 
 async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = useSessionStore.getState().refreshToken;
-  if (!refreshToken) return null;
-
   const response = await fetch(`${API_URL}/api/auth/refresh`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: refreshToken })
+    credentials: "include",
+    body: JSON.stringify({})
   });
   if (!response.ok) {
     useSessionStore.getState().clearSession();
@@ -88,7 +86,7 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 
   const data = (await response.json()) as TokenResponse;
-  useSessionStore.getState().setTokens(data.access_token, data.refresh_token);
+  useSessionStore.getState().setAccessToken(data.access_token);
   return data.access_token;
 }
 
@@ -96,6 +94,7 @@ async function requestWithToken(path: string, init: ApiFetchInit | undefined, to
   const isFormData = init?.body instanceof FormData;
   return fetch(`${API_URL}${path}`, {
     ...init,
+    credentials: "include",
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -105,7 +104,10 @@ async function requestWithToken(path: string, init: ApiFetchInit | undefined, to
 }
 
 export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
-  const token = useSessionStore.getState().accessToken;
+  let token = useSessionStore.getState().accessToken;
+  if (init?.requireAuth && !token) {
+    token = await refreshAccessToken();
+  }
   if (init?.requireAuth && !token) {
     throw new ApiError(
       "Authentication is required before using live finance tools. Sign in or provide a valid session token, then try again.",
@@ -135,6 +137,9 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
       // Keep the status-only fallback when the server does not return JSON.
     }
     throw new ApiError(formatApiError(response.status, detail, Boolean(token)), response.status);
+  }
+  if (response.status === 204) {
+    return undefined as T;
   }
   return response.json() as Promise<T>;
 }
@@ -176,6 +181,13 @@ export function refreshSession(refreshToken: string): Promise<TokenResponse> {
   });
 }
 
+export async function logout(): Promise<void> {
+  await apiFetch<void>("/api/auth/logout", {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
 export function fetchMonthlySummary(month: string): Promise<MonthlySummary> {
   return apiFetch<MonthlySummary>(`/api/transactions/summary/${month}`, { requireAuth: true });
 }
@@ -203,33 +215,33 @@ export function uploadFinancialFile(file: File): Promise<UploadResponse> {
 
 export const demoTransactions: Transaction[] = [
   {
-    id: "1",
+    id: "CASE-1042",
     posted_at: "2026-05-28",
-    merchant: "Whole Foods",
-    description: "Groceries",
-    amount: "-84.22",
+    merchant: "Card testing cluster",
+    description: "First-seen device attempted six low-value authorizations in 11 minutes.",
+    amount: "-184.22",
     currency: "USD",
-    category: "Groceries",
-    source: "demo"
+    category: "Velocity spike",
+    source: "rules"
   },
   {
-    id: "2",
+    id: "CASE-1038",
     posted_at: "2026-05-26",
-    merchant: "Payroll",
-    description: "Salary",
-    amount: "4200.00",
+    merchant: "New beneficiary transfer",
+    description: "High-value transfer to a beneficiary created from an unfamiliar IP range.",
+    amount: "-4200.00",
     currency: "USD",
-    category: "Income",
-    source: "demo"
+    category: "New payee",
+    source: "model"
   },
   {
-    id: "3",
+    id: "CASE-1031",
     posted_at: "2026-05-25",
-    merchant: "Spotify",
-    description: "Monthly plan",
-    amount: "-11.99",
+    merchant: "Travel merchant mismatch",
+    description: "Card-present transaction conflicts with recent customer session geography.",
+    amount: "-611.99",
     currency: "USD",
-    category: "Subscriptions",
-    source: "demo"
+    category: "Geo mismatch",
+    source: "rules"
   }
 ];

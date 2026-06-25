@@ -70,6 +70,26 @@ export default function Home() {
 
         <div className="min-w-0">
           <header className="sticky top-0 z-20 border-b border-border bg-panel/95 backdrop-blur">
+            <nav
+              className="flex gap-2 overflow-x-auto border-b border-border px-4 py-2 text-sm font-medium lg:hidden"
+              aria-label="Primary navigation"
+            >
+              {navigation.map((item) => (
+                <a
+                  key={item.label}
+                  className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-md border px-3 transition ${
+                    item.active
+                      ? "border-accent/30 bg-accent/10 text-accent"
+                      : "border-border bg-white text-muted hover:border-accent/60 hover:text-foreground"
+                  }`}
+                  href="#dashboard"
+                  aria-current={item.active ? "page" : undefined}
+                >
+                  <item.icon aria-hidden className="h-4 w-4" />
+                  {item.label}
+                </a>
+              ))}
+            </nav>
             <div className="flex min-h-16 flex-col gap-3 px-4 py-3 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted">Alert triage queue</p>
@@ -108,6 +128,7 @@ export default function Home() {
                           ? "border-danger/40 bg-danger/10 text-danger"
                           : "border-border bg-white text-muted hover:border-accent/60 hover:text-foreground"
                       }`}
+                      aria-pressed={index === 1}
                     >
                       {filter}
                     </button>

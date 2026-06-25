@@ -5,12 +5,12 @@ import { LogIn, LogOut, UserPlus } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
-import { login, register } from "@/lib/api";
+import { login, logout, register } from "@/lib/api";
 import { useSessionStore } from "@/store/session";
 
 export function AuthPanel() {
   const accessToken = useSessionStore((state) => state.accessToken);
-  const setTokens = useSessionStore((state) => state.setTokens);
+  const setAccessToken = useSessionStore((state) => state.setAccessToken);
   const clearSession = useSessionStore((state) => state.clearSession);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("demo@example.com");
@@ -21,7 +21,7 @@ export function AuthPanel() {
   const loginMutation = useMutation({
     mutationFn: () => login(email, password),
     onSuccess: (data) => {
-      setTokens(data.access_token, data.refresh_token);
+      setAccessToken(data.access_token);
       setMessage("Signed in. Live finance tools are enabled.");
     },
     onError: (error) => setMessage(error instanceof Error ? error.message : "Sign in failed.")
@@ -34,6 +34,14 @@ export function AuthPanel() {
       setMessage("Account created. Sign in to enable live data.");
     },
     onError: (error) => setMessage(error instanceof Error ? error.message : "Registration failed.")
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: logout,
+    onSettled: () => {
+      clearSession();
+      setMessage("Signed out. Demo alerts are visible.");
+    }
   });
 
   function submit(event: FormEvent) {
@@ -56,7 +64,12 @@ export function AuthPanel() {
           </p>
         </div>
         {accessToken ? (
-          <Button type="button" className="h-9 px-3" onClick={clearSession}>
+          <Button
+            type="button"
+            className="h-9 px-3"
+            onClick={() => logoutMutation.mutate()}
+            disabled={logoutMutation.isPending}
+          >
             <LogOut aria-hidden className="h-4 w-4" />
             Sign out
           </Button>
@@ -70,6 +83,7 @@ export function AuthPanel() {
               type="button"
               className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${mode === "login" ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:text-foreground"}`}
               onClick={() => setMode("login")}
+              aria-pressed={mode === "login"}
             >
               Sign in
             </button>
@@ -77,6 +91,7 @@ export function AuthPanel() {
               type="button"
               className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${mode === "register" ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:text-foreground"}`}
               onClick={() => setMode("register")}
+              aria-pressed={mode === "register"}
             >
               Register
             </button>
