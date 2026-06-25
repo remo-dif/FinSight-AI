@@ -54,7 +54,8 @@ The current AWS target is ECS on Fargate behind one Application Load Balancer:
 - Frontend service: `finsight-ai-frontend-service-0pfkokpq`
 - Backend service: `finsight-ai-backend-service-cet6tjci`
 - Region: `eu-north-1`
-- Public ALB: `http://finsight-ai-alb-19805196.eu-north-1.elb.amazonaws.com`
+- HTTPS endpoint: `https://d3p7l0r823wgar.cloudfront.net`
+- Public ALB origin: `http://finsight-ai-alb-19805196.eu-north-1.elb.amazonaws.com`
 
 CI publishes immutable images tagged by commit SHA:
 

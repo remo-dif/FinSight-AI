@@ -29,6 +29,7 @@ The first AWS environment is deployed in `eu-north-1`:
 | Backend container | `backend` |
 | Frontend container | `frontend` |
 | Public ALB | `finsight-ai-alb-19805196.eu-north-1.elb.amazonaws.com` |
+| HTTPS endpoint | `https://d3p7l0r823wgar.cloudfront.net` |
 | Backend target group | `finsight-ai-backend-tg` |
 | Frontend target group | `finsight-ai-frontend-tg` |
 | RDS endpoint | `database-1.cv8ik06wq9ev.eu-north-1.rds.amazonaws.com:5432` |
@@ -50,9 +51,10 @@ Current listener routing:
 | `/readyz` | `finsight-ai-backend-tg` |
 | default `/` | `finsight-ai-frontend-tg` |
 
-HTTPS is not enabled yet. The next production hardening step is adding either an ACM certificate
-and HTTPS listener on the ALB for a custom domain, or CloudFront in front of the ALB for a
-temporary HTTPS endpoint.
+HTTPS is enabled for viewers through CloudFront at
+`https://d3p7l0r823wgar.cloudfront.net`. CloudFront redirects HTTP viewers to HTTPS and forwards
+traffic to the existing ALB origin. End-to-end TLS between CloudFront and the ALB still requires a
+custom domain plus an ACM certificate on the ALB.
 
 Production cutover should block on this HTTPS checklist:
 
