@@ -52,7 +52,7 @@ export class ApiError extends Error {
   }
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "production" ? "" : "http://localhost:8000");
 
 function formatApiError(status: number, fallback: string, hasToken: boolean) {
   if ((status === 401 || status === 403) && !hasToken) {

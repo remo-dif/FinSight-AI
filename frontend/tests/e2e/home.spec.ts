@@ -2,10 +2,10 @@ import { expect, test } from "@playwright/test";
 
 test("renders finance workspace", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Personal Finance AI Assistant" })).toBeVisible();
-  await expect(page.getByText("Net Cash Flow")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "AI Financial Assistant" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Secure Upload" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Investigate suspicious transaction activity" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Operations overview" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Investigation copilot" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Evidence ingestion" })).toBeVisible();
 });
 
 test("keeps upload controls constrained to supported financial files", async ({ page }) => {

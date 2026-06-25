@@ -93,7 +93,7 @@ jobs:
       - name: Build backend image
         run: docker build -t finsight-ai-backend:ci ./backend
       - name: Build frontend image
-        run: docker build --build-arg NEXT_PUBLIC_API_URL=http://localhost:8000 -t finsight-ai-frontend:ci ./frontend
+        run: docker build -t finsight-ai-frontend:ci ./frontend
       - name: Scan backend image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
