@@ -15,6 +15,45 @@ FinSight-AI targets Amazon ECS on AWS Fargate. The expected production architect
 
 The workflow deploys to existing ECS services. It does not provision AWS infrastructure.
 
+## Current AWS Environment
+
+The first AWS environment is deployed in `eu-north-1`:
+
+| Resource | Current value |
+| --- | --- |
+| ECS cluster | `busy-lion-6wzrd8` |
+| Backend service | `finsight-ai-backend-service-cet6tjci` |
+| Frontend service | `finsight-ai-frontend-service-0pfkokpq` |
+| Backend task family | `finsight-ai-backend` |
+| Frontend task family | `finsight-ai-frontend` |
+| Backend container | `backend` |
+| Frontend container | `frontend` |
+| Public ALB | `finsight-ai-alb-19805196.eu-north-1.elb.amazonaws.com` |
+| Backend target group | `finsight-ai-backend-tg` |
+| Frontend target group | `finsight-ai-frontend-tg` |
+| RDS endpoint | `database-1.cv8ik06wq9ev.eu-north-1.rds.amazonaws.com:5432` |
+
+The ALB is enabled in these subnets:
+
+- `subnet-0946545d9d1d70f4f`
+- `subnet-0b1e5ecb9ad45873f`
+
+Keep ECS service subnets aligned with the ALB-enabled subnets. If a Fargate task is placed in
+an Availability Zone not enabled on the ALB, target health reports `Target.NotInUse` and
+deployments can wait indefinitely for stability.
+
+Current listener routing:
+
+| Path | Target group |
+| --- | --- |
+| `/api/*` | `finsight-ai-backend-tg` |
+| `/readyz` | `finsight-ai-backend-tg` |
+| default `/` | `finsight-ai-frontend-tg` |
+
+HTTPS is not enabled yet. The next production hardening step is adding either an ACM certificate
+and HTTPS listener on the ALB for a custom domain, or CloudFront in front of the ALB for a
+temporary HTTPS endpoint.
+
 ## GHCR Images
 
 After backend tests, frontend tests, Docker builds, and Trivy scans pass on `master`, CI publishes:
@@ -43,7 +82,7 @@ the repository or pass it as an image build argument.
 
 Create a repository variable named `AWS_DEPLOY_ENABLED` and leave it unset or set to `false` until
 the ECS infrastructure is ready. Create a GitHub environment named `production`, add approval
-protection, and configure the remaining environment variables there:
+protection, and configure the remaining variables:
 
 | Variable | Purpose |
 | --- | --- |
@@ -60,13 +99,46 @@ protection, and configure the remaining environment variables there:
 Set the repository variable `AWS_DEPLOY_ENABLED=true` only after all production environment values
 are configured.
 
+Current repository variables:
+
+```text
+AWS_DEPLOY_ENABLED=true
+AWS_ROLE_ARN=arn:aws:iam::649024131408:role/FinSightGitHubActionsDeployRole
+AWS_REGION=eu-north-1
+ECS_CLUSTER=busy-lion-6wzrd8
+ECS_BACKEND_SERVICE=finsight-ai-backend-service-cet6tjci
+ECS_FRONTEND_SERVICE=finsight-ai-frontend-service-0pfkokpq
+ECS_BACKEND_TASK_FAMILY=finsight-ai-backend
+ECS_FRONTEND_TASK_FAMILY=finsight-ai-frontend
+ECS_BACKEND_CONTAINER=backend
+ECS_FRONTEND_CONTAINER=frontend
+```
+
 ## AWS Authentication
 
 The deployment workflow uses GitHub OIDC to obtain short-lived AWS credentials. Do not create
 long-lived `AWS_ACCESS_KEY_ID` or `AWS_SECRET_ACCESS_KEY` GitHub secrets.
 
 The IAM role trust policy should restrict access to this repository and the `production` GitHub
-environment. The role needs only the permissions required to:
+environment. Because the deploy job uses `environment: production`, the OIDC subject must allow:
+
+```text
+repo:remo-dif/FinSight-AI:environment:production
+```
+
+The role may also allow the branch subject for direct `master` deploys:
+
+```text
+repo:remo-dif/FinSight-AI:ref:refs/heads/master
+```
+
+The deploy role is:
+
+```text
+arn:aws:iam::649024131408:role/FinSightGitHubActionsDeployRole
+```
+
+The role needs only the permissions required to:
 
 - Read and register the configured ECS task-definition families.
 - Update and describe the two ECS services.
@@ -79,10 +151,67 @@ Store runtime secrets in AWS Secrets Manager and reference them from ECS task de
 - `OPENAI_API_KEY`
 - `JWT_SECRET_KEY`
 - `JWT_REFRESH_SECRET_KEY`
-- Database credentials or the full `DATABASE_URL`
+- Full `DATABASE_URL`
 - Any private GHCR pull credential
 
 GitHub Actions should deploy task definitions without reading or printing these values.
+
+The backend task definition currently references these AWS Secrets Manager values:
+
+```text
+DATABASE_URL
+OPENAI_API_KEY
+JWT_SECRET_KEY
+JWT_REFRESH_SECRET_KEY
+```
+
+When a Secrets Manager secret is stored as key/value JSON, ECS `valueFrom` must include the JSON
+key suffix:
+
+```text
+arn:aws:secretsmanager:REGION:ACCOUNT:secret:secret-name-random:JSON_KEY::
+```
+
+For plaintext secrets, use the plain secret ARN.
+
+## Frontend API Routing
+
+The production frontend defaults to same-origin API requests. This means browser requests use
+paths such as:
+
+```text
+/api/auth/login
+/api/auth/register
+```
+
+The ALB forwards `/api/*` to the backend target group. Avoid baking
+`NEXT_PUBLIC_API_URL=http://localhost:8000` into the production frontend image; that makes deployed
+browsers call their own local machine instead of AWS.
+
+If an explicit public API origin is needed later, set `NEXT_PUBLIC_API_URL` at build time to that
+origin. For the current single-ALB setup, leave it unset for production images.
+
+## Local AWS CLI Access
+
+Human CLI access is configured with IAM Identity Center SSO instead of long-lived root access keys.
+Use the `finsight-ai` profile:
+
+```powershell
+& 'C:\Program Files\Amazon\AWSCLIV2\aws.exe' sso login --profile finsight-ai
+& 'C:\Program Files\Amazon\AWSCLIV2\aws.exe' sts get-caller-identity --profile finsight-ai
+```
+
+The SSO portal URL is:
+
+```text
+https://d-906675e0cc.awsapps.com/start
+```
+
+Default workload region:
+
+```text
+eu-north-1
+```
 
 ## Database Migrations
 
