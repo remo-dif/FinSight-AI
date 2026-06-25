@@ -25,8 +25,8 @@ export function ChatPanel() {
     {
       role: "assistant",
       content:
-        "Ask about spending, budgets, recurring payments, merchants, or uploaded documents. Answers are grounded through approved tools."
-      }
+        "Ask for case summaries, suspicious transaction patterns, merchant history, or evidence from uploaded documents. Answers are grounded through approved tools."
+    }
   ]);
 
   const chat = useMutation({
@@ -67,11 +67,11 @@ export function ChatPanel() {
   }
 
   return (
-    <Panel className="flex h-[540px] flex-col" aria-labelledby="assistant-heading">
+    <Panel className="flex h-[520px] flex-col p-4" aria-labelledby="assistant-heading">
       <div className="flex items-start justify-between gap-3 border-b border-border pb-4">
         <div>
-          <h2 id="assistant-heading" className="text-lg font-semibold">AI Financial Assistant</h2>
-          <p className="mt-1 text-sm leading-5 text-muted">Tool-only analytics with reviewer validation</p>
+          <h2 id="assistant-heading" className="text-base font-semibold">Investigation copilot</h2>
+          <p className="mt-1 text-sm leading-5 text-muted">Tool-grounded analysis with reviewer validation</p>
         </div>
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-success/10 text-success">
           <ShieldCheck aria-hidden className="h-5 w-5" />
@@ -118,7 +118,7 @@ export function ChatPanel() {
           aria-label="Ask the finance assistant"
           aria-describedby={statusId}
           className="min-w-0 flex-1 rounded-md border border-border bg-white px-3 text-sm outline-none transition placeholder:text-muted/70 hover:border-accent/70 focus:border-accent focus:ring-2 focus:ring-accent/30"
-          placeholder="Ask about spending, budgets, or merchants"
+          placeholder="Ask about a case, entity, or signal"
           value={input}
           onChange={(event) => setInput(event.target.value)}
         />

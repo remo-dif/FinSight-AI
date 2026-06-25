@@ -3,15 +3,15 @@
 @tailwind utilities;
 
 :root {
-  --background: 210 20% 98%;
-  --foreground: 218 28% 13%;
+  --background: 210 24% 97%;
+  --foreground: 222 28% 12%;
   --panel: 0 0% 100%;
-  --muted: 215 18% 38%;
-  --border: 214 22% 84%;
-  --accent: 202 88% 34%;
-  --success: 154 57% 36%;
-  --warning: 35 88% 42%;
-  --danger: 351 73% 45%;
+  --muted: 215 14% 40%;
+  --border: 214 20% 86%;
+  --accent: 207 78% 33%;
+  --success: 160 58% 32%;
+  --warning: 34 84% 38%;
+  --danger: 346 72% 42%;
 }
 
 * {
@@ -23,6 +23,7 @@ body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
   text-rendering: optimizeLegibility;
 }
 

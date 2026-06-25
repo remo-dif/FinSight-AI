@@ -1,6 +1,3 @@
-"use client";
-
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Panel } from "@/components/ui/panel";
 
 export type SpendingChartDatum = {
@@ -10,44 +7,47 @@ export type SpendingChartDatum = {
 };
 
 const defaultData: SpendingChartDatum[] = [
-  { name: "Housing", value: 1500, color: "#0b84a5" },
-  { name: "Groceries", value: 420, color: "#16a064" },
-  { name: "Transport", value: 260, color: "#f59e0b" },
-  { name: "Subscriptions", value: 78, color: "#dc3055" }
+  { name: "Velocity spike", value: 42, color: "#be123c" },
+  { name: "New payee", value: 31, color: "#b45309" },
+  { name: "Geo mismatch", value: 18, color: "#0f766e" },
+  { name: "Round amount", value: 9, color: "#0369a1" }
 ];
 
 export function SpendingChart({ data = defaultData }: { data?: SpendingChartDatum[] }) {
   const chartData = data.length ? data : defaultData;
+  const max = Math.max(...chartData.map((item) => item.value), 1);
 
   return (
-    <Panel className="h-[360px]" aria-labelledby="spending-mix-heading">
+    <Panel className="h-full p-4" aria-labelledby="risk-drivers-heading">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 id="spending-mix-heading" className="text-lg font-semibold">Spending Mix</h2>
-          <p className="mt-1 text-sm text-muted">Current month by category</p>
+          <h2 id="risk-drivers-heading" className="text-base font-semibold">Risk drivers</h2>
+          <p className="mt-1 text-sm text-muted">Top signals contributing to open alerts</p>
         </div>
+        <span className="rounded-md bg-danger/10 px-2 py-1 text-xs font-semibold text-danger">Rules + AI</span>
       </div>
-      <div className="mt-4 h-[210px]" role="img" aria-label="Pie chart of current month spending by category">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92}>
-              {chartData.map((entry) => (
-                <Cell key={entry.name} fill={entry.color} />
-              ))}
-            </Pie>
-            <Tooltip formatter={(value) => `$${value}`} />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-      <ul className="mt-3 grid grid-cols-2 gap-2 text-sm" aria-label="Spending category legend">
+
+      <ul className="mt-5 space-y-4" aria-label="Risk driver distribution">
         {chartData.map((entry) => (
-          <li key={entry.name} className="flex items-center gap-2 text-muted">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
-            <span className="truncate">{entry.name}</span>
-            <span className="ml-auto font-semibold text-foreground">${entry.value}</span>
+          <li key={entry.name}>
+            <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+              <span className="font-medium">{entry.name}</span>
+              <span className="text-muted">{entry.value} alerts</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-background" role="img" aria-label={`${entry.name}: ${entry.value} alerts`}>
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${Math.max((entry.value / max) * 100, 6)}%`, backgroundColor: entry.color }}
+              />
+            </div>
           </li>
         ))}
       </ul>
+
+      <div className="mt-5 rounded-md border border-border bg-background p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">Model calibration</p>
+        <p className="mt-1 text-sm leading-5">Reviewers overturned 8% of high-risk alerts this week. Threshold drift should be checked before increasing automation.</p>
+      </div>
     </Panel>
   );
 }

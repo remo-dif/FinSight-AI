@@ -31,11 +31,11 @@ export function UploadPanel() {
   }
 
   return (
-    <Panel aria-labelledby="uploads-heading">
+    <Panel className="p-4" aria-labelledby="uploads-heading">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 id="uploads-heading" className="text-lg font-semibold">Secure Upload</h2>
-          <p className="mt-1 text-sm text-muted">CSV, PDF, PNG, JPG, JPEG</p>
+          <h2 id="uploads-heading" className="text-base font-semibold">Evidence ingestion</h2>
+          <p className="mt-1 text-sm text-muted">Statements, screenshots, receipts, CSV exports</p>
         </div>
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-success/10 text-success">
           <Lock aria-hidden className="h-5 w-5" />
@@ -46,7 +46,7 @@ export function UploadPanel() {
         htmlFor={inputId}
       >
         <UploadCloud aria-hidden className="h-8 w-8 text-accent" />
-        <span className="mt-3 text-sm font-semibold">Select a financial file</span>
+        <span className="mt-3 text-sm font-semibold">Attach evidence file</span>
         <span className="mt-1 max-w-full truncate text-xs text-muted" aria-live="polite">{filename}</span>
         <input
           id={inputId}
@@ -83,7 +83,7 @@ export function UploadPanel() {
         </Button>
       </div>
       <ol className="mt-4 grid grid-cols-1 gap-2 text-xs font-medium text-muted sm:grid-cols-3" aria-label="Upload processing steps">
-        {["Validate", "Normalize", "Categorize"].map((step) => (
+        {["Validate", "Extract", "Link"].map((step) => (
           <li key={step} className="flex min-h-10 items-center gap-2 rounded-md border border-border bg-white p-2 transition hover:border-accent/60 hover:text-foreground">
             <FileUp aria-hidden className="h-4 w-4 text-accent" />
             {step}

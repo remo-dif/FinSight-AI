@@ -47,12 +47,12 @@ export function AuthPanel() {
   }
 
   return (
-    <Panel aria-labelledby="auth-heading">
+    <Panel className="p-4" aria-labelledby="auth-heading">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 id="auth-heading" className="text-lg font-semibold">Account</h2>
+          <h2 id="auth-heading" className="text-base font-semibold">Analyst session</h2>
           <p className="mt-1 text-sm text-muted">
-            {accessToken ? "Live API access is active." : "Sign in to replace demo data with your own."}
+            {accessToken ? "Live investigation data is active." : "Sign in to replace demo alerts with live data."}
           </p>
         </div>
         {accessToken ? (
