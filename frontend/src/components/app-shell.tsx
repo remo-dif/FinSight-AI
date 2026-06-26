@@ -1,9 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { ChatPanel } from "@/components/assistant/chat-panel";
-import { AuthPanel } from "@/components/auth/auth-panel";
 import { DashboardWorkspace } from "@/components/dashboard/dashboard-workspace";
-import { UploadPanel } from "@/components/uploads/upload-panel";
 import {
   Bell,
   BriefcaseBusiness,
@@ -137,7 +134,7 @@ export function AppShell({ activeRoute }: { activeRoute: WorkspaceRoute }) {
                   <Siren aria-hidden className="h-4 w-4" />
                   {copy.eyebrow}
                 </p>
-                <h1 className="text-2xl font-semibold leading-tight">{copy.title}</h1>
+                <h1 className="text-xl font-semibold leading-tight sm:text-2xl">{copy.title}</h1>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <label className="relative block min-w-0 sm:w-[340px]">
@@ -156,10 +153,10 @@ export function AppShell({ activeRoute }: { activeRoute: WorkspaceRoute }) {
             </div>
           </header>
 
-          <div className="grid gap-4 px-4 py-4 sm:px-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="px-4 py-4 sm:px-6">
             <section id="dashboard" className="min-w-0 space-y-4" aria-labelledby="dashboard-heading">
-              <div className="flex flex-col gap-3 rounded-lg border border-border bg-panel p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
+              <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="max-w-3xl">
                   <h2 id="dashboard-heading" className="text-base font-semibold">Investigation workspace</h2>
                   <p className="mt-1 text-sm text-muted">{copy.description}</p>
                 </div>
@@ -181,16 +178,6 @@ export function AppShell({ activeRoute }: { activeRoute: WorkspaceRoute }) {
               </div>
               <DashboardWorkspace />
             </section>
-
-            <aside className="space-y-4" aria-label="Investigation side rail">
-              <AuthPanel />
-              <section id="assistant" aria-labelledby="assistant-heading">
-                <ChatPanel />
-              </section>
-              <section id="uploads" aria-labelledby="uploads-heading">
-                <UploadPanel />
-              </section>
-            </aside>
           </div>
         </div>
       </div>

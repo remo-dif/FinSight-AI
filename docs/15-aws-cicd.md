@@ -52,9 +52,20 @@ Current listener routing:
 | default `/` | `finsight-ai-frontend-tg` |
 
 HTTPS is enabled for viewers through CloudFront at
-`https://d3p7l0r823wgar.cloudfront.net`. CloudFront redirects HTTP viewers to HTTPS and forwards
-traffic to the existing ALB origin. End-to-end TLS between CloudFront and the ALB still requires a
-custom domain plus an ACM certificate on the ALB.
+`https://d3p7l0r823wgar.cloudfront.net`. CloudFront redirects HTTP viewers to HTTPS, but the
+current origin connection from CloudFront to the ALB is still HTTP. This is edge TLS only, not
+full end-to-end TLS.
+
+Why this matters for production:
+
+- Traffic is encrypted between the browser and CloudFront, but not on the CloudFront-to-ALB hop.
+- Security reviews will flag this as incomplete TLS termination for a fintech-style application.
+- ALB-only controls such as TLS policy enforcement and ALB HTTP-to-HTTPS redirect are not active yet.
+- The default `*.elb.amazonaws.com` ALB hostname cannot be used for a public ACM certificate owned by
+  this account; use a custom domain instead.
+
+End-to-end TLS between CloudFront and the ALB requires a custom application domain plus an ACM
+certificate on the ALB.
 
 Production cutover should block on this HTTPS checklist:
 
@@ -63,7 +74,13 @@ Production cutover should block on this HTTPS checklist:
 - Move application routing rules to the HTTPS listener.
 - Replace the HTTP `80` listener default action with a `301` redirect to HTTPS.
 - Update `PUBLIC_APP_URL`, `ALLOWED_ORIGINS`, and any frontend API origin to the HTTPS domain.
+- Configure CloudFront with the ALB HTTPS origin and `HTTPS only` origin protocol policy.
+- Set GitHub variable `ORIGIN_HTTPS_URL=https://DOMAIN`.
+- Set GitHub variable `E2E_TLS_REQUIRED=true` so deployment fails if origin HTTPS regresses.
 - Smoke test `https://DOMAIN/readyz` and `https://DOMAIN/`.
+
+Estimated implementation effort: 2-4 hours when the domain is already in Route53, or 0.5-1 day if
+domain purchase/delegation and DNS validation are still needed.
 
 ## GHCR Images
 
@@ -106,6 +123,9 @@ protection, and configure the remaining variables:
 | `ECS_FRONTEND_TASK_FAMILY` | Frontend task-definition family. |
 | `ECS_BACKEND_CONTAINER` | Backend container name in its task definition. |
 | `ECS_FRONTEND_CONTAINER` | Frontend container name in its task definition. |
+| `PUBLIC_APP_URL` | Public HTTPS endpoint used by deploy smoke tests. |
+| `ORIGIN_HTTPS_URL` | HTTPS URL for the ALB origin after custom-domain TLS is configured. |
+| `E2E_TLS_REQUIRED` | Set to `true` only after ALB origin HTTPS is live; deploys then fail if origin TLS is absent. |
 
 Set the repository variable `AWS_DEPLOY_ENABLED=true` only after all production environment values
 are configured.

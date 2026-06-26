@@ -54,11 +54,11 @@ export class ApiError extends Error {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "production" ? "" : "http://localhost:8000");
 
-function formatApiError(status: number, fallback: string, hasToken: boolean) {
-  if ((status === 401 || status === 403) && !hasToken) {
+function formatApiError(status: number, fallback: string, hasToken: boolean, requiresAuth: boolean) {
+  if ((status === 401 || status === 403) && requiresAuth && !hasToken) {
     return "Authentication is required before using live finance tools. Sign in or provide a valid session token, then try again.";
   }
-  if (status === 401 || status === 403) {
+  if (status === 401 && hasToken) {
     return "Your session token was rejected. Sign in again or refresh the token, then try again.";
   }
   return fallback;
@@ -136,7 +136,7 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
     } catch {
       // Keep the status-only fallback when the server does not return JSON.
     }
-    throw new ApiError(formatApiError(response.status, detail, Boolean(token)), response.status);
+    throw new ApiError(formatApiError(response.status, detail, Boolean(token), Boolean(init?.requireAuth)), response.status);
   }
   if (response.status === 204) {
     return undefined as T;

@@ -49,18 +49,17 @@ export function TransactionsTable({
       <div className="flex flex-col gap-1 border-b border-border px-4 py-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 id="recent-transactions-heading" className="text-base font-semibold">Alert queue</h2>
-          <p className="text-sm text-muted">Prioritized cases with SLA, signal, and ownership context</p>
+          <p className="text-sm text-muted">Pick the next case by risk, SLA, signal, and owner</p>
         </div>
         <p className="text-xs font-semibold uppercase tracking-wide text-muted">{transactions.length} open items</p>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[960px] border-collapse text-sm">
+        <table className="w-full min-w-[760px] border-collapse text-sm">
           <caption className="sr-only">Open fraud alerts with case, risk, entity, signal, amount, SLA, status, and owner</caption>
           <thead>
             <tr className="border-y border-border bg-background text-left text-xs uppercase tracking-wide text-muted">
               <th className="px-4 py-3 font-semibold" scope="col">Case</th>
               <th className="px-3 py-3 font-semibold" scope="col">Risk</th>
-              <th className="px-3 py-3 font-semibold" scope="col">Date</th>
               <th className="px-3 py-3 font-semibold" scope="col">Entity / Merchant</th>
               <th className="px-3 py-3 font-semibold" scope="col">Primary signal</th>
               <th className="px-3 py-3 text-right font-semibold" scope="col">Amount</th>
@@ -97,10 +96,9 @@ export function TransactionsTable({
                       {risk.label} {risk.score}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-3 text-muted">{transaction.posted_at}</td>
                   <th className="px-3 py-3 text-left font-semibold" scope="row">
                     <span className="block">{transaction.merchant}</span>
-                    <span className="text-xs font-normal text-muted">{transaction.source} source</span>
+                    <span className="text-xs font-normal text-muted">{transaction.source} source - {transaction.posted_at}</span>
                   </th>
                   <td className="px-3 py-3 text-muted">{transaction.category || transaction.description}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-right font-semibold">{formatAmount(transaction)}</td>

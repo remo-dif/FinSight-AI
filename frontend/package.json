@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:server": "next build && next start -p 3101"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.62.11",

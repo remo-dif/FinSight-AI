@@ -1,12 +1,14 @@
 import { expect, test } from "@playwright/test";
+import { analystTokens, json } from "./fixtures/api";
 
 test("renders finance workspace", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Triage live-risk alerts and document decisions" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Investigation workspace" })).toBeVisible();
-  await expect(page.getByText("Case command")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Investigation copilot" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Evidence ingestion" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Alert queue" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Selected alert" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Evidence summary" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decision", exact: true })).toBeVisible();
 });
 
 test("changes route from the primary navigation", async ({ page, isMobile }) => {
@@ -25,10 +27,11 @@ test("changes route from the primary navigation", async ({ page, isMobile }) => 
 
 test("keeps upload controls constrained to supported financial files", async ({ page }) => {
   await page.goto("/");
+  await page.getByRole("button", { name: "Upload evidence" }).click();
 
   const fileInput = page.locator("input[type='file']");
   await expect(fileInput).toHaveAttribute("accept", ".csv,.pdf,.png,.jpg,.jpeg");
-  await expect(page.getByRole("button", { name: "Upload" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Upload", exact: true })).toBeDisabled();
   await expect(page.getByText("Files are validated before processing.")).toBeVisible();
 });
 
@@ -44,18 +47,12 @@ test("sets baseline browser security headers", async ({ page }) => {
 test("does not persist bearer tokens after analyst sign in", async ({ page, isMobile }) => {
   test.skip(isMobile, "token persistence behavior is viewport-independent and covered on desktop");
 
-  await page.route("http://localhost:8000/api/auth/login", async (route) => {
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        access_token: "test-access-token",
-        refresh_token: "test-refresh-token",
-        token_type: "bearer"
-      })
-    });
+  await page.route("**/api/auth/login", async (route) => {
+    await json(route, 200, analystTokens);
   });
 
   await page.goto("/");
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page
     .getByRole("region", { name: "Analyst session" })
     .locator("form button[type='submit']")
