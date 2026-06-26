@@ -2,10 +2,25 @@ import { expect, test } from "@playwright/test";
 
 test("renders finance workspace", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Investigate suspicious transaction activity" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Operations overview" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Triage live-risk alerts and document decisions" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Investigation workspace" })).toBeVisible();
+  await expect(page.getByText("Case command")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Investigation copilot" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Evidence ingestion" })).toBeVisible();
+});
+
+test("changes route from the primary navigation", async ({ page, isMobile }) => {
+  test.skip(isMobile, "desktop navigation route changes are covered by the desktop project");
+
+  await page.goto("/");
+  await page.getByRole("navigation", { name: "Workspace" }).getByRole("link", { name: "Cases" }).click();
+
+  await expect(page).toHaveURL(/\/cases$/);
+  await expect(page.getByRole("heading", { name: "Review assigned cases and escalation state" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Workspace" }).getByRole("link", { name: "Cases" })).toHaveAttribute(
+    "aria-current",
+    "page"
+  );
 });
 
 test("keeps upload controls constrained to supported financial files", async ({ page }) => {

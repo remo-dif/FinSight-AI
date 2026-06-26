@@ -6,11 +6,14 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
+  FileWarning,
   FileCheck2,
   Fingerprint,
   Gavel,
+  History,
   Network,
   ShieldAlert,
+  Sparkles,
   UserCheck
 } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/metric-card";
@@ -83,6 +86,7 @@ export function DashboardWorkspace() {
           Live dashboard data could not be loaded. The demo fallback is still visible.
         </p>
       ) : null}
+      <CaseCommandPanel transaction={selectedTransaction} />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Open alerts" value={String(openAlerts)} detail="Unresolved items across monitored accounts" icon={ShieldAlert} tone="danger" trend="+14%" />
         <MetricCard label="High risk" value={String(highRisk)} detail="Prioritized by rule severity and model score" icon={AlertTriangle} tone="warning" trend="+6" />
@@ -105,6 +109,89 @@ export function DashboardWorkspace() {
         <DecisionPanel transaction={selectedTransaction} />
       </div>
     </>
+  );
+}
+
+function CaseCommandPanel({ transaction }: { transaction?: Transaction }) {
+  const risk = transaction ? riskFor(transaction) : null;
+  const amount = transaction ? formatAmount(transaction) : "$0.00";
+
+  return (
+    <section
+      className="overflow-hidden rounded-lg border border-danger/20 bg-panel shadow-soft"
+      aria-labelledby="case-command-heading"
+    >
+      <div className="grid gap-0 xl:grid-cols-[280px_minmax(0,1fr)_260px]">
+        <div className="border-b border-danger/15 bg-danger/10 p-5 xl:border-b-0 xl:border-r">
+          <p className="text-xs font-semibold uppercase tracking-wide text-danger">Case command</p>
+          <h2 id="case-command-heading" className="mt-2 text-2xl font-semibold leading-tight">
+            {transaction?.id ?? "No case selected"}
+          </h2>
+          <p className="mt-2 text-sm leading-5 text-muted">{transaction?.merchant ?? "Choose an alert from the queue."}</p>
+          <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-md border border-danger/20 bg-white p-3">
+              <p className="font-semibold uppercase tracking-wide text-muted">Risk</p>
+              <p className="mt-1 text-xl font-semibold text-danger">{risk?.score ?? "--"}</p>
+            </div>
+            <div className="rounded-md border border-danger/20 bg-white p-3">
+              <p className="font-semibold uppercase tracking-wide text-muted">Exposure</p>
+              <p className="mt-1 text-xl font-semibold">{amount}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">Primary signal</p>
+              <h3 className="mt-1 text-lg font-semibold">{transaction?.category ?? "Awaiting selection"}</h3>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+                {transaction?.description ?? "Select an alert to review evidence, entity links, and recommended action."}
+              </p>
+            </div>
+            <span className={`inline-flex w-fit items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold ${risk?.className ?? "bg-background text-muted"}`}>
+              <FileWarning aria-hidden className="h-4 w-4" />
+              {risk ? `${risk.label} priority` : "No priority"}
+            </span>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            {[
+              { label: "SLA remaining", value: "42 minutes", icon: Clock3 },
+              { label: "Evidence linked", value: "3 signals", icon: FileCheck2 },
+              { label: "AI recommendation", value: "Escalate", icon: Sparkles }
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className="flex min-h-20 items-center gap-3 rounded-md border border-border bg-background p-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent">
+                    <Icon aria-hidden className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">{item.label}</p>
+                    <p className="mt-1 font-semibold">{item.value}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="border-t border-border bg-background p-5 xl:border-l xl:border-t-0">
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
+            <History aria-hidden className="h-4 w-4" />
+            Audit preview
+          </p>
+          <ol className="mt-4 space-y-3 text-sm">
+            {["Analyst reviewed evidence", "Customer verification queued", "Disposition requires reason code"].map((item) => (
+              <li key={item} className="rounded-md border border-border bg-white p-3 leading-5">
+                {item}
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -162,7 +249,7 @@ function EvidencePanel({ transaction }: { transaction?: Transaction }) {
         <div>
           <h2 id="evidence-heading" className="text-base font-semibold">Evidence timeline</h2>
           <p className="mt-1 text-sm text-muted">
-            {transaction ? `${transaction.id} · ${transaction.merchant}` : "Explainable signals before an analyst makes a decision"}
+            {transaction ? `${transaction.id} - ${transaction.merchant}` : "Explainable signals before an analyst makes a decision"}
           </p>
         </div>
         <div className="flex items-center gap-2">
