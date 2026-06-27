@@ -67,7 +67,7 @@ export function ChatPanel() {
   }
 
   return (
-    <Panel className="flex h-[520px] flex-col p-4" aria-labelledby="assistant-heading">
+    <Panel as="section" className="flex h-[520px] flex-col p-4" aria-labelledby="assistant-heading">
       <div className="flex items-start justify-between gap-3 border-b border-border pb-4">
         <div>
           <h2 id="assistant-heading" className="text-base font-semibold">Investigation copilot</h2>

@@ -6,6 +6,8 @@ import { restoreSession } from "@/lib/api";
 
 function SessionBootstrap() {
   useEffect(() => {
+    // The refresh session lives in an HttpOnly cookie, so client code cannot
+    // reliably detect it before attempting restoration.
     void restoreSession();
   }, []);
 

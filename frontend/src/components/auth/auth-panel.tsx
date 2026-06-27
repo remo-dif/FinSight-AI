@@ -55,7 +55,7 @@ export function AuthPanel() {
   }
 
   return (
-    <Panel className="p-4" aria-labelledby="auth-heading">
+    <Panel as="section" className="p-4" aria-labelledby="auth-heading">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 id="auth-heading" className="text-base font-semibold">Analyst session</h2>

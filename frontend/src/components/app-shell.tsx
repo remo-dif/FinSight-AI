@@ -65,7 +65,7 @@ export function AppShell({ activeRoute }: { activeRoute: WorkspaceRoute }) {
       </a>
 
       <div className="grid min-h-screen lg:grid-cols-[244px_minmax(0,1fr)]">
-        <aside className="hidden border-r border-border bg-panel lg:flex lg:flex-col" aria-label="Primary navigation">
+        <aside className="hidden border-r border-border bg-panel lg:flex lg:flex-col" aria-label="Sidebar navigation">
           <div className="flex h-16 items-center gap-3 border-b border-border px-5">
             <span className="flex h-9 w-9 items-center justify-center rounded-md bg-danger/10 text-danger">
               <ShieldAlert aria-hidden className="h-5 w-5" />
@@ -107,7 +107,7 @@ export function AppShell({ activeRoute }: { activeRoute: WorkspaceRoute }) {
           <header className="sticky top-0 z-20 border-b border-border bg-panel/95 backdrop-blur">
             <nav
               className="flex gap-2 overflow-x-auto border-b border-border px-4 py-2 text-sm font-medium [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden"
-              aria-label="Primary navigation"
+              aria-label="Mobile navigation"
             >
               {navigation.map((item) => {
                 const isActive = item.id === activeRoute;
@@ -137,10 +137,12 @@ export function AppShell({ activeRoute }: { activeRoute: WorkspaceRoute }) {
                 <h1 className="text-xl font-semibold leading-tight sm:text-2xl">{copy.title}</h1>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <label className="relative block min-w-0 sm:w-[340px]">
+                <label className="relative block min-w-0 sm:w-[340px]" htmlFor="workspace-search">
                   <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
                   <span className="sr-only">Search cases, entities, merchants, or transaction ids</span>
                   <input
+                    id="workspace-search"
+                    type="search"
                     className="h-10 w-full rounded-md border border-border bg-white pl-9 pr-3 text-sm outline-none transition placeholder:text-muted/70 hover:border-accent/70 focus:border-accent focus:ring-2 focus:ring-accent/20"
                     placeholder="Search cases, entities, merchants..."
                   />
@@ -162,17 +164,16 @@ export function AppShell({ activeRoute }: { activeRoute: WorkspaceRoute }) {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {["Unassigned", "High risk", "SLA breach"].map((filter, index) => (
-                    <button
+                    <span
                       key={filter}
-                      className={`h-8 rounded-md border px-3 text-xs font-semibold transition ${
+                      className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-semibold ${
                         index === 1
                           ? "border-danger/40 bg-danger/10 text-danger"
-                          : "border-border bg-white text-muted hover:border-accent/60 hover:text-foreground"
+                          : "border-border bg-white text-muted"
                       }`}
-                      aria-pressed={index === 1}
                     >
                       {filter}
-                    </button>
+                    </span>
                   ))}
                 </div>
               </div>

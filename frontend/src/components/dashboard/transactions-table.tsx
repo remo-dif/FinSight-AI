@@ -14,11 +14,22 @@ export function riskFor(transaction: Transaction) {
 
 export function formatAmount(transaction: Transaction) {
   const value = Number(transaction.amount);
-  return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency: transaction.currency || "USD",
-    maximumFractionDigits: 2
-  }).format(value);
+  return getCurrencyFormatter(transaction.currency || "USD").format(value);
+}
+
+const currencyFormatters = new Map<string, Intl.NumberFormat>();
+
+function getCurrencyFormatter(currency: string) {
+  let formatter = currencyFormatters.get(currency);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 2
+    });
+    currencyFormatters.set(currency, formatter);
+  }
+  return formatter;
 }
 
 function ownerFor(index: number) {
@@ -41,7 +52,7 @@ export function TransactionsTable({
   onSelect
 }: TransactionsTableProps) {
   return (
-    <Panel className="p-0" aria-labelledby="recent-transactions-heading">
+    <Panel as="section" className="p-0" aria-labelledby="recent-transactions-heading">
       <div className="flex flex-col gap-1 border-b border-border px-4 py-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 id="recent-transactions-heading" className="text-base font-semibold">Alert queue</h2>
@@ -109,6 +120,13 @@ export function TransactionsTable({
                   key={transaction.id}
                   className={`cursor-pointer transition hover:bg-accent/5 ${isSelected ? "bg-accent/10" : ""}`}
                   onClick={() => onSelect?.(transaction)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onSelect?.(transaction);
+                    }
+                  }}
+                  tabIndex={0}
                   aria-selected={isSelected}
                 >
                   <td className="px-4 py-3">
