@@ -3,13 +3,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { restoreSession } from "@/lib/api";
-import { useSessionStore } from "@/store/session";
 
 function SessionBootstrap() {
   useEffect(() => {
-    if (useSessionStore.getState().chatSessionId) {
-      void restoreSession();
-    }
+    // The refresh session lives in an HttpOnly cookie, so client code cannot
+    // reliably detect it before attempting restoration.
+    void restoreSession();
   }, []);
 
   return null;
