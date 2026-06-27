@@ -3,10 +3,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { restoreSession } from "@/lib/api";
+import { useSessionStore } from "@/store/session";
 
 function SessionBootstrap() {
   useEffect(() => {
-    void restoreSession();
+    if (useSessionStore.getState().chatSessionId) {
+      void restoreSession();
+    }
   }, []);
 
   return null;

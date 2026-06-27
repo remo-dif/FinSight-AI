@@ -1,9 +1,11 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import dynamic from "next/dynamic";
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronDown,
   Clock3,
   FileUp,
   History,
@@ -13,14 +15,24 @@ import {
   SlidersHorizontal,
   X
 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { ChatPanel } from "@/components/assistant/chat-panel";
-import { AuthPanel } from "@/components/auth/auth-panel";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatAmount, riskFor, TransactionsTable } from "@/components/dashboard/transactions-table";
 import { Panel } from "@/components/ui/panel";
-import { UploadPanel } from "@/components/uploads/upload-panel";
 import { demoTransactions, fetchMonthlySummary, fetchTransactions, Transaction } from "@/lib/api";
 import { useSessionStore } from "@/store/session";
+
+const AuthPanel = dynamic(
+  () => import("@/components/auth/auth-panel").then((module) => module.AuthPanel),
+  { ssr: false, loading: DrawerPanelLoading }
+);
+const ChatPanel = dynamic(
+  () => import("@/components/assistant/chat-panel").then((module) => module.ChatPanel),
+  { ssr: false, loading: DrawerPanelLoading }
+);
+const UploadPanel = dynamic(
+  () => import("@/components/uploads/upload-panel").then((module) => module.UploadPanel),
+  { ssr: false, loading: DrawerPanelLoading }
+);
 
 type ToolDrawer = "session" | "copilot" | "upload" | null;
 
@@ -39,7 +51,7 @@ export function DashboardWorkspace() {
   const token = useSessionStore((state) => state.accessToken);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawer, setDrawer] = useState<ToolDrawer>(null);
-  const month = currentMonth();
+  const [month] = useState(currentMonth);
 
   const summary = useQuery({
     queryKey: ["monthly-summary", month],
@@ -193,7 +205,7 @@ function AlertDetailPanel({
   const evidence = evidenceFor(transaction);
 
   return (
-    <Panel className="p-0 xl:sticky xl:top-[96px] xl:max-h-[calc(100vh-120px)] xl:overflow-y-auto" aria-labelledby="selected-alert-heading">
+    <Panel as="section" className="p-0 xl:sticky xl:top-[96px] xl:max-h-[calc(100vh-120px)] xl:overflow-y-auto" aria-labelledby="selected-alert-heading">
       <div className="border-b border-border p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -259,8 +271,11 @@ function AlertDetailPanel({
           </div>
         </section>
 
-        <details className="rounded-md border border-border bg-background p-3">
-          <summary className="cursor-pointer text-sm font-semibold">Audit preview</summary>
+        <details className="group rounded-md border border-border bg-background p-3">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold" aria-label="Audit preview — expand to view history">
+            Audit preview
+            <ChevronDown aria-hidden className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+          </summary>
           <ol className="mt-3 space-y-2 text-sm text-muted">
             <li className="flex gap-2"><History aria-hidden className="mt-0.5 h-4 w-4 shrink-0" /> Analyst reviewed evidence</li>
             <li className="flex gap-2"><Clock3 aria-hidden className="mt-0.5 h-4 w-4 shrink-0" /> Customer verification queued</li>
@@ -268,8 +283,11 @@ function AlertDetailPanel({
           </ol>
         </details>
 
-        <details className="rounded-md border border-border bg-background p-3">
-          <summary className="cursor-pointer text-sm font-semibold">Entity snapshot</summary>
+        <details className="group rounded-md border border-border bg-background p-3">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold" aria-label="Entity snapshot — expand to view linked entities">
+            Entity snapshot
+            <ChevronDown aria-hidden className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+          </summary>
           <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
             <SummaryItem label="Device" value="Device 42" />
             <SummaryItem label="Card" value="9182" />
@@ -317,26 +335,35 @@ function DecisionButton({
 }
 
 function ContextDrawer({ drawer, onClose }: { drawer: Exclude<ToolDrawer, null>; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
   const titles = {
     session: "Analyst session",
     copilot: "Investigation copilot",
     upload: "Evidence ingestion"
   };
 
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialog?.showModal();
+
+    return () => triggerRef.current?.focus();
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-40 bg-foreground/20 p-3 sm:p-6" role="presentation">
-      <aside
-        className="ml-auto flex h-full w-full max-w-[440px] flex-col overflow-y-auto rounded-lg border border-border bg-background shadow-soft"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="context-drawer-heading"
-      >
+    <dialog
+      ref={dialogRef}
+      className="m-0 ml-auto h-full max-h-none w-[min(440px,calc(100%-1.5rem))] overflow-y-auto rounded-l-lg border border-border bg-background p-0 text-foreground shadow-soft backdrop:bg-foreground/30"
+      aria-labelledby="context-drawer-heading"
+      onClose={onClose}
+    >
         <div className="flex items-center justify-between gap-3 border-b border-border bg-panel px-4 py-3">
           <h2 id="context-drawer-heading" className="text-base font-semibold">{titles[drawer]}</h2>
           <button
             type="button"
             className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-white text-muted hover:text-foreground"
-            onClick={onClose}
+            onClick={() => dialogRef.current?.close()}
             aria-label="Close panel"
           >
             <X aria-hidden className="h-4 w-4" />
@@ -347,9 +374,12 @@ function ContextDrawer({ drawer, onClose }: { drawer: Exclude<ToolDrawer, null>;
           {drawer === "copilot" ? <ChatPanel /> : null}
           {drawer === "upload" ? <UploadPanel /> : null}
         </div>
-      </aside>
-    </div>
+    </dialog>
   );
+}
+
+function DrawerPanelLoading() {
+  return <div className="h-48 animate-pulse rounded-lg bg-border/50" aria-label="Loading panel" />;
 }
 
 function evidenceFor(transaction?: Transaction) {

@@ -68,6 +68,6 @@ test("keeps primary navigation reachable on mobile", async ({ page, isMobile }) 
   test.skip(!isMobile, "mobile navigation is covered by the mobile project");
 
   await page.goto("/");
-  await expect(page.getByRole("navigation", { name: "Primary navigation" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Mobile navigation" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Triage" })).toBeVisible();
 });

@@ -18,7 +18,7 @@ export function SpendingChart({ data = defaultData }: { data?: SpendingChartDatu
   const max = Math.max(...chartData.map((item) => item.value), 1);
 
   return (
-    <Panel className="h-full p-4" aria-labelledby="risk-drivers-heading">
+    <Panel as="section" className="h-full p-4" aria-labelledby="risk-drivers-heading">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 id="risk-drivers-heading" className="text-base font-semibold">Risk drivers</h2>

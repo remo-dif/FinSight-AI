@@ -31,7 +31,7 @@ export function UploadPanel() {
   }
 
   return (
-    <Panel className="p-4" aria-labelledby="uploads-heading">
+    <Panel as="section" className="p-4" aria-labelledby="uploads-heading">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 id="uploads-heading" className="text-base font-semibold">Evidence ingestion</h2>
