@@ -21,10 +21,6 @@ export function formatAmount(transaction: Transaction) {
   }).format(value);
 }
 
-function statusFor(index: number) {
-  return index === 0 ? "Needs evidence" : index === 1 ? "Escalated" : "New";
-}
-
 function ownerFor(index: number) {
   return index === 1 ? "Risk Ops" : "Unassigned";
 }
@@ -53,19 +49,55 @@ export function TransactionsTable({
         </div>
         <p className="text-xs font-semibold uppercase tracking-wide text-muted">{transactions.length} open items</p>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] border-collapse text-sm">
-          <caption className="sr-only">Open fraud alerts with case, risk, entity, signal, amount, SLA, status, and owner</caption>
+      <ul className="divide-y divide-border md:hidden" aria-label="Open fraud alerts">
+        {transactions.map((transaction, index) => {
+          const risk = riskFor(transaction);
+          const isSelected = transaction.id === selectedId;
+          return (
+            <li key={transaction.id}>
+              <button
+                type="button"
+                className={`grid w-full gap-3 p-4 text-left transition hover:bg-accent/5 ${isSelected ? "bg-accent/10" : "bg-panel"}`}
+                onClick={() => onSelect?.(transaction)}
+                aria-pressed={isSelected}
+              >
+                <span className="flex items-start justify-between gap-3">
+                  <span>
+                    <span className="block font-semibold text-accent">{transaction.id}</span>
+                    <span className="mt-1 block text-xs text-muted">{ownerFor(index)}</span>
+                  </span>
+                  <span className={`rounded-md px-2 py-1 text-xs font-semibold ${risk.className}`}>
+                    {risk.label} {risk.score}
+                  </span>
+                </span>
+                <span className="flex items-start justify-between gap-4">
+                  <span className="min-w-0">
+                    <span className="block font-semibold">{transaction.merchant}</span>
+                    <span className="mt-1 block text-xs text-muted">{transaction.category || transaction.description}</span>
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="block font-semibold">{formatAmount(transaction)}</span>
+                    <span className={index === 0 ? "mt-1 block text-xs font-semibold text-danger" : "mt-1 block text-xs text-muted"}>
+                      SLA {slaFor(index)}
+                    </span>
+                  </span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="hidden overflow-hidden md:block">
+        <table className="w-full table-fixed border-collapse text-sm">
+          <caption className="sr-only">Open fraud alerts with case, owner, risk, entity, signal, amount, and SLA</caption>
           <thead>
             <tr className="border-y border-border bg-background text-left text-xs uppercase tracking-wide text-muted">
-              <th className="px-4 py-3 font-semibold" scope="col">Case</th>
+              <th className="px-4 py-3 font-semibold" scope="col">Case / Owner</th>
               <th className="px-3 py-3 font-semibold" scope="col">Risk</th>
               <th className="px-3 py-3 font-semibold" scope="col">Entity / Merchant</th>
               <th className="px-3 py-3 font-semibold" scope="col">Primary signal</th>
               <th className="px-3 py-3 text-right font-semibold" scope="col">Amount</th>
               <th className="px-3 py-3 font-semibold" scope="col">SLA</th>
-              <th className="px-3 py-3 font-semibold" scope="col">Status</th>
-              <th className="px-4 py-3 font-semibold" scope="col">Owner</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -90,6 +122,7 @@ export function TransactionsTable({
                     >
                       {transaction.id}
                     </button>
+                    <span className="mt-1 block text-xs text-muted">{ownerFor(index)}</span>
                   </td>
                   <td className="px-3 py-3">
                     <span className={`inline-flex min-w-20 justify-center rounded-md px-2 py-1 text-xs font-semibold ${risk.className}`}>
@@ -105,12 +138,6 @@ export function TransactionsTable({
                   <td className="whitespace-nowrap px-3 py-3">
                     <span className={index === 0 ? "font-semibold text-danger" : "text-muted"}>{slaFor(index)}</span>
                   </td>
-                  <td className="px-3 py-3">
-                    <span className="rounded-md bg-background px-2 py-1 text-xs font-semibold text-muted">
-                      {statusFor(index)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-muted">{ownerFor(index)}</td>
                 </tr>
               );
             })}

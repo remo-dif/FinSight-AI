@@ -106,7 +106,7 @@ export function AppShell({ activeRoute }: { activeRoute: WorkspaceRoute }) {
         <div className="min-w-0">
           <header className="sticky top-0 z-20 border-b border-border bg-panel/95 backdrop-blur">
             <nav
-              className="flex gap-2 overflow-x-auto border-b border-border px-4 py-2 text-sm font-medium lg:hidden"
+              className="flex gap-2 overflow-x-auto border-b border-border px-4 py-2 text-sm font-medium [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden"
               aria-label="Primary navigation"
             >
               {navigation.map((item) => {

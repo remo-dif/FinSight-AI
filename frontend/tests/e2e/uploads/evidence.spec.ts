@@ -35,7 +35,7 @@ test("uploads accepted evidence files and reports processing counts", async ({ p
   });
   await expect(page.getByText("evidence.csv")).toBeVisible();
 
-  await page.getByRole("button", { name: "Upload" }).click();
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
 
   await expect(page.getByText("processed: 12 imported, 7 indexed")).toBeVisible();
 });
@@ -58,7 +58,7 @@ test("rejected evidence files surface backend validation messages", async ({ pag
     mimeType: "application/octet-stream",
     buffer: Buffer.from("not a supported evidence file")
   });
-  await page.getByRole("button", { name: "Upload" }).click();
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
 
   await expect(page.getByText("Unsupported file type")).toBeVisible();
 });

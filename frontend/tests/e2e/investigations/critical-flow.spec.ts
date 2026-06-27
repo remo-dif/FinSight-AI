@@ -17,14 +17,15 @@ test("analyst can triage a high-risk case through evidence, assistant, and decis
 
   await expect(page.getByText("Live investigation data is active.")).toBeVisible();
   await page.getByRole("button", { name: "Close panel" }).click();
-  await expect(page.getByText("CASE-9001")).toBeVisible();
-  await expect(page.getByRole("region", { name: "Selected alert" })).toContainText("Wire mule cluster");
-  await expect(page.getByText("High 92")).toBeVisible();
+  const selectedAlert = page.getByRole("region", { name: "Selected alert" });
+  await expect(selectedAlert.getByText("CASE-9001", { exact: true })).toBeVisible();
+  await expect(selectedAlert).toContainText("Wire mule cluster");
+  await expect(selectedAlert.getByText("High 92", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "CASE-9002" }).click();
 
-  await expect(page.getByText("CASE-9002")).toBeVisible();
-  await expect(page.getByRole("region", { name: "Selected alert" })).toContainText(
+  await expect(selectedAlert.getByText("CASE-9002", { exact: true })).toBeVisible();
+  await expect(selectedAlert).toContainText(
     "Low-value authorization burst across the same card fingerprint."
   );
   await expect(page.getByRole("button", { name: "Escalate to fraud ops" })).toHaveAttribute("aria-pressed", "true");

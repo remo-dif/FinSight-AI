@@ -10,6 +10,7 @@ import {
   MessageSquareText,
   ShieldAlert,
   UserCheck,
+  SlidersHorizontal,
   X
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -68,7 +69,7 @@ export function DashboardWorkspace() {
         onDrawerChange={setDrawer}
       />
 
-      <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)_400px]">
+      <div className="grid gap-4 xl:grid-cols-[190px_minmax(0,1fr)_350px]">
         <QueueFilters />
         <section aria-labelledby="alert-queue-heading" className="min-w-0">
           <TransactionsTable
@@ -136,13 +137,29 @@ function WorkspaceToolbar({
 }
 
 function QueueFilters() {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
     <aside className="rounded-lg border border-border bg-panel p-4" aria-label="Alert queue filters">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold">Queue filters</h2>
-        <span className="rounded-md bg-danger/10 px-2 py-1 text-xs font-semibold text-danger">12 open</span>
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal aria-hidden className="h-4 w-4 text-muted xl:hidden" />
+          <h2 className="text-sm font-semibold">Queue filters</h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="rounded-md bg-danger/10 px-2 py-1 text-xs font-semibold text-danger">12 open</span>
+          <button
+            type="button"
+            className="h-8 rounded-md border border-border bg-white px-3 text-xs font-semibold text-muted hover:border-accent/60 hover:text-foreground xl:hidden"
+            aria-expanded={isOpen}
+            aria-controls="queue-filter-groups"
+            onClick={() => setIsOpen((current) => !current)}
+          >
+            {isOpen ? "Hide" : "Filter"}
+          </button>
+        </div>
       </div>
-      <div className="mt-4 space-y-4">
+      <div id="queue-filter-groups" className={`${isOpen ? "block" : "hidden"} mt-4 space-y-4 xl:block`}>
         {filters.map((group) => (
           <fieldset key={group.label}>
             <legend className="text-xs font-semibold uppercase tracking-wide text-muted">{group.label}</legend>
@@ -176,7 +193,7 @@ function AlertDetailPanel({
   const evidence = evidenceFor(transaction);
 
   return (
-    <Panel className="sticky top-[96px] max-h-[calc(100vh-120px)] overflow-y-auto p-0" aria-labelledby="selected-alert-heading">
+    <Panel className="p-0 xl:sticky xl:top-[96px] xl:max-h-[calc(100vh-120px)] xl:overflow-y-auto" aria-labelledby="selected-alert-heading">
       <div className="border-b border-border p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">

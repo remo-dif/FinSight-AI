@@ -88,7 +88,7 @@ test("upload authorization failures are visible to analysts", async ({ page, isM
     mimeType: "text/csv",
     buffer: Buffer.from("posted_at,merchant,amount\n2026-06-20,Test,-10.00\n")
   });
-  await page.getByRole("button", { name: "Upload" }).click();
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
 
   await expect(page.getByText("Only analysts can upload evidence")).toBeVisible();
 });

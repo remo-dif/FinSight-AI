@@ -22,7 +22,7 @@ test("primary workspace controls are reachable by keyboard", async ({ page, isMo
   await expect(page.getByRole("heading", { name: "Review assigned cases and escalation state" })).toBeVisible();
 });
 
-test("forms, status regions, and data table expose stable accessible names", async ({ page }) => {
+test("forms, status regions, and alert queue expose stable accessible names", async ({ page }) => {
   await page.goto("/");
 
   await page.getByRole("button", { name: "Sign in" }).click();
@@ -40,5 +40,11 @@ test("forms, status regions, and data table expose stable accessible names", asy
   await expect(page.getByRole("list", { name: "Upload processing steps" })).toBeVisible();
   await page.getByRole("button", { name: "Close panel" }).click();
 
-  await expect(page.getByRole("table", { name: "Open fraud alerts with case, risk, entity, signal, amount, SLA, status, and owner" })).toBeVisible();
+  if ((page.viewportSize()?.width ?? 1280) < 768) {
+    await expect(page.getByRole("list", { name: "Open fraud alerts" })).toBeVisible();
+  } else {
+    await expect(
+      page.getByRole("table", { name: "Open fraud alerts with case, owner, risk, entity, signal, amount, and SLA" })
+    ).toBeVisible();
+  }
 });

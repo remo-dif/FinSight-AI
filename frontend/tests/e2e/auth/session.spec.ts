@@ -20,8 +20,9 @@ test("valid login enables live dashboard data and logout clears the session", as
   await submitLogin(page);
 
   await expect(page.getByText("Live investigation data is active.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "CASE-9001" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "CASE-9001" })).toContainText("Wire mule cluster");
+  const selectedAlert = page.getByRole("region", { name: "Selected alert" });
+  await expect(selectedAlert.getByText("CASE-9001", { exact: true })).toBeVisible();
+  await expect(selectedAlert).toContainText("Wire mule cluster");
 
   await page.getByRole("button", { name: "Sign out" }).click();
 
@@ -83,6 +84,8 @@ test("expired access token refreshes once and retries live-data requests", async
   await page.goto("/");
   await submitLogin(page);
 
-  await expect(page.getByRole("heading", { name: "CASE-9010" })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Selected alert" }).getByText("CASE-9010", { exact: true })
+  ).toBeVisible();
   expect(refreshCount).toBe(1);
 });
