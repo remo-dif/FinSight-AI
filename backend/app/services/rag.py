@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import math
 import re
 from dataclasses import dataclass
@@ -8,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from openai import OpenAI
+from openai import OpenAI, OpenAIError
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -17,6 +18,7 @@ from app.models.embedding import EMBEDDING_DIMENSIONS, Embedding
 
 
 LOCAL_EMBEDDING_MODEL = "deterministic-local-hash-v1"
+logger = logging.getLogger(__name__)
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9._%+-]*")
 
@@ -84,7 +86,14 @@ class RagService:
         if limit <= 0 or not query.strip():
             return []
 
-        query_embedding = self.embed_text(query)
+        try:
+            query_embedding = self.embed_text(query)
+        except OpenAIError:
+            logger.warning(
+                "RAG retrieval skipped because the embedding provider is unavailable",
+                extra={"event": "rag.embedding_provider_unavailable"},
+            )
+            return []
         bind = self.db.get_bind()
         if bind.dialect.name == "postgresql":
             rows = self.db.execute(
