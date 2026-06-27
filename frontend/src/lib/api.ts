@@ -53,6 +53,7 @@ export class ApiError extends Error {
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "production" ? "" : "http://localhost:8000");
+let refreshRequest: Promise<string | null> | null = null;
 
 function formatApiError(status: number, fallback: string, hasToken: boolean, requiresAuth: boolean) {
   if ((status === 401 || status === 403) && requiresAuth && !hasToken) {
@@ -73,21 +74,39 @@ function extractErrorMessage(body: unknown, fallback: string) {
   return fallback;
 }
 
-async function refreshAccessToken(): Promise<string | null> {
-  const response = await fetch(`${API_URL}/api/auth/refresh`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({})
-  });
-  if (!response.ok) {
+async function performTokenRefresh(): Promise<string | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({})
+    });
+    if (!response.ok) {
+      useSessionStore.getState().clearSession();
+      return null;
+    }
+
+    const data = (await response.json()) as TokenResponse;
+    useSessionStore.getState().setAccessToken(data.access_token);
+    return data.access_token;
+  } catch {
     useSessionStore.getState().clearSession();
     return null;
   }
+}
 
-  const data = (await response.json()) as TokenResponse;
-  useSessionStore.getState().setAccessToken(data.access_token);
-  return data.access_token;
+async function refreshAccessToken(): Promise<string | null> {
+  if (!refreshRequest) {
+    refreshRequest = performTokenRefresh().finally(() => {
+      refreshRequest = null;
+    });
+  }
+  return refreshRequest;
+}
+
+export async function restoreSession(): Promise<boolean> {
+  return Boolean(await refreshAccessToken());
 }
 
 async function requestWithToken(path: string, init: ApiFetchInit | undefined, token: string | null) {

@@ -45,6 +45,44 @@ test("invalid login reports the API error and keeps demo mode", async ({ page, i
   await expect(page.getByText("Live investigation data is active.")).toBeHidden();
 });
 
+test("secure refresh cookie restores the session after a page reload", async ({ page, isMobile }) => {
+  test.skip(isMobile, "session restoration is viewport-independent and covered on desktop");
+
+  let signedIn = false;
+  let refreshCount = 0;
+  await page.route("**/api/auth/login", async (route) => {
+    signedIn = true;
+    await json(route, 200, analystTokens);
+  });
+  await page.route("**/api/auth/refresh", async (route) => {
+    refreshCount += 1;
+    if (!signedIn) {
+      await json(route, 401, { detail: "No refresh session" });
+      return;
+    }
+    await json(route, 200, {
+      ...analystTokens,
+      access_token: "restored-access-token"
+    });
+  });
+  await mockDashboardData(page);
+
+  await page.goto("/");
+  await expect.poll(() => refreshCount).toBe(1);
+  await submitLogin(page);
+  await expect(page.getByText("Live investigation data is active.")).toBeVisible();
+
+  await page.reload();
+
+  await expect(page.getByText("Live queue is active. Select an alert to review evidence and record a decision.")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Selected alert" }).getByText("CASE-9001", { exact: true })
+  ).toBeVisible();
+  expect(refreshCount).toBe(2);
+  const stored = await page.evaluate(() => localStorage.getItem("finsight-session"));
+  expect(stored).not.toContain("restored-access-token");
+});
+
 test("expired access token refreshes once and retries live-data requests", async ({ page, isMobile }) => {
   test.skip(isMobile, "token refresh behavior is viewport-independent and covered on desktop");
 
@@ -53,6 +91,10 @@ test("expired access token refreshes once and retries live-data requests", async
   let transactionCount = 0;
   await page.route("**/api/auth/refresh", async (route) => {
     refreshCount += 1;
+    if (refreshCount === 1) {
+      await json(route, 401, { detail: "No refresh session" });
+      return;
+    }
     await json(route, 200, {
       ...analystTokens,
       access_token: "refreshed-access-token"
@@ -82,10 +124,11 @@ test("expired access token refreshes once and retries live-data requests", async
   });
 
   await page.goto("/");
+  await expect.poll(() => refreshCount).toBe(1);
   await submitLogin(page);
 
   await expect(
     page.getByRole("region", { name: "Selected alert" }).getByText("CASE-9010", { exact: true })
   ).toBeVisible();
-  expect(refreshCount).toBe(1);
+  expect(refreshCount).toBe(2);
 });
