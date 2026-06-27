@@ -12,6 +12,7 @@ test.describe("application smoke", () => {
   for (const route of routes) {
     test(`renders ${route.path}`, async ({ page }) => {
       const consoleErrors: string[] = [];
+      await page.route("**/api/auth/refresh", async (request) => request.fulfill({ status: 204 }));
       page.on("console", (message) => {
         if (message.type() === "error") consoleErrors.push(message.text());
       });
@@ -27,6 +28,7 @@ test.describe("application smoke", () => {
   test("navigates primary routes without a full page reload", async ({ page, isMobile }) => {
     test.skip(isMobile, "desktop navigation covers route transitions; mobile visibility is covered separately");
 
+    await page.route("**/api/auth/refresh", async (request) => request.fulfill({ status: 204 }));
     await page.goto("/");
     const beforeNavigation = await page.evaluate(() => performance.getEntriesByType("navigation").length);
 
