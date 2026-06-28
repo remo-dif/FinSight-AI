@@ -13,11 +13,16 @@ from uuid import UUID, uuid4
 
 import pdfplumber
 from fastapi import HTTPException, UploadFile, status
-from openai import AsyncOpenAI
+from openai import OpenAIError
 from PIL import Image, UnidentifiedImageError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.openai_resilience import (
+    CircuitOpenError,
+    create_async_openai_client,
+    openai_circuit,
+)
 from app.models.embedding import EMBEDDING_DIMENSIONS, Embedding
 from app.models.finance import Transaction, UploadedFile
 from app.schemas.finance import TransactionCreate
@@ -36,6 +41,7 @@ Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 @dataclass(frozen=True)
 class StoredUpload:
     path: Path
+    storage_uri: str
     filename: str
     content_type: str
     suffix: str
@@ -72,7 +78,8 @@ class DocumentIngestionService:
 
     def __init__(self, categorizer: CategorizationService | None = None) -> None:
         self.categorizer = categorizer or CategorizationService()
-        self._openai_client = AsyncOpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
+        self._openai_client = create_async_openai_client()
+        self._using_local_embeddings = self._openai_client is None
 
     async def save_upload(self, user_id: UUID, file: UploadFile) -> StoredUpload:
         filename = file.filename or "upload"
@@ -80,7 +87,7 @@ class DocumentIngestionService:
         content_type = file.content_type or "application/octet-stream"
         self._validate_metadata(suffix, content_type)
 
-        user_dir = settings.upload_dir / str(user_id)
+        user_dir = settings.upload_dir / "staging" / str(user_id)
         await asyncio.to_thread(user_dir.mkdir, parents=True, exist_ok=True)
         path = user_dir / f"{uuid4()}{suffix}"
         max_bytes = settings.max_upload_mb * 1024 * 1024
@@ -103,8 +110,18 @@ class DocumentIngestionService:
             await asyncio.to_thread(path.unlink, missing_ok=True)
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "File is empty")
         self._validate_magic_bytes(suffix, first_bytes)
+        storage_uri = str(path)
+        if settings.storage_backend == "s3":
+            key = f"{settings.s3_upload_prefix.strip('/')}/{user_id}/{path.name}"
+            try:
+                await asyncio.to_thread(self._upload_to_s3, path, key, content_type)
+            except Exception:
+                await asyncio.to_thread(path.unlink, missing_ok=True)
+                raise
+            storage_uri = f"s3://{settings.s3_upload_bucket}/{key}"
         return StoredUpload(
             path=path,
+            storage_uri=storage_uri,
             filename=filename,
             content_type=content_type,
             suffix=suffix,
@@ -125,27 +142,31 @@ class DocumentIngestionService:
             {"file_id": str(record.id), "content_type": upload.content_type, "size_bytes": upload.size_bytes},
         )
 
-        if upload.suffix == ".csv":
-            payload = await asyncio.to_thread(upload.path.read_bytes)
-            transactions = await asyncio.to_thread(self.parse_csv, payload)
-            rows = [Transaction(user_id=user_id, **item.model_dump()) for item in transactions]
-            db.add_all(rows)
-            await db.flush()
-            await audit.record(
-                "document_ingestion.csv_processed",
-                user_id,
-                {"file_id": str(record.id), "rows": len(rows)},
-            )
-            return IngestionResult(status="processed", imported=len(rows))
+        try:
+            if upload.suffix == ".csv":
+                payload = await asyncio.to_thread(upload.path.read_bytes)
+                transactions = await asyncio.to_thread(self.parse_csv, payload)
+                rows = [Transaction(user_id=user_id, **item.model_dump()) for item in transactions]
+                db.add_all(rows)
+                await db.flush()
+                await audit.record(
+                    "document_ingestion.csv_processed",
+                    user_id,
+                    {"file_id": str(record.id), "rows": len(rows)},
+                )
+                return IngestionResult(status="processed", imported=len(rows))
 
-        text = await self.extract_document_text(upload.path)
-        indexed = await self.index_text(db, user_id, "upload", record.id, text)
-        await audit.record(
-            "document_ingestion.document_indexed",
-            user_id,
-            {"file_id": str(record.id), "chunks": indexed},
-        )
-        return IngestionResult(status="indexed", indexed=indexed)
+            text = await self.extract_document_text(upload.path)
+            indexed = await self.index_text(db, user_id, "upload", record.id, text)
+            await audit.record(
+                "document_ingestion.document_indexed",
+                user_id,
+                {"file_id": str(record.id), "chunks": indexed},
+            )
+            return IngestionResult(status="indexed", indexed=indexed)
+        finally:
+            if settings.storage_backend == "s3":
+                await asyncio.to_thread(upload.path.unlink, missing_ok=True)
 
     async def index_text(
         self,
@@ -210,11 +231,22 @@ class DocumentIngestionService:
         if self._openai_client is None:
             return [self._local_embedding(value) for value in values]
 
-        response = await self._openai_client.embeddings.create(
-            model=settings.openai_embedding_model,
-            input=values,
-            dimensions=EMBEDDING_DIMENSIONS,
-        )
+        try:
+            openai_circuit.before_call()
+        except CircuitOpenError:
+            self._using_local_embeddings = True
+            return [self._local_embedding(value) for value in values]
+        try:
+            response = await self._openai_client.embeddings.create(
+                model=settings.openai_embedding_model,
+                input=values,
+                dimensions=EMBEDDING_DIMENSIONS,
+            )
+        except OpenAIError:
+            openai_circuit.record_failure()
+            self._using_local_embeddings = True
+            return [self._local_embedding(value) for value in values]
+        openai_circuit.record_success()
         return [[float(item) for item in row.embedding] for row in response.data]
 
     async def extract_document_text(self, path: Path) -> str:
@@ -256,7 +288,7 @@ class DocumentIngestionService:
 
     @property
     def embedding_model(self) -> str:
-        if self._openai_client is None:
+        if self._using_local_embeddings:
             return LOCAL_EMBEDDING_MODEL
         return settings.openai_embedding_model
 
@@ -324,3 +356,20 @@ class DocumentIngestionService:
     def _append_bytes(path: Path, payload: bytes) -> None:
         with path.open("ab") as handle:
             handle.write(payload)
+
+    @staticmethod
+    def _upload_to_s3(path: Path, key: str, content_type: str) -> None:
+        import boto3
+
+        extra_args = {"ContentType": content_type, "ServerSideEncryption": "AES256"}
+        if settings.s3_kms_key_id:
+            extra_args.update(
+                ServerSideEncryption="aws:kms",
+                SSEKMSKeyId=settings.s3_kms_key_id,
+            )
+        boto3.client("s3").upload_file(
+            str(path),
+            settings.s3_upload_bucket,
+            key,
+            ExtraArgs=extra_args,
+        )

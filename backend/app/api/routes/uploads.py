@@ -23,7 +23,7 @@ async def upload_file(
         user_id=user.id,
         filename=upload.filename,
         content_type=upload.content_type,
-        storage_path=str(upload.path),
+        storage_path=upload.storage_uri,
         status="stored",
     )
     db.add(record)

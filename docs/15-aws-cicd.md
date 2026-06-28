@@ -15,29 +15,29 @@ FinSight-AI targets Amazon ECS on AWS Fargate. The expected production architect
 
 The workflow deploys to existing ECS services. It does not provision AWS infrastructure.
 
-## Current AWS Environment
+The existing task definitions must declare Fargate task-level CPU and memory. Deployments enable
+the ECS deployment circuit breaker with automatic rollback and reject task definitions without
+resource sizing.
 
-The first AWS environment is deployed in `eu-north-1`:
+## AWS Environment Configuration
 
-| Resource | Current value |
+Keep environment-specific resource names and endpoints in the protected GitHub `production`
+environment. Do not commit account IDs, ARNs, database endpoints, subnet IDs, or public origins.
+
+| Resource | Configuration source |
 | --- | --- |
-| ECS cluster | `busy-lion-6wzrd8` |
-| Backend service | `finsight-ai-backend-service-cet6tjci` |
-| Frontend service | `finsight-ai-frontend-service-0pfkokpq` |
-| Backend task family | `finsight-ai-backend` |
-| Frontend task family | `finsight-ai-frontend` |
-| Backend container | `backend` |
-| Frontend container | `frontend` |
-| Public ALB | `finsight-ai-alb-19805196.eu-north-1.elb.amazonaws.com` |
-| HTTPS endpoint | `https://d3p7l0r823wgar.cloudfront.net` |
-| Backend target group | `finsight-ai-backend-tg` |
-| Frontend target group | `finsight-ai-frontend-tg` |
-| RDS endpoint | `database-1.cv8ik06wq9ev.eu-north-1.rds.amazonaws.com:5432` |
-
-The ALB is enabled in these subnets:
-
-- `subnet-0946545d9d1d70f4f`
-- `subnet-0b1e5ecb9ad45873f`
+| ECS cluster | `ECS_CLUSTER` |
+| Backend service | `ECS_BACKEND_SERVICE` |
+| Frontend service | `ECS_FRONTEND_SERVICE` |
+| Backend task family | `ECS_BACKEND_TASK_FAMILY` |
+| Frontend task family | `ECS_FRONTEND_TASK_FAMILY` |
+| Backend container | `ECS_BACKEND_CONTAINER` |
+| Frontend container | `ECS_FRONTEND_CONTAINER` |
+| HTTPS ALB origin | `ORIGIN_HTTPS_URL` |
+| HTTPS endpoint | `PUBLIC_APP_URL` |
+| CloudFront distribution | `CLOUDFRONT_DISTRIBUTION_ID` |
+| RDS instance | `RDS_DB_INSTANCE_ID` |
+| Upload bucket | `S3_UPLOAD_BUCKET` |
 
 Keep ECS service subnets aligned with the ALB-enabled subnets. If a Fargate task is placed in
 an Availability Zone not enabled on the ALB, target health reports `Target.NotInUse` and
@@ -51,16 +51,14 @@ Current listener routing:
 | `/readyz` | `finsight-ai-backend-tg` |
 | default `/` | `finsight-ai-frontend-tg` |
 
-HTTPS is enabled for viewers through CloudFront at
-`https://d3p7l0r823wgar.cloudfront.net`. CloudFront redirects HTTP viewers to HTTPS, but the
-current origin connection from CloudFront to the ALB is still HTTP. This is edge TLS only, not
-full end-to-end TLS.
+HTTPS is mandatory from the viewer through CloudFront and from CloudFront to the ALB. The deploy
+workflow probes both endpoints and inspects the distribution origin policy before changing ECS.
 
 Why this matters for production:
 
-- Traffic is encrypted between the browser and CloudFront, but not on the CloudFront-to-ALB hop.
-- Security reviews will flag this as incomplete TLS termination for a fintech-style application.
-- ALB-only controls such as TLS policy enforcement and ALB HTTP-to-HTTPS redirect are not active yet.
+- Traffic is encrypted on both externally reachable hops.
+- The deployment gate prevents an edge-only TLS configuration from being released.
+- The ALB uses a TLS 1.2+ policy and redirects HTTP to HTTPS.
 - The default `*.elb.amazonaws.com` ALB hostname cannot be used for a public ACM certificate owned by
   this account; use a custom domain instead.
 
@@ -76,11 +74,26 @@ Production cutover should block on this HTTPS checklist:
 - Update `PUBLIC_APP_URL`, `ALLOWED_ORIGINS`, and any frontend API origin to the HTTPS domain.
 - Configure CloudFront with the ALB HTTPS origin and `HTTPS only` origin protocol policy.
 - Set GitHub variable `ORIGIN_HTTPS_URL=https://DOMAIN`.
-- Set GitHub variable `E2E_TLS_REQUIRED=true` so deployment fails if origin HTTPS regresses.
+- Set GitHub variable `E2E_TLS_REQUIRED=true`; production deployment rejects every other value.
 - Smoke test `https://DOMAIN/readyz` and `https://DOMAIN/`.
 
 Estimated implementation effort: 2-4 hours when the domain is already in Route53, or 0.5-1 day if
 domain purchase/delegation and DNS validation are still needed.
+
+## Required Operational Controls
+
+Provision the AWS resources through reviewed infrastructure as code. The production stack should
+also include:
+
+- AWS WAF managed core and known-bad-input rule groups plus a rate-based rule for `/api/auth/*`.
+- ECS service auto scaling with tested minimum/maximum task counts and CPU or ALB request targets.
+- CloudWatch alarms routed through SNS/on-call for ECS running-task shortfall, ALB 5xx/latency,
+  RDS CPU/connections/storage, and application error rate.
+- S3 versioning, lifecycle/retention policy, public-access block, and encryption.
+- Restore drills for RDS and evidence objects, with recorded recovery-time and recovery-point results.
+
+The deployment workflow verifies the release-blocking controls it can inspect safely, but it does
+not replace infrastructure provisioning, drift detection, or incident-response testing.
 
 ## GHCR Images
 
@@ -88,9 +101,7 @@ After backend tests, frontend tests, Docker builds, and Trivy scans pass on `mas
 
 - `ghcr.io/remo-dif/finsight-ai-backend:<commit-sha>`
 - `ghcr.io/remo-dif/finsight-ai-frontend:<commit-sha>`
-- `latest` tags for operator convenience only
-
-ECS deployments use the immutable commit SHA tag, never `latest`.
+Only immutable commit SHA tags are published and deployed. CI does not publish `latest`.
 
 If the GHCR packages are private, create an AWS Secrets Manager secret containing:
 
@@ -126,19 +137,22 @@ protection, and configure the remaining variables:
 | `PUBLIC_APP_URL` | Public HTTPS endpoint used by deploy smoke tests. |
 | `ORIGIN_HTTPS_URL` | HTTPS URL for the ALB origin after custom-domain TLS is configured. |
 | `E2E_TLS_REQUIRED` | Set to `true` only after ALB origin HTTPS is live; deploys then fail if origin TLS is absent. |
+| `CLOUDFRONT_DISTRIBUTION_ID` | Distribution checked for WAF and HTTPS-only origins. |
+| `RDS_DB_INSTANCE_ID` | Instance checked for Multi-AZ, encryption, and private access. |
+| `S3_UPLOAD_BUCKET` | Private encrypted evidence bucket checked before release. |
 
 Set the repository variable `AWS_DEPLOY_ENABLED=true` only after all production environment values
 are configured.
 
-Current repository variables:
+Example repository variables (use environment-specific values):
 
 ```text
 AWS_DEPLOY_ENABLED=true
-AWS_ROLE_ARN=arn:aws:iam::649024131408:role/FinSightGitHubActionsDeployRole
+AWS_ROLE_ARN=<deployment-role-arn>
 AWS_REGION=eu-north-1
-ECS_CLUSTER=busy-lion-6wzrd8
-ECS_BACKEND_SERVICE=finsight-ai-backend-service-cet6tjci
-ECS_FRONTEND_SERVICE=finsight-ai-frontend-service-0pfkokpq
+ECS_CLUSTER=<cluster-name>
+ECS_BACKEND_SERVICE=<backend-service-name>
+ECS_FRONTEND_SERVICE=<frontend-service-name>
 ECS_BACKEND_TASK_FAMILY=finsight-ai-backend
 ECS_FRONTEND_TASK_FAMILY=finsight-ai-frontend
 ECS_BACKEND_CONTAINER=backend
@@ -163,10 +177,10 @@ The role may also allow the branch subject for direct `master` deploys:
 repo:remo-dif/FinSight-AI:ref:refs/heads/master
 ```
 
-The deploy role is:
+The deploy role is supplied through:
 
 ```text
-arn:aws:iam::649024131408:role/FinSightGitHubActionsDeployRole
+AWS_ROLE_ARN=<protected GitHub environment variable>
 ```
 
 The role needs only the permissions required to:
@@ -175,6 +189,8 @@ The role needs only the permissions required to:
 - Update and describe the two ECS services.
 - Run and describe one-off migration tasks for the backend task definition.
 - Pass the ECS task execution and task roles with `iam:PassRole`.
+- Read CloudFront distribution configuration, describe the RDS instance, and inspect S3 public
+  access/encryption configuration for the production release gate.
 
 ## Application Secrets
 
@@ -187,6 +203,20 @@ Store runtime secrets in AWS Secrets Manager and reference them from ECS task de
 - Any private GHCR pull credential
 
 GitHub Actions should deploy task definitions without reading or printing these values.
+
+The backend task also requires these non-secret production settings:
+
+```text
+APP_ENV=production
+STORAGE_BACKEND=s3
+S3_UPLOAD_BUCKET=<private bucket name>
+S3_UPLOAD_PREFIX=uploads
+RATE_LIMIT_BACKEND=redis
+REDIS_URL=<ElastiCache endpoint>
+```
+
+Its task role needs least-privilege `s3:PutObject` access to the configured upload prefix and
+`s3:ListBucket` for readiness checks. Add KMS encrypt permissions when `S3_KMS_KEY_ID` is set.
 
 The backend task definition currently references these AWS Secrets Manager values:
 
@@ -225,18 +255,13 @@ origin. For the current single-ALB setup, leave it unset for production images.
 
 ## Local AWS CLI Access
 
-Human CLI access is configured with IAM Identity Center SSO instead of long-lived root access keys.
-Use the `finsight-ai` profile:
+Human CLI access should use IAM Identity Center SSO instead of long-lived root access keys. Configure
+an operator-specific profile without committing the SSO start URL or account identifiers:
 
 ```powershell
-& 'C:\Program Files\Amazon\AWSCLIV2\aws.exe' sso login --profile finsight-ai
-& 'C:\Program Files\Amazon\AWSCLIV2\aws.exe' sts get-caller-identity --profile finsight-ai
-```
-
-The SSO portal URL is:
-
-```text
-https://d-906675e0cc.awsapps.com/start
+aws configure sso --profile <operator-profile>
+aws sso login --profile <operator-profile>
+aws sts get-caller-identity --profile <operator-profile>
 ```
 
 Default workload region:

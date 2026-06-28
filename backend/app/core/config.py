@@ -40,8 +40,31 @@ class Settings(BaseSettings):
         default="text-embedding-3-large",
         validation_alias="OPENAI_EMBEDDING_MODEL",
     )
+    openai_timeout_seconds: float = Field(
+        default=20.0,
+        gt=0,
+        validation_alias="OPENAI_TIMEOUT_SECONDS",
+    )
+    openai_max_retries: int = Field(default=2, ge=0, le=5, validation_alias="OPENAI_MAX_RETRIES")
+    openai_circuit_failure_threshold: int = Field(
+        default=5,
+        gt=0,
+        validation_alias="OPENAI_CIRCUIT_FAILURE_THRESHOLD",
+    )
+    openai_circuit_reset_seconds: float = Field(
+        default=30.0,
+        gt=0,
+        validation_alias="OPENAI_CIRCUIT_RESET_SECONDS",
+    )
+    storage_backend: Literal["local", "s3"] = Field(
+        default="local",
+        validation_alias="STORAGE_BACKEND",
+    )
     upload_dir: Path = Field(default=Path("/app/uploads"), validation_alias="UPLOAD_DIR")
     max_upload_mb: int = Field(default=10, gt=0, validation_alias="MAX_UPLOAD_SIZE_MB")
+    s3_upload_bucket: str | None = Field(default=None, validation_alias="S3_UPLOAD_BUCKET")
+    s3_upload_prefix: str = Field(default="uploads", validation_alias="S3_UPLOAD_PREFIX")
+    s3_kms_key_id: str | None = Field(default=None, validation_alias="S3_KMS_KEY_ID")
     redis_url: str = Field(default="redis://redis:6379/0", validation_alias="REDIS_URL")
     rate_limit_backend: Literal["memory", "redis"] = Field(
         default="memory",
@@ -113,6 +136,12 @@ class Settings(BaseSettings):
             not self.allowed_origins or any(origin == "*" for origin in self.allowed_origins)
         ):
             raise ValueError("ALLOWED_ORIGINS must be explicit in production")
+        if self.storage_backend == "s3" and not self.s3_upload_bucket:
+            raise ValueError("S3_UPLOAD_BUCKET is required when STORAGE_BACKEND=s3")
+        if self.app_env == "production" and self.storage_backend != "s3":
+            raise ValueError("STORAGE_BACKEND must be s3 in production")
+        if self.app_env == "production" and self.rate_limit_backend != "redis":
+            raise ValueError("RATE_LIMIT_BACKEND must be redis in production")
         return self
 
 

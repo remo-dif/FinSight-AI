@@ -9,11 +9,12 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from openai import OpenAI, OpenAIError
+from openai import OpenAIError
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.openai_resilience import CircuitOpenError, create_openai_client, openai_circuit
 from app.models.embedding import EMBEDDING_DIMENSIONS, Embedding
 
 
@@ -41,7 +42,7 @@ class RagChunkResult:
 class RagService:
     def __init__(self, db: Session) -> None:
         self.db = db
-        self._openai_client = OpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
+        self._openai_client = create_openai_client()
 
     def chunk_text(self, text: str, max_chars: int = 1200, overlap_chars: int = 160) -> list[str]:
         return [chunk.text for chunk in self._chunk_text(text, max_chars, overlap_chars)]
@@ -88,7 +89,7 @@ class RagService:
 
         try:
             query_embedding = self.embed_text(query)
-        except OpenAIError:
+        except (OpenAIError, CircuitOpenError):
             logger.warning(
                 "RAG retrieval skipped because the embedding provider is unavailable",
                 extra={"event": "rag.embedding_provider_unavailable"},
@@ -155,7 +156,13 @@ class RagService:
             }
             if settings.openai_embedding_model.startswith("text-embedding-3"):
                 kwargs["dimensions"] = EMBEDDING_DIMENSIONS
-            response = self._openai_client.embeddings.create(**kwargs)
+            openai_circuit.before_call()
+            try:
+                response = self._openai_client.embeddings.create(**kwargs)
+            except OpenAIError:
+                openai_circuit.record_failure()
+                raise
+            openai_circuit.record_success()
             return [[float(item) for item in row.embedding] for row in response.data]
         return [self._local_embedding(value) for value in values]
 

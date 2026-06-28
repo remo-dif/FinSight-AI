@@ -41,6 +41,9 @@ jobs:
       PUBLIC_APP_URL: ${{ vars.PUBLIC_APP_URL }}
       ORIGIN_HTTPS_URL: ${{ vars.ORIGIN_HTTPS_URL }}
       E2E_TLS_REQUIRED: ${{ vars.E2E_TLS_REQUIRED }}
+      CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
+      RDS_DB_INSTANCE_ID: ${{ vars.RDS_DB_INSTANCE_ID }}
+      S3_UPLOAD_BUCKET: ${{ vars.S3_UPLOAD_BUCKET }}
       IMAGE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.image_sha || github.event.workflow_run.head_sha }}
       BACKEND_IMAGE: ghcr.io/remo-dif/finsight-ai-backend
       FRONTEND_IMAGE: ghcr.io/remo-dif/finsight-ai-frontend
@@ -54,7 +57,8 @@ jobs:
           required=(
             AWS_ROLE_ARN AWS_REGION ECS_CLUSTER ECS_BACKEND_SERVICE ECS_FRONTEND_SERVICE
             ECS_BACKEND_TASK_FAMILY ECS_FRONTEND_TASK_FAMILY
-            ECS_BACKEND_CONTAINER ECS_FRONTEND_CONTAINER IMAGE_SHA
+            ECS_BACKEND_CONTAINER ECS_FRONTEND_CONTAINER IMAGE_SHA PUBLIC_APP_URL
+            ORIGIN_HTTPS_URL CLOUDFRONT_DISTRIBUTION_ID RDS_DB_INSTANCE_ID S3_UPLOAD_BUCKET
           )
           for name in "${required[@]}"; do
             if [ -z "${!name}" ]; then
@@ -70,35 +74,53 @@ jobs:
       - name: Verify public HTTPS posture
         shell: bash
         run: |
-          if [ -n "$PUBLIC_APP_URL" ]; then
-            case "$PUBLIC_APP_URL" in
+          if [ "$E2E_TLS_REQUIRED" != "true" ]; then
+            echo "Production deploys require end-to-end TLS (E2E_TLS_REQUIRED=true)." >&2
+            exit 1
+          fi
+          for url in "$PUBLIC_APP_URL" "$ORIGIN_HTTPS_URL"; do
+            case "$url" in
               https://*) ;;
-              *)
-                echo "PUBLIC_APP_URL must use HTTPS: $PUBLIC_APP_URL" >&2
-                exit 1
-                ;;
+              *) echo "Production endpoint must use HTTPS: $url" >&2; exit 1 ;;
             esac
-            curl --fail --show-error --silent --retry 5 --retry-delay 5 "$PUBLIC_APP_URL/readyz" > /dev/null
-          else
-            echo "PUBLIC_APP_URL is unset; deploy smoke tests will not verify the public HTTPS endpoint." >&2
+            curl --fail --show-error --silent --retry 5 --retry-delay 5 "$url/readyz" > /dev/null
+          done
+      - name: Verify production AWS controls
+        shell: bash
+        run: |
+          distribution=$(aws cloudfront get-distribution \
+            --id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --query Distribution.DistributionConfig \
+            --output json)
+          if [ -z "$(jq -r '.WebACLId // empty' <<< "$distribution")" ]; then
+            echo "CloudFront distribution must have an AWS WAF web ACL." >&2
+            exit 1
+          fi
+          if ! jq -e 'all(.Origins.Items[]; (has("CustomOriginConfig") | not) or .CustomOriginConfig.OriginProtocolPolicy == "https-only")' \
+            <<< "$distribution" > /dev/null; then
+            echo "Every CloudFront custom origin must use HTTPS only." >&2
+            exit 1
           fi
 
-          if [ "$E2E_TLS_REQUIRED" = "true" ]; then
-            if [ -z "$ORIGIN_HTTPS_URL" ]; then
-              echo "E2E_TLS_REQUIRED=true requires ORIGIN_HTTPS_URL to point at the HTTPS ALB origin." >&2
-              exit 1
-            fi
-            case "$ORIGIN_HTTPS_URL" in
-              https://*) ;;
-              *)
-                echo "ORIGIN_HTTPS_URL must use HTTPS: $ORIGIN_HTTPS_URL" >&2
-                exit 1
-                ;;
-            esac
-            curl --fail --show-error --silent --retry 5 --retry-delay 5 "$ORIGIN_HTTPS_URL/readyz" > /dev/null
-          else
-            echo "End-to-end origin TLS is not enforced. Set E2E_TLS_REQUIRED=true after the ALB has an ACM-backed HTTPS listener." >&2
+          database=$(aws rds describe-db-instances \
+            --db-instance-identifier "$RDS_DB_INSTANCE_ID" \
+            --query 'DBInstances[0]' \
+            --output json)
+          if ! jq -e '.MultiAZ == true and .StorageEncrypted == true and .PubliclyAccessible == false' \
+            <<< "$database" > /dev/null; then
+            echo "RDS must be Multi-AZ, encrypted, and private." >&2
+            exit 1
           fi
+
+          public_access=$(aws s3api get-public-access-block \
+            --bucket "$S3_UPLOAD_BUCKET" \
+            --query PublicAccessBlockConfiguration \
+            --output json)
+          if ! jq -e 'all(.[]; . == true)' <<< "$public_access" > /dev/null; then
+            echo "The uploads bucket must block all forms of public access." >&2
+            exit 1
+          fi
+          aws s3api get-bucket-encryption --bucket "$S3_UPLOAD_BUCKET" > /dev/null
       - name: Deploy immutable images to ECS
         shell: bash
         run: |
@@ -113,6 +135,12 @@ jobs:
               --task-definition "$family" \
               --query taskDefinition \
               --output json > "$current"
+
+            if ! jq -e '(.cpu | tonumber) > 0 and (.memory | tonumber) > 0' \
+              "$current" > /dev/null; then
+              echo "Fargate task family $family must declare task-level CPU and memory." >&2
+              exit 1
+            fi
 
             jq --arg container "$container" --arg image "$image" '
               if any(.containerDefinitions[]; .name == $container) then
@@ -191,6 +219,7 @@ jobs:
               --cluster "$ECS_CLUSTER" \
               --service "$service" \
               --task-definition "$task_definition" \
+              --deployment-configuration 'deploymentCircuitBreaker={enable=true,rollback=true}' \
               --force-new-deployment > /dev/null
           }
 

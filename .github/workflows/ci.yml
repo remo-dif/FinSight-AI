@@ -186,16 +186,12 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
           docker tag finsight-ai-backend:ci "$BACKEND_IMAGE:${GITHUB_SHA}"
-          docker tag finsight-ai-backend:ci "$BACKEND_IMAGE:latest"
           docker push "$BACKEND_IMAGE:${GITHUB_SHA}"
-          docker push "$BACKEND_IMAGE:latest"
       - name: Publish frontend image
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
           docker tag finsight-ai-frontend:ci "$FRONTEND_IMAGE:${GITHUB_SHA}"
-          docker tag finsight-ai-frontend:ci "$FRONTEND_IMAGE:latest"
           docker push "$FRONTEND_IMAGE:${GITHUB_SHA}"
-          docker push "$FRONTEND_IMAGE:latest"
 
   security:
     runs-on: ubuntu-latest

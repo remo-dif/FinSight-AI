@@ -21,6 +21,9 @@ def production_settings(**overrides):
         "jwt_secret_key": "access-secret-for-production-tests-123",
         "jwt_refresh_secret_key": "refresh-secret-for-production-tests-123",
         "allowed_origins": ["https://finance.example.com"],
+        "storage_backend": "s3",
+        "s3_upload_bucket": "finance-upload-test",
+        "rate_limit_backend": "redis",
     }
     defaults.update(overrides)
     return Settings(**defaults)
@@ -34,6 +37,14 @@ def test_production_rejects_sqlite_database_url():
 def test_production_rejects_wildcard_cors_origin():
     with pytest.raises(ValidationError, match="ALLOWED_ORIGINS must be explicit"):
         production_settings(allowed_origins=["*"])
+
+
+def test_production_requires_durable_upload_storage_and_distributed_rate_limits():
+    with pytest.raises(ValidationError, match="STORAGE_BACKEND must be s3"):
+        production_settings(storage_backend="local")
+
+    with pytest.raises(ValidationError, match="RATE_LIMIT_BACKEND must be redis"):
+        production_settings(rate_limit_backend="memory")
 
 
 def test_production_rejects_unsafe_or_short_jwt_secrets():

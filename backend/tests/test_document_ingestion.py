@@ -2,6 +2,7 @@
 
 from io import BytesIO
 from pathlib import Path
+import shutil
 from uuid import uuid4
 
 import pytest
@@ -49,6 +50,33 @@ async def test_save_upload_rejects_mismatched_extension_and_content_type():
 
 
 @pytest.mark.asyncio
+async def test_save_upload_persists_to_private_s3_uri(monkeypatch):
+    uploaded: list[tuple[Path, str, str]] = []
+    upload_root = Path(__file__).parent / ".upload-test-output" / str(uuid4())
+    monkeypatch.setattr("app.services.document_ingestion.settings.storage_backend", "s3")
+    monkeypatch.setattr("app.services.document_ingestion.settings.s3_upload_bucket", "evidence-private")
+    monkeypatch.setattr("app.services.document_ingestion.settings.s3_upload_prefix", "evidence")
+    monkeypatch.setattr("app.services.document_ingestion.settings.upload_dir", upload_root)
+    monkeypatch.setattr(
+        DocumentIngestionService,
+        "_upload_to_s3",
+        staticmethod(lambda path, key, content_type: uploaded.append((path, key, content_type))),
+    )
+    user_id = uuid4()
+
+    stored = await DocumentIngestionService().save_upload(
+        user_id,
+        upload_file("statement.csv", "text/csv", b"date,merchant,amount\n2026-05-01,Cafe,-4.25\n"),
+    )
+
+    try:
+        assert stored.storage_uri == f"s3://evidence-private/evidence/{user_id}/{stored.path.name}"
+        assert uploaded == [(stored.path, f"evidence/{user_id}/{stored.path.name}", "text/csv")]
+    finally:
+        shutil.rmtree(upload_root.parent, ignore_errors=True)
+
+
+@pytest.mark.asyncio
 async def test_embed_texts_uses_local_embedding_without_api_key(monkeypatch):
     monkeypatch.setattr("app.services.document_ingestion.settings.openai_api_key", None)
     service = DocumentIngestionService()
@@ -80,6 +108,7 @@ async def test_ingest_upload_imports_csv_transactions_and_audits():
     try:
         upload = StoredUpload(
             path=path,
+            storage_uri=str(path),
             filename="transactions.csv",
             content_type="text/csv",
             suffix=".csv",

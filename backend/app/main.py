@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
@@ -82,10 +83,18 @@ def create_app() -> FastAPI:
             connection.execute(text("SELECT 1"))
         if settings.rate_limit_backend == "redis":
             await app.state.redis.ping()
-        settings.upload_dir.mkdir(parents=True, exist_ok=True)
-        test_file = settings.upload_dir / ".readyz"
-        test_file.write_text("ok", encoding="utf-8")
-        test_file.unlink(missing_ok=True)
+        if settings.storage_backend == "s3":
+            import boto3
+
+            await asyncio.to_thread(
+                boto3.client("s3").head_bucket,
+                Bucket=settings.s3_upload_bucket,
+            )
+        else:
+            settings.upload_dir.mkdir(parents=True, exist_ok=True)
+            test_file = settings.upload_dir / ".readyz"
+            test_file.write_text("ok", encoding="utf-8")
+            test_file.unlink(missing_ok=True)
         return {"status": "ready"}
 
     return app

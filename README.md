@@ -50,19 +50,10 @@ configuration.
 
 See [`AWS-TECHNOLOGIES.md`](AWS-TECHNOLOGIES.md) for a concise inventory and architecture diagram of the AWS services currently in use.
 
-The current AWS target is ECS on Fargate behind one Application Load Balancer:
-
-- Cluster: `busy-lion-6wzrd8`
-- Frontend service: `finsight-ai-frontend-service-0pfkokpq`
-- Backend service: `finsight-ai-backend-service-cet6tjci`
-- Region: `eu-north-1`
-- HTTPS endpoint: `https://d3p7l0r823wgar.cloudfront.net`
-- Public ALB origin: `http://finsight-ai-alb-19805196.eu-north-1.elb.amazonaws.com`
-
-Current TLS posture: browsers connect to CloudFront over HTTPS, but CloudFront still uses HTTP to
-reach the ALB origin. Full end-to-end TLS requires a custom application domain, an ACM certificate
-validated for that domain, an ALB `443` listener with a TLS 1.2+ policy, an ALB `80` to `443`
-redirect, and a CloudFront origin configured for HTTPS-only.
+The AWS target is ECS on Fargate behind CloudFront and an Application Load Balancer. Resource names
+and endpoints are held in the protected GitHub `production` environment rather than committed.
+Production deployment is blocked unless CloudFront-to-ALB traffic is HTTPS-only, the distribution
+has WAF attached, RDS is private/encrypted/Multi-AZ, and the private uploads bucket is encrypted.
 
 CI publishes immutable images tagged by commit SHA:
 

@@ -33,7 +33,7 @@ flowchart TB
     openai["OpenAI API<br/>LLM and embeddings"]
 
     user -->|"HTTPS"| cf
-    cf -->|"HTTP origin connection (current)"| alb
+    cf -->|"HTTPS-only origin connection"| alb
     alb -->|"default /"| front
     alb -->|"/api/* and /readyz"| back
     front -->|"same-origin API calls"| alb
@@ -57,7 +57,7 @@ flowchart TB
 | --- | --- |
 | **Amazon CloudFront** | Provides the public HTTPS endpoint and redirects viewers from HTTP to HTTPS. It forwards traffic to the ALB origin. |
 | **Elastic Load Balancing - Application Load Balancer (ALB)** | Routes `/api/*` and `/readyz` to the backend target group; all other paths go to the frontend target group. |
-| **Amazon Elastic Container Service (ECS)** | Runs separate frontend and backend services and stores their task definitions. The cluster is `busy-lion-6wzrd8`. |
+| **Amazon Elastic Container Service (ECS)** | Runs separate frontend and backend services and stores their task definitions. Resource names stay in protected deployment variables. |
 | **AWS Fargate** | Supplies serverless compute for the ECS containers and for one-off backend database-migration tasks. |
 | **Amazon RDS for PostgreSQL** | Hosts the production relational database. The application uses PostgreSQL and the `vector` extension for pgvector embeddings and similarity search. |
 | **Amazon VPC** | Provides the network boundary for the ALB, ECS tasks, and RDS. The deployed ALB uses two subnets, and ECS uses `awsvpc` networking with subnets and security groups. |
@@ -68,20 +68,20 @@ flowchart TB
 | **AWS IAM Identity Center** | Provides human AWS CLI access through the `finsight-ai` SSO profile. |
 | **AWS CLI** | Used by operators and the deployment workflow to inspect/register ECS task definitions, run migrations, update services, and wait for service stability. |
 
-## Current deployed resources
+## Deployment resource configuration
 
-| Resource | Current value |
+| Resource | Configuration source |
 | --- | --- |
-| AWS Region | `eu-north-1` |
-| CloudFront endpoint | `https://d3p7l0r823wgar.cloudfront.net` |
-| Public ALB origin | `http://finsight-ai-alb-19805196.eu-north-1.elb.amazonaws.com` |
-| ECS cluster | `busy-lion-6wzrd8` |
-| Frontend ECS service | `finsight-ai-frontend-service-0pfkokpq` |
-| Backend ECS service | `finsight-ai-backend-service-cet6tjci` |
-| Frontend task family | `finsight-ai-frontend` |
-| Backend task family | `finsight-ai-backend` |
-| Frontend target group | `finsight-ai-frontend-tg` |
-| Backend target group | `finsight-ai-backend-tg` |
+| AWS Region | `AWS_REGION` |
+| CloudFront endpoint | `PUBLIC_APP_URL` |
+| HTTPS ALB origin | `ORIGIN_HTTPS_URL` |
+| ECS cluster | `ECS_CLUSTER` |
+| Frontend ECS service | `ECS_FRONTEND_SERVICE` |
+| Backend ECS service | `ECS_BACKEND_SERVICE` |
+| Frontend task family | `ECS_FRONTEND_TASK_FAMILY` |
+| Backend task family | `ECS_BACKEND_TASK_FAMILY` |
+| CloudFront distribution | `CLOUDFRONT_DISTRIBUTION_ID` |
+| RDS instance | `RDS_DB_INSTANCE_ID` |
 | RDS engine/port | PostgreSQL on `5432` |
 | Deployment IAM role | `FinSightGitHubActionsDeployRole` |
 
@@ -94,19 +94,20 @@ flowchart TB
 5. It registers a new frontend ECS task definition and updates the frontend service.
 6. ECS sends container logs to CloudWatch Logs, while the workflow waits for service stability and runs public smoke checks.
 
-## Important current limitation
+## Production release controls
 
-TLS currently ends at CloudFront. Browser-to-CloudFront traffic is encrypted, but CloudFront connects to the ALB over HTTP. Full end-to-end TLS is not yet active.
+The deployment workflow refuses a production release unless end-to-end TLS, CloudFront WAF, private
+encrypted Multi-AZ RDS, and private encrypted S3 storage are all verifiably active.
 
-## Planned AWS services - not currently active
+## Additional AWS services
 
 These technologies appear in the production roadmap but should not be described as part of the current deployed stack:
 
 | Planned technology | Intended purpose |
 | --- | --- |
-| **Amazon S3** | Durable private storage for uploaded evidence files. Uploads currently use container-local storage. |
-| **Amazon ElastiCache for Redis** | Managed Redis for distributed rate limiting and ARQ background jobs. Redis currently exists only in the local Docker Compose stack. |
-| **AWS Certificate Manager (ACM)** | Certificate for HTTPS between CloudFront and the ALB. |
+| **Amazon S3** | Durable private storage for uploaded evidence files; mandatory in production. |
+| **Amazon ElastiCache for Redis** | Managed Redis for distributed rate limiting; mandatory in production. |
+| **AWS Certificate Manager (ACM)** | Certificates for HTTPS between viewers, CloudFront, and the ALB. |
 | **Amazon Route 53 / custom domain** | DNS and domain validation needed for end-to-end TLS. |
 | **Additional ECS worker service** | Runs ARQ background jobs when asynchronous processing is enabled. |
 

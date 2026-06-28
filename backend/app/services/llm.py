@@ -2,14 +2,13 @@ import json
 from decimal import Decimal
 from typing import Any
 
-from openai import OpenAI
-
 from app.core.config import settings
+from app.core.openai_resilience import CircuitOpenError, create_openai_client, openai_circuit
 
 
 class LLMService:
     def __init__(self) -> None:
-        self._client = OpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
+        self._client = create_openai_client()
         self.model = settings.openai_model
 
     def synthesize_financial_answer(
@@ -23,6 +22,10 @@ class LLMService:
             return self._synthesize_local(user_message, intent, tool_results, rag_chunks or [])
 
         prompt = self._build_prompt(user_message, intent, tool_results, rag_chunks)
+        try:
+            openai_circuit.before_call()
+        except CircuitOpenError:
+            return self._synthesize_local(user_message, intent, tool_results, rag_chunks or [])
         try:
             response = self._client.chat.completions.create(
                 model=self.model,
@@ -41,8 +44,10 @@ class LLMService:
                 max_tokens=450,
             )
         except Exception:
+            openai_circuit.record_failure()
             return self._synthesize_local(user_message, intent, tool_results, rag_chunks or [])
 
+        openai_circuit.record_success()
         return self._extract_text(response)
 
     def _build_prompt(
