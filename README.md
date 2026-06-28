@@ -48,6 +48,8 @@ configuration.
 
 ## Production Deployment
 
+See [`AWS-TECHNOLOGIES.md`](AWS-TECHNOLOGIES.md) for a concise inventory and architecture diagram of the AWS services currently in use.
+
 The current AWS target is ECS on Fargate behind one Application Load Balancer:
 
 - Cluster: `busy-lion-6wzrd8`

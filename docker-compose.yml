@@ -46,6 +46,7 @@ services:
       DATABASE_URL: postgresql+psycopg://finance:finance@postgres:5432/finance_ai
       UPLOAD_DIR: /app/uploads
       REDIS_URL: redis://redis:6379/0
+      RATE_LIMIT_BACKEND: redis
     ports:
       - "8000:8000"
     volumes:

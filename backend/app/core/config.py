@@ -1,8 +1,10 @@
 from functools import lru_cache
+from ipaddress import ip_network
 from pathlib import Path
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 UNSAFE_SECRET_VALUES = {
@@ -41,7 +43,15 @@ class Settings(BaseSettings):
     upload_dir: Path = Field(default=Path("/app/uploads"), validation_alias="UPLOAD_DIR")
     max_upload_mb: int = Field(default=10, gt=0, validation_alias="MAX_UPLOAD_SIZE_MB")
     redis_url: str = Field(default="redis://redis:6379/0", validation_alias="REDIS_URL")
-    allowed_origins: list[str] = Field(
+    rate_limit_backend: Literal["memory", "redis"] = Field(
+        default="memory",
+        validation_alias="RATE_LIMIT_BACKEND",
+    )
+    trusted_proxy_cidrs: Annotated[list[str], NoDecode] = Field(
+        default=["127.0.0.1/32", "::1/128"],
+        validation_alias="TRUSTED_PROXY_CIDRS",
+    )
+    allowed_origins: Annotated[list[str], NoDecode] = Field(
         default=["http://localhost:3000"],
         validation_alias="ALLOWED_ORIGINS",
     )
@@ -78,6 +88,15 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
+
+    @field_validator("trusted_proxy_cidrs", mode="before")
+    @classmethod
+    def parse_trusted_proxy_cidrs(cls, value: str | list[str]) -> list[str]:
+        cidrs = [item.strip() for item in value.split(",")] if isinstance(value, str) else value
+        normalized = [item for item in cidrs if item]
+        for cidr in normalized:
+            ip_network(cidr, strict=False)
+        return normalized
 
     @model_validator(mode="after")
     def validate_settings(self) -> "Settings":

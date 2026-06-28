@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI
@@ -11,9 +12,24 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.core.database import engine
 from app.core.logging import configure_logging
-from app.core.rate_limit import InMemoryRateLimitMiddleware
+from app.core.rate_limit import InMemoryRateLimitMiddleware, RedisRateLimitMiddleware
+from app.core.redis import create_redis_client
 
 configure_logging()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    redis_client = None
+    if settings.rate_limit_backend == "redis":
+        redis_client = create_redis_client(settings.redis_url)
+        await redis_client.ping()
+        app.state.redis = redis_client
+    try:
+        yield
+    finally:
+        if redis_client is not None:
+            await redis_client.aclose()
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
@@ -34,6 +50,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
         docs_url="/docs" if settings.app_env != "production" else None,
         redoc_url=None,
+        lifespan=lifespan,
     )
     app.add_middleware(
         CORSMiddleware,
@@ -43,9 +60,15 @@ def create_app() -> FastAPI:
         allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
     )
     app.add_middleware(RequestContextMiddleware)
+    rate_limit_middleware = (
+        RedisRateLimitMiddleware
+        if settings.rate_limit_backend == "redis"
+        else InMemoryRateLimitMiddleware
+    )
     app.add_middleware(
-        InMemoryRateLimitMiddleware,
+        rate_limit_middleware,
         requests_per_minute=settings.rate_limit_per_minute,
+        trusted_proxy_cidrs=settings.trusted_proxy_cidrs,
     )
     app.include_router(api_router)
 
@@ -54,9 +77,11 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     @app.get("/readyz", tags=["system"])
-    def readiness() -> dict[str, str]:
+    async def readiness() -> dict[str, str]:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
+        if settings.rate_limit_backend == "redis":
+            await app.state.redis.ping()
         settings.upload_dir.mkdir(parents=True, exist_ok=True)
         test_file = settings.upload_dir / ".readyz"
         test_file.write_text("ok", encoding="utf-8")
