@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { LogIn, LogOut, UserPlus } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { login, logout, register } from "@/lib/api";
 import { useSessionStore } from "@/store/session";
 
 export function AuthPanel() {
+  const queryClient = useQueryClient();
   const accessToken = useSessionStore((state) => state.accessToken);
   const setAccessToken = useSessionStore((state) => state.setAccessToken);
   const clearSession = useSessionStore((state) => state.clearSession);
@@ -21,6 +23,8 @@ export function AuthPanel() {
   const loginMutation = useMutation({
     mutationFn: () => login(email, password),
     onSuccess: (data) => {
+      queryClient.removeQueries({ queryKey: ["cases"] });
+      queryClient.removeQueries({ queryKey: ["case"] });
       setAccessToken(data.access_token);
       setMessage("Signed in. Live finance tools are enabled.");
     },
@@ -39,6 +43,8 @@ export function AuthPanel() {
   const logoutMutation = useMutation({
     mutationFn: logout,
     onSettled: () => {
+      queryClient.removeQueries({ queryKey: ["cases"] });
+      queryClient.removeQueries({ queryKey: ["case"] });
       clearSession();
       setMessage("Signed out. Demo alerts are visible.");
     }

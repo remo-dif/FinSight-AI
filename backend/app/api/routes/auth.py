@@ -24,6 +24,28 @@ from app.services.audit import AuditService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 REFRESH_COOKIE_NAME = "finsight_refresh_token"
+ACCESS_COOKIE_NAME = "finsight_access_token"
+
+
+def set_access_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=ACCESS_COOKIE_NAME,
+        value=token,
+        max_age=settings.access_token_minutes * 60,
+        httponly=True,
+        secure=settings.app_env == "production",
+        samesite="lax",
+        path="/",
+    )
+
+
+def clear_access_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=ACCESS_COOKIE_NAME,
+        path="/",
+        samesite="lax",
+        secure=settings.app_env == "production",
+    )
 
 
 def set_refresh_cookie(response: Response, token: str) -> None:
@@ -89,10 +111,12 @@ def login(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
     refresh_token = create_persisted_refresh_token(user.id, db)
     set_refresh_cookie(response, refresh_token)
+    access_token = create_token(user.id, TokenType.ACCESS)
+    set_access_cookie(response, access_token)
     AuditService(db).record("auth.login", user.id)
     db.commit()
     return TokenResponse(
-        access_token=create_token(user.id, TokenType.ACCESS),
+        access_token=access_token,
         refresh_token=refresh_token,
     )
 
@@ -126,15 +150,14 @@ def refresh(
 
     next_refresh_token = create_persisted_refresh_token(user.id, db)
     set_refresh_cookie(response, next_refresh_token)
+    access_token = create_token(user.id, TokenType.ACCESS)
+    set_access_cookie(response, access_token)
     next_payload = decode_refresh_token(next_refresh_token)
     stored.revoked_at = now
     stored.replaced_by_jti = str(next_payload["jti"])
     AuditService(db).record("auth.refresh", user.id)
     db.commit()
-    return TokenResponse(
-        access_token=create_token(user.id, TokenType.ACCESS),
-        refresh_token=next_refresh_token,
-    )
+    return TokenResponse(access_token=access_token, refresh_token=next_refresh_token)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -155,6 +178,7 @@ def logout(
             AuditService(db).record("auth.logout", user_id)
             db.commit()
     clear_refresh_cookie(response)
+    clear_access_cookie(response)
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
 

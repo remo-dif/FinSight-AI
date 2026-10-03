@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy import Select, case, func, select
 from sqlalchemy.orm import Session
 
+from app.models.case import InvestigationCase
 from app.models.finance import Transaction
 from app.schemas.finance import TransactionCreate
 
@@ -16,6 +17,8 @@ class TransactionRepository:
     def create_many(self, user_id: UUID, items: list[TransactionCreate]) -> list[Transaction]:
         rows = [Transaction(user_id=user_id, **item.model_dump()) for item in items]
         self.db.add_all(rows)
+        self.db.flush()
+        self.db.add_all([InvestigationCase(transaction_id=row.id) for row in rows])
         self.db.flush()
         for row in rows:
             self.db.refresh(row)

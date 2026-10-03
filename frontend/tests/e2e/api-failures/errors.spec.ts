@@ -43,15 +43,12 @@ for (const failure of chatFailures) {
   });
 }
 
-test("dashboard API failures show an explicit live-data warning", async ({ page, isMobile }) => {
+test("dashboard API failures do not fall back to demo cases for an authenticated analyst", async ({ page, isMobile }) => {
   test.skip(isMobile, "dashboard API failure behavior is viewport-independent and covered on desktop");
 
   await mockLogin(page);
-  await page.route("**/api/transactions/summary/**", async (route) =>
-    json(route, 500, { detail: "Summary service unavailable" })
-  );
-  await page.route("**/api/transactions?limit=50", async (route) =>
-    json(route, 500, { detail: "Transaction service unavailable" })
+  await page.route("**/api/cases?limit=50", async (route) =>
+    json(route, 500, { detail: "Case service unavailable" })
   );
 
   await page.goto("/");
@@ -61,7 +58,28 @@ test("dashboard API failures show an explicit live-data warning", async ({ page,
     .locator("form button[type='submit']")
     .click();
 
-  await expect(page.getByText("Showing demo alerts. Sign in when you need live data.")).toBeVisible();
+  await expect(page.getByText("Live cases are unavailable. No demo cases are shown.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "CASE-1042" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
+});
+
+test("cases page renders an authenticated data failure without demo records", async ({ page, isMobile }) => {
+  test.skip(isMobile, "server-rendered case queue behavior is viewport-independent and covered on desktop");
+
+  await page.context().addCookies([
+    {
+      name: "finsight_access_token",
+      value: "expired-access-token",
+      url: "http://127.0.0.1:3101/",
+      httpOnly: true,
+      sameSite: "Lax"
+    }
+  ]);
+
+  await page.goto("/cases");
+
+  await expect(page.getByText("Live cases are unavailable. No demo cases are shown.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "CASE-1042" })).toHaveCount(0);
 });
 
 test("upload authorization failures are visible to analysts", async ({ page, isMobile }) => {

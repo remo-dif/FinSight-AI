@@ -18,6 +18,37 @@ export type Transaction = {
   source: string;
 };
 
+export type CaseStatus = "new" | "needs_evidence" | "escalated" | "resolved";
+export type CaseDecision = "escalate" | "request_verification" | "false_positive";
+
+export type InvestigationCase = Transaction & {
+  status: CaseStatus;
+  assignee_name: string | null;
+  assigned_to_me: boolean;
+  decision: CaseDecision | null;
+  decision_reason: string | null;
+  updated_at: string | null;
+};
+
+export type CaseNote = {
+  id: string;
+  author_name: string;
+  content: string;
+  created_at: string;
+};
+
+export type CaseDetail = InvestigationCase & { notes: CaseNote[] };
+
+export type CaseUpdate = {
+  status?: CaseStatus;
+  assignee?: "me" | "unassigned";
+  decision?: CaseDecision;
+  reason?: string;
+};
+
+export const caseListQueryKey = (limit = 50) => ["cases", limit] as const;
+export const caseDetailQueryKey = (caseId: string) => ["case", caseId] as const;
+
 export type ChatResponse = {
   session_id: string;
   answer: string;
@@ -53,6 +84,7 @@ export class ApiError extends Error {
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "production" ? "" : "http://localhost:8000");
+const API_REQUEST_TIMEOUT_MS = 10_000;
 let refreshRequest: Promise<string | null> | null = null;
 
 function formatApiError(status: number, fallback: string, hasToken: boolean, requiresAuth: boolean) {
@@ -74,9 +106,23 @@ function extractErrorMessage(body: unknown, fallback: string) {
   return fallback;
 }
 
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS);
+  const abortRequest = () => controller.abort();
+
+  init.signal?.addEventListener("abort", abortRequest, { once: true });
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+    init.signal?.removeEventListener("abort", abortRequest);
+  }
+}
+
 async function performTokenRefresh(): Promise<string | null> {
   try {
-    const response = await fetch(`${API_URL}/api/auth/refresh`, {
+    const response = await fetchWithTimeout(`${API_URL}/api/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -110,14 +156,16 @@ export async function restoreSession(): Promise<boolean> {
 }
 
 async function requestWithToken(path: string, init: ApiFetchInit | undefined, token: string | null) {
-  const isFormData = init?.body instanceof FormData;
-  return fetch(`${API_URL}${path}`, {
-    ...init,
+  const requestInit = { ...(init ?? {}) };
+  delete requestInit.requireAuth;
+  const isFormData = requestInit.body instanceof FormData;
+  return fetchWithTimeout(`${API_URL}${path}`, {
+    ...requestInit,
     credentials: "include",
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {})
+      ...(requestInit.headers ?? {})
     }
   });
 }
@@ -215,6 +263,30 @@ export function fetchTransactions(limit = 50): Promise<Transaction[]> {
   return apiFetch<Transaction[]>(`/api/transactions?limit=${limit}`, { requireAuth: true });
 }
 
+export function fetchCases(limit = 50): Promise<InvestigationCase[]> {
+  return apiFetch<InvestigationCase[]>(`/api/cases?limit=${limit}`, { requireAuth: true });
+}
+
+export function fetchCaseDetail(caseId: string): Promise<CaseDetail> {
+  return apiFetch<CaseDetail>(`/api/cases/${caseId}`, { requireAuth: true });
+}
+
+export function updateCase(caseId: string, update: CaseUpdate): Promise<InvestigationCase> {
+  return apiFetch<InvestigationCase>(`/api/cases/${caseId}`, {
+    method: "PATCH",
+    body: JSON.stringify(update),
+    requireAuth: true
+  });
+}
+
+export function addCaseNote(caseId: string, content: string): Promise<CaseNote> {
+  return apiFetch<CaseNote>(`/api/cases/${caseId}/notes`, {
+    method: "POST",
+    body: JSON.stringify({ content }),
+    requireAuth: true
+  });
+}
+
 export type UploadResponse = {
   file_id: string;
   status: string;
@@ -232,7 +304,7 @@ export function uploadFinancialFile(file: File): Promise<UploadResponse> {
   });
 }
 
-export const demoTransactions: Transaction[] = [
+export const demoTransactions: InvestigationCase[] = [
   {
     id: "CASE-1042",
     posted_at: "2026-05-28",
@@ -241,7 +313,13 @@ export const demoTransactions: Transaction[] = [
     amount: "-184.22",
     currency: "USD",
     category: "Velocity spike",
-    source: "rules"
+    source: "rules",
+    status: "needs_evidence",
+    assignee_name: null,
+    assigned_to_me: false,
+    decision: null,
+    decision_reason: null,
+    updated_at: null
   },
   {
     id: "CASE-1038",
@@ -251,7 +329,13 @@ export const demoTransactions: Transaction[] = [
     amount: "-4200.00",
     currency: "USD",
     category: "New payee",
-    source: "model"
+    source: "model",
+    status: "escalated",
+    assignee_name: "Risk Ops",
+    assigned_to_me: false,
+    decision: null,
+    decision_reason: null,
+    updated_at: null
   },
   {
     id: "CASE-1031",
@@ -261,6 +345,12 @@ export const demoTransactions: Transaction[] = [
     amount: "-611.99",
     currency: "USD",
     category: "Geo mismatch",
-    source: "rules"
+    source: "rules",
+    status: "new",
+    assignee_name: null,
+    assigned_to_me: false,
+    decision: null,
+    decision_reason: null,
+    updated_at: null
   }
 ];

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { mockChatSuccess, mockDashboardData, mockLogin } from "../fixtures/api";
 
-test("analyst can triage a high-risk case through evidence, assistant, and decision panels", async ({ page, isMobile }) => {
+test("analyst can update case state, record a decision and note, then use the copilot", async ({ page, isMobile }) => {
   test.skip(isMobile, "critical workflow is covered on desktop where the full analyst workspace is visible");
 
   await mockLogin(page);
@@ -20,7 +20,6 @@ test("analyst can triage a high-risk case through evidence, assistant, and decis
   const selectedAlert = page.getByRole("region", { name: "Selected alert" });
   await expect(selectedAlert.getByText("CASE-9001", { exact: true })).toBeVisible();
   await expect(selectedAlert).toContainText("Wire mule cluster");
-  await expect(selectedAlert.getByText("High 92", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "CASE-9002" }).click();
 
@@ -28,9 +27,23 @@ test("analyst can triage a high-risk case through evidence, assistant, and decis
   await expect(selectedAlert).toContainText(
     "Low-value authorization burst across the same card fingerprint."
   );
-  await expect(page.getByRole("button", { name: "Escalate to fraud ops" })).toHaveAttribute("aria-pressed", "true");
-  await page.getByText("Audit preview").click();
-  await expect(page.getByText("Disposition requires reason code")).toBeVisible();
+  const status = selectedAlert.getByLabel("Status");
+  await expect(status).toHaveValue("new");
+  await status.selectOption("escalated");
+  await expect(status).toHaveValue("escalated");
+
+  await selectedAlert.getByRole("button", { name: "Assign to me" }).click();
+  await expect(selectedAlert).toContainText("Assigned to Test Analyst");
+
+  await selectedAlert.getByRole("combobox", { name: /Decision/ }).selectOption("request_verification");
+  await selectedAlert.getByLabel("Reason").fill("Customer activity needs confirmation.");
+  await selectedAlert.getByRole("button", { name: "Record decision" }).click();
+  await expect(selectedAlert).toContainText("Request customer verification");
+  await expect(selectedAlert).toContainText("Customer activity needs confirmation.");
+
+  await selectedAlert.getByLabel("Add a note").fill("Reviewed the transaction origin with the customer.");
+  await selectedAlert.getByRole("button", { name: "Add note" }).click();
+  await expect(selectedAlert).toContainText("Reviewed the transaction origin with the customer.");
 
   await page.getByRole("button", { name: "Ask copilot" }).click();
   await page.getByRole("button", { name: "Send message" }).click();

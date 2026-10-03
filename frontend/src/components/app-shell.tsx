@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { DashboardWorkspace } from "@/components/dashboard/dashboard-workspace";
+import type { InitialCaseQueue } from "@/lib/server-data";
 import {
   Bell,
   BriefcaseBusiness,
@@ -52,7 +53,13 @@ const routeCopy: Record<WorkspaceRoute, { eyebrow: string; title: string; descri
   }
 };
 
-export function AppShell({ activeRoute }: { activeRoute: WorkspaceRoute }) {
+export function AppShell({
+  activeRoute,
+  initialQueue
+}: {
+  activeRoute: WorkspaceRoute;
+  initialQueue?: InitialCaseQueue;
+}) {
   const copy = routeCopy[activeRoute];
 
   return (
@@ -177,7 +184,7 @@ export function AppShell({ activeRoute }: { activeRoute: WorkspaceRoute }) {
                   ))}
                 </div>
               </div>
-              <DashboardWorkspace />
+              <DashboardWorkspace initialQueue={initialQueue} />
             </section>
           </div>
         </div>

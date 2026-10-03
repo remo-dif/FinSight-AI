@@ -41,7 +41,7 @@ test("invalid login reports the API error and keeps demo mode", async ({ page, i
   await submitLogin(page);
 
   await expect(page.getByText("Invalid email or password")).toBeVisible();
-  await expect(page.getByText("Showing demo alerts. Sign in when you need live data.")).toBeVisible();
+  await expect(page.getByText("Demo queue. Sign in to load live cases.")).toBeVisible();
   await expect(page.getByText("Live investigation data is active.")).toBeHidden();
 });
 
@@ -88,7 +88,7 @@ test("expired access token refreshes once and retries live-data requests", async
 
   await mockLogin(page);
   let refreshCount = 0;
-  let transactionCount = 0;
+  let caseCount = 0;
   await page.route("**/api/auth/refresh", async (route) => {
     refreshCount += 1;
     if (refreshCount === 1) {
@@ -100,12 +100,9 @@ test("expired access token refreshes once and retries live-data requests", async
       access_token: "refreshed-access-token"
     });
   });
-  await page.route("**/api/transactions/summary/**", async (route) =>
-    json(route, 200, { month: "2026-06", income: "9200.00", spending: "7400.00", net_cash_flow: "1800.00" })
-  );
-  await page.route("**/api/transactions?limit=50", async (route) => {
-    transactionCount += 1;
-    if (transactionCount === 1) {
+  await page.route("**/api/cases?limit=50", async (route) => {
+    caseCount += 1;
+    if (caseCount === 1) {
       await json(route, 401, { detail: "Token expired" });
       return;
     }
@@ -118,7 +115,13 @@ test("expired access token refreshes once and retries live-data requests", async
         amount: "-1300.00",
         currency: "USD",
         category: "New payee",
-        source: "model"
+        source: "model",
+        status: "new",
+        assignee_name: null,
+        assigned_to_me: false,
+        decision: null,
+        decision_reason: null,
+        updated_at: null
       }
     ]);
   });

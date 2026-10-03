@@ -3,22 +3,25 @@
 import { useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import {
-  AlertTriangle,
-  CheckCircle2,
-  ChevronDown,
-  Clock3,
   FileUp,
-  History,
   MessageSquareText,
-  ShieldAlert,
   UserCheck,
   SlidersHorizontal,
   X
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatAmount, riskFor, TransactionsTable } from "@/components/dashboard/transactions-table";
+import { formatAmount, TransactionsTable } from "@/components/dashboard/transactions-table";
+import { CaseWorkflow } from "@/components/dashboard/case-workflow";
 import { Panel } from "@/components/ui/panel";
-import { demoTransactions, fetchMonthlySummary, fetchTransactions, Transaction } from "@/lib/api";
+import {
+  caseDetailQueryKey,
+  caseListQueryKey,
+  demoTransactions,
+  fetchCaseDetail,
+  fetchCases,
+  InvestigationCase
+} from "@/lib/api";
+import type { InitialCaseQueue } from "@/lib/server-data";
 import { useSessionStore } from "@/store/session";
 
 const AuthPanel = dynamic(
@@ -43,54 +46,61 @@ const filters = [
   { label: "Status", values: ["Needs evidence", "Escalated", "New"] }
 ];
 
-function currentMonth() {
-  return new Date().toISOString().slice(0, 7);
-}
-
-export function DashboardWorkspace() {
+export function DashboardWorkspace({ initialQueue }: { initialQueue?: InitialCaseQueue }) {
   const token = useSessionStore((state) => state.accessToken);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawer, setDrawer] = useState<ToolDrawer>(null);
-  const [month] = useState(currentMonth);
-
-  const summary = useQuery({
-    queryKey: ["monthly-summary", month],
-    queryFn: () => fetchMonthlySummary(month),
-    enabled: Boolean(token)
-  });
-  const transactions = useQuery({
-    queryKey: ["transactions", 50],
-    queryFn: () => fetchTransactions(50),
-    enabled: Boolean(token)
+  const hasServerSession = initialQueue?.status === "live" || initialQueue?.status === "unavailable";
+  const hasSession = Boolean(token) || hasServerSession;
+  const cases = useQuery({
+    queryKey: caseListQueryKey(),
+    queryFn: () => fetchCases(50),
+    enabled: Boolean(token),
+    initialData: initialQueue?.status === "live" ? initialQueue.cases ?? undefined : undefined,
+    retry: false
   });
 
-  const activeTransactions = transactions.data?.length ? transactions.data : demoTransactions;
-  const selectedTransaction = useMemo(
+  const queueStatus = !hasSession
+    ? "demo"
+    : (!cases.data && initialQueue?.status === "unavailable") || cases.isError
+      ? "error"
+      : cases.isPending && !cases.data
+        ? "loading"
+        : "live";
+  const activeCases = useMemo(
+    () => hasSession ? cases.data ?? [] : demoTransactions,
+    [hasSession, cases.data]
+  );
+  const selectedCase = useMemo(
     () =>
-      activeTransactions.find((transaction) => transaction.id === selectedId) ??
-      activeTransactions[0],
-    [activeTransactions, selectedId]
+      activeCases.find((caseRecord) => caseRecord.id === selectedId) ??
+      activeCases[0],
+    [activeCases, selectedId]
   );
 
   return (
     <div className="space-y-4">
       <WorkspaceToolbar
-        hasSession={Boolean(token)}
-        isUsingFallback={!token || summary.isError || transactions.isError}
+        queueStatus={queueStatus}
+        onRetry={() => void cases.refetch()}
         drawer={drawer}
         onDrawerChange={setDrawer}
       />
 
       <div className="grid gap-4 xl:grid-cols-[190px_minmax(0,1fr)_350px]">
-        <QueueFilters />
+        <QueueFilters caseCount={activeCases.length} />
         <section aria-labelledby="alert-queue-heading" className="min-w-0">
           <TransactionsTable
-            transactions={activeTransactions}
-            selectedId={selectedTransaction?.id}
-            onSelect={(transaction) => setSelectedId(transaction.id)}
+            transactions={activeCases}
+            selectedId={selectedCase?.id}
+            onSelect={(caseRecord) => setSelectedId(caseRecord.id)}
           />
         </section>
-        <AlertDetailPanel transaction={selectedTransaction} onDrawerChange={setDrawer} />
+        <AlertDetailPanel
+          caseRecord={selectedCase}
+          canMutate={Boolean(token)}
+          onDrawerChange={setDrawer}
+        />
       </div>
 
       {drawer ? <ContextDrawer drawer={drawer} onClose={() => setDrawer(null)} /> : null}
@@ -99,29 +109,40 @@ export function DashboardWorkspace() {
 }
 
 function WorkspaceToolbar({
-  hasSession,
-  isUsingFallback,
+  queueStatus,
+  onRetry,
   drawer,
   onDrawerChange
 }: {
-  hasSession: boolean;
-  isUsingFallback: boolean;
+  queueStatus: "demo" | "loading" | "live" | "error";
+  onRetry: () => void;
   drawer: ToolDrawer;
   onDrawerChange: (drawer: ToolDrawer) => void;
 }) {
   const tools: Array<{ id: Exclude<ToolDrawer, null>; label: string; icon: typeof UserCheck }> = [
-    { id: "session", label: hasSession ? "Session active" : "Sign in", icon: UserCheck },
+    { id: "session", label: queueStatus !== "demo" ? "Session active" : "Sign in", icon: UserCheck },
     { id: "copilot", label: "Ask copilot", icon: MessageSquareText },
     { id: "upload", label: "Upload evidence", icon: FileUp }
   ];
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-panel px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-      <p className="text-sm text-muted">
-        {isUsingFallback
-          ? "Showing demo alerts. Sign in when you need live data."
-          : "Live queue is active. Select an alert to review evidence and record a decision."}
-      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-sm text-muted" role={queueStatus === "error" ? "status" : undefined}>
+          {queueStatus === "demo"
+            ? "Demo queue. Sign in to load live cases."
+            : queueStatus === "loading"
+              ? "Loading live cases..."
+              : queueStatus === "error"
+                ? "Live cases are unavailable. No demo cases are shown."
+                : "Live queue is active. Select an alert to review evidence and record a decision."}
+        </p>
+        {queueStatus === "error" ? (
+          <button type="button" className="text-sm font-semibold text-accent underline-offset-4 hover:underline" onClick={onRetry}>
+            Retry
+          </button>
+        ) : null}
+      </div>
       <div className="flex flex-wrap gap-2">
         {tools.map((tool) => {
           const Icon = tool.icon;
@@ -148,7 +169,7 @@ function WorkspaceToolbar({
   );
 }
 
-function QueueFilters() {
+function QueueFilters({ caseCount }: { caseCount: number }) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -159,7 +180,7 @@ function QueueFilters() {
           <h2 className="text-sm font-semibold">Queue filters</h2>
         </div>
         <div className="flex items-center gap-2">
-          <span className="rounded-md bg-danger/10 px-2 py-1 text-xs font-semibold text-danger">12 open</span>
+          <span className="rounded-md bg-background px-2 py-1 text-xs font-semibold text-muted">{caseCount} cases</span>
           <button
             type="button"
             className="h-8 rounded-md border border-border bg-white px-3 text-xs font-semibold text-muted hover:border-accent/60 hover:text-foreground xl:hidden"
@@ -195,14 +216,23 @@ function QueueFilters() {
 }
 
 function AlertDetailPanel({
-  transaction,
+  caseRecord,
+  canMutate,
   onDrawerChange
 }: {
-  transaction?: Transaction;
+  caseRecord?: InvestigationCase;
+  canMutate: boolean;
   onDrawerChange: (drawer: ToolDrawer) => void;
 }) {
-  const risk = transaction ? riskFor(transaction) : null;
-  const evidence = evidenceFor(transaction);
+  const caseDetail = useQuery({
+    queryKey: caseDetailQueryKey(caseRecord?.id ?? "none"),
+    queryFn: () => {
+      if (!caseRecord) throw new Error("A case must be selected");
+      return fetchCaseDetail(caseRecord.id);
+    },
+    enabled: Boolean(caseRecord && canMutate),
+    retry: false
+  });
 
   return (
     <Panel as="section" className="p-0 xl:sticky xl:top-[96px] xl:max-h-[calc(100vh-120px)] xl:overflow-y-auto" aria-labelledby="selected-alert-heading">
@@ -211,37 +241,31 @@ function AlertDetailPanel({
           <div className="min-w-0">
             <h2 id="selected-alert-heading" className="text-xs font-semibold uppercase tracking-wide text-muted">Selected alert</h2>
             <p className="mt-1 text-xl font-semibold leading-tight">
-              {transaction?.id ?? "No alert selected"}
+              {caseRecord?.id ?? "No alert selected"}
             </p>
-            <p className="mt-1 text-sm text-muted">{transaction?.merchant ?? "Select a row to review the case."}</p>
+            <p className="mt-1 text-sm text-muted">{caseRecord?.merchant ?? "Select a row to review the case."}</p>
           </div>
-          {risk ? (
-            <span className={`shrink-0 rounded-md px-2 py-1 text-xs font-semibold ${risk.className}`}>
-              {risk.label} {risk.score}
-            </span>
-          ) : null}
         </div>
 
         <dl className="mt-4 grid grid-cols-2 gap-2 text-sm">
-          <SummaryItem label="Exposure" value={transaction ? formatAmount(transaction) : "$0.00"} />
-          <SummaryItem label="SLA" value="42m" tone="danger" />
-          <SummaryItem label="Source" value={transaction?.source ?? "--"} />
-          <SummaryItem label="Status" value="Needs evidence" />
+          <SummaryItem label="Exposure" value={caseRecord ? formatAmount(caseRecord) : "--"} />
+          <SummaryItem label="Source" value={caseRecord?.source ?? "--"} />
+          <SummaryItem label="Status" value={caseRecord ? statusLabel(caseRecord.status) : "--"} />
         </dl>
       </div>
 
       <div className="space-y-5 p-4">
         <section aria-labelledby="signal-heading">
           <h3 id="signal-heading" className="text-sm font-semibold">Primary signal</h3>
-          <p className="mt-1 text-base font-semibold">{transaction?.category ?? "Awaiting selection"}</p>
+          <p className="mt-1 text-base font-semibold">{caseRecord?.category ?? "Awaiting selection"}</p>
           <p className="mt-2 text-sm leading-6 text-muted">
-            {transaction?.description ?? "Select an alert to review evidence, entity links, and recommended action."}
+            {caseRecord?.description ?? "Select a case to review its transaction context and record an investigation."}
           </p>
         </section>
 
         <section aria-labelledby="evidence-heading">
           <div className="flex items-center justify-between gap-3">
-            <h3 id="evidence-heading" className="text-sm font-semibold">Evidence summary</h3>
+            <h3 id="evidence-heading" className="text-sm font-semibold">Transaction context</h3>
             <button
               type="button"
               className="text-sm font-semibold text-accent underline-offset-4 hover:underline"
@@ -250,51 +274,23 @@ function AlertDetailPanel({
               Add evidence
             </button>
           </div>
-          <ol className="mt-3 space-y-2">
-            {evidence.map((item, index) => (
-              <li key={item} className="grid grid-cols-[24px_minmax(0,1fr)] gap-2 rounded-md border border-border bg-background p-3 text-sm leading-5">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-panel text-xs font-semibold text-muted">
-                  {index + 1}
-                </span>
-                <span>{item}</span>
-              </li>
-            ))}
-          </ol>
+          <p className="mt-3 rounded-md border border-border bg-background p-3 text-sm leading-5">
+            {caseRecord
+              ? `${caseRecord.category} classification from ${caseRecord.source} source.`
+              : "Transaction details appear when a case is selected."}
+          </p>
         </section>
 
-        <section aria-labelledby="decision-heading">
-          <h3 id="decision-heading" className="text-sm font-semibold">Decision</h3>
-          <div className="mt-3 grid gap-2">
-            <DecisionButton icon={ShieldAlert} label="Escalate to fraud ops" selected />
-            <DecisionButton icon={UserCheck} label="Request customer verification" />
-            <DecisionButton icon={CheckCircle2} label="Mark false positive" />
-          </div>
-        </section>
-
-        <details className="group rounded-md border border-border bg-background p-3">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold" aria-label="Audit preview — expand to view history">
-            Audit preview
-            <ChevronDown aria-hidden className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
-          </summary>
-          <ol className="mt-3 space-y-2 text-sm text-muted">
-            <li className="flex gap-2"><History aria-hidden className="mt-0.5 h-4 w-4 shrink-0" /> Analyst reviewed evidence</li>
-            <li className="flex gap-2"><Clock3 aria-hidden className="mt-0.5 h-4 w-4 shrink-0" /> Customer verification queued</li>
-            <li className="flex gap-2"><AlertTriangle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" /> Disposition requires reason code</li>
-          </ol>
-        </details>
-
-        <details className="group rounded-md border border-border bg-background p-3">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold" aria-label="Entity snapshot — expand to view linked entities">
-            Entity snapshot
-            <ChevronDown aria-hidden className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
-          </summary>
-          <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
-            <SummaryItem label="Device" value="Device 42" />
-            <SummaryItem label="Card" value="9182" />
-            <SummaryItem label="Merchant" value={transaction?.merchant ?? "--"} />
-            <SummaryItem label="Signals" value="3 linked" />
-          </dl>
-        </details>
+        {caseRecord ? (
+          <CaseWorkflow
+            caseRecord={caseRecord}
+            detail={caseDetail.data}
+            canMutate={canMutate}
+            isDetailLoading={caseDetail.isLoading}
+            isDetailError={caseDetail.isError}
+            onRetryDetail={() => void caseDetail.refetch()}
+          />
+        ) : null}
       </div>
     </Panel>
   );
@@ -306,31 +302,6 @@ function SummaryItem({ label, value, tone }: { label: string; value: string; ton
       <dt className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</dt>
       <dd className={`mt-1 truncate font-semibold ${tone === "danger" ? "text-danger" : ""}`}>{value}</dd>
     </div>
-  );
-}
-
-function DecisionButton({
-  icon: Icon,
-  label,
-  selected = false
-}: {
-  icon: typeof ShieldAlert;
-  label: string;
-  selected?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      className={`flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-left text-sm font-semibold transition ${
-        selected
-          ? "border-danger/40 bg-danger/10 text-danger hover:bg-danger/15"
-          : "border-border bg-white text-muted hover:border-accent/60 hover:text-foreground"
-      }`}
-      aria-pressed={selected}
-    >
-      <Icon aria-hidden className="h-4 w-4 shrink-0" />
-      {label}
-    </button>
   );
 }
 
@@ -350,7 +321,6 @@ function ContextDrawer({ drawer, onClose }: { drawer: Exclude<ToolDrawer, null>;
 
     return () => triggerRef.current?.focus();
   }, []);
-
   return (
     <dialog
       ref={dialogRef}
@@ -382,18 +352,11 @@ function DrawerPanelLoading() {
   return <div className="h-48 animate-pulse rounded-lg bg-border/50" aria-label="Loading panel" />;
 }
 
-function evidenceFor(transaction?: Transaction) {
-  if (!transaction) {
-    return [
-      "No alert selected.",
-      "Select a queue item to review signal evidence.",
-      "Decision controls will update with the selected case."
-    ];
-  }
-
-  return [
-    transaction.description,
-    `${transaction.category} triggered on ${transaction.source} evidence with ${formatAmount(transaction)} exposure.`,
-    "Related entity appeared in one other escalated case this week."
-  ];
+function statusLabel(status: InvestigationCase["status"]) {
+  return {
+    new: "New",
+    needs_evidence: "Needs evidence",
+    escalated: "Escalated",
+    resolved: "Resolved"
+  }[status];
 }

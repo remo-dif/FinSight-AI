@@ -41,10 +41,10 @@ test("forms, status regions, and alert queue expose stable accessible names", as
   await page.getByRole("button", { name: "Close panel" }).click();
 
   if ((page.viewportSize()?.width ?? 1280) < 768) {
-    await expect(page.getByRole("list", { name: "Open fraud alerts" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Fraud cases" })).toBeVisible();
   } else {
     await expect(
-      page.getByRole("table", { name: "Open fraud alerts with case, owner, risk, entity, signal, amount, and SLA" })
+      page.getByRole("table", { name: "Fraud cases with case, assignee, merchant, signal, amount, and status" })
     ).toBeVisible();
   }
 });

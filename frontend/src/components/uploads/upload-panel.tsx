@@ -1,19 +1,23 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { FileUp, LoaderCircle, Lock, UploadCloud } from "lucide-react";
 import { ChangeEvent, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
-import { uploadFinancialFile } from "@/lib/api";
+import { caseListQueryKey, uploadFinancialFile } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export function UploadPanel() {
+  const queryClient = useQueryClient();
   const inputId = useId();
   const statusId = useId();
   const [filename, setFilename] = useState<string>("No file selected");
   const [file, setFile] = useState<File | null>(null);
-  const upload = useMutation({ mutationFn: uploadFinancialFile });
+  const upload = useMutation({
+    mutationFn: uploadFinancialFile,
+    onSuccess: async () => queryClient.invalidateQueries({ queryKey: caseListQueryKey() })
+  });
 
   const statusMessage = upload.isSuccess
     ? `${upload.data.status}: ${upload.data.imported} imported, ${upload.data.indexed} indexed`

@@ -64,10 +64,11 @@ def test_register_response_schema_accepts_user_uuid(db: Session):
 
 def test_login_persists_hashed_refresh_token(db: Session):
     user = create_user(db)
+    http_response = Response()
 
     response = login(
         LoginRequest(email=user.email, password="correct horse battery staple"),
-        Response(),
+        http_response,
         db,
     )
 
@@ -80,6 +81,12 @@ def test_login_persists_hashed_refresh_token(db: Session):
     assert stored.token_hash != response.refresh_token
     assert len(stored.token_hash) == 64
     assert stored.revoked_at is None
+    access_cookie = next(
+        cookie for cookie in http_response.headers.getlist("set-cookie")
+        if cookie.startswith("finsight_access_token=")
+    )
+    assert "HttpOnly" in access_cookie
+    assert "Path=/" in access_cookie
 
 
 def test_login_uses_configured_refresh_token_lifetime(db: Session, monkeypatch):
@@ -103,13 +110,22 @@ def test_refresh_rotates_and_revokes_previous_refresh_token(db: Session):
     )
     original = db.scalar(select(RefreshToken).where(RefreshToken.user_id == user.id))
 
-    rotated = refresh(RefreshTokenRequest(refresh_token=login_response.refresh_token), Response(), db)
+    refresh_http_response = Response()
+    rotated = refresh(
+        RefreshTokenRequest(refresh_token=login_response.refresh_token),
+        refresh_http_response,
+        db,
+    )
 
     db.refresh(original)
     replacement = db.scalar(
         select(RefreshToken).where(RefreshToken.jti == original.replaced_by_jti),
     )
     assert rotated.access_token
+    assert any(
+        cookie.startswith("finsight_access_token=")
+        for cookie in refresh_http_response.headers.getlist("set-cookie")
+    )
     assert rotated.refresh_token != login_response.refresh_token
     assert original.revoked_at is not None
     assert replacement is not None
@@ -128,11 +144,20 @@ def test_logout_revokes_refresh_token(db: Session):
         db,
     )
 
-    response = logout(RefreshTokenRequest(refresh_token=login_response.refresh_token), Response(), db)
+    http_response = Response()
+    response = logout(
+        RefreshTokenRequest(refresh_token=login_response.refresh_token),
+        http_response,
+        db,
+    )
 
     stored = db.scalar(select(RefreshToken).where(RefreshToken.user_id == user.id))
     assert response.status_code == 204
     assert stored.revoked_at is not None
+    assert any(
+        cookie.startswith("finsight_access_token=") and "Max-Age=0" in cookie
+        for cookie in http_response.headers.getlist("set-cookie")
+    )
 
     with pytest.raises(HTTPException) as exc:
         refresh(RefreshTokenRequest(refresh_token=login_response.refresh_token), Response(), db)

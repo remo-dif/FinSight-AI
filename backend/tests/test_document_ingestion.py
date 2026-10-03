@@ -9,6 +9,7 @@ import pytest
 from fastapi import HTTPException
 from starlette.datastructures import Headers, UploadFile
 
+from app.models.case import InvestigationCase
 from app.models.finance import UploadedFile
 from app.services.document_ingestion import DocumentIngestionService, StoredUpload
 from app.services.rag import LOCAL_EMBEDDING_MODEL
@@ -128,7 +129,8 @@ async def test_ingest_upload_imports_csv_transactions_and_audits():
 
         assert result.status == "processed"
         assert result.imported == 1
-        assert db.flushed == 1
-        assert len(db.added) == 3
+        assert db.flushed == 2
+        assert sum(isinstance(item, InvestigationCase) for item in db.added) == 1
+        assert len(db.added) == 4
     finally:
         path.unlink(missing_ok=True)

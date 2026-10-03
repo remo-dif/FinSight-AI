@@ -7,8 +7,8 @@ test("renders finance workspace", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Investigation workspace" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Alert queue" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Selected alert" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Evidence summary" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Decision", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Transaction context" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Investigation decision" })).toBeVisible();
 });
 
 test("changes route from the primary navigation", async ({ page, isMobile }) => {

@@ -24,6 +24,7 @@ from app.core.openai_resilience import (
     openai_circuit,
 )
 from app.models.embedding import EMBEDDING_DIMENSIONS, Embedding
+from app.models.case import InvestigationCase
 from app.models.finance import Transaction, UploadedFile
 from app.schemas.finance import TransactionCreate
 from app.services.audit import AsyncAuditService
@@ -148,6 +149,8 @@ class DocumentIngestionService:
                 transactions = await asyncio.to_thread(self.parse_csv, payload)
                 rows = [Transaction(user_id=user_id, **item.model_dump()) for item in transactions]
                 db.add_all(rows)
+                await db.flush()
+                db.add_all([InvestigationCase(transaction_id=row.id) for row in rows])
                 await db.flush()
                 await audit.record(
                     "document_ingestion.csv_processed",
