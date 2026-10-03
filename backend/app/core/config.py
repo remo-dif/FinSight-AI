@@ -6,7 +6,6 @@ from typing import Annotated, Literal
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-
 UNSAFE_SECRET_VALUES = {
     "dev-secret",
     "dev-refresh-secret",

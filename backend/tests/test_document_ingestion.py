@@ -1,8 +1,8 @@
 """Async tests for the document ingestion service."""
 
+import shutil
 from io import BytesIO
 from pathlib import Path
-import shutil
 from uuid import uuid4
 
 import pytest

@@ -11,7 +11,8 @@ from sqlalchemy.pool import StaticPool
 import app.models  # noqa: F401
 from app.api.routes.cases import add_case_note, get_case, list_cases, update_case
 from app.core.database import Base, get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, hash_password
+from app.main import create_app
 from app.models.audit import AuditLog
 from app.models.case import CaseNote, InvestigationCase
 from app.models.finance import Transaction
@@ -19,8 +20,6 @@ from app.models.user import User
 from app.repositories.transactions import TransactionRepository
 from app.schemas.cases import CaseDecision, CaseNoteCreate, CaseUpdate
 from app.schemas.finance import TransactionCreate
-from app.core.security import hash_password
-from app.main import create_app
 
 
 @pytest.fixture()

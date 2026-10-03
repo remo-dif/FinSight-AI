@@ -17,7 +17,6 @@ from app.core.config import settings
 from app.core.openai_resilience import CircuitOpenError, create_openai_client, openai_circuit
 from app.models.embedding import EMBEDDING_DIMENSIONS, Embedding
 
-
 LOCAL_EMBEDDING_MODEL = "deterministic-local-hash-v1"
 logger = logging.getLogger(__name__)
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")

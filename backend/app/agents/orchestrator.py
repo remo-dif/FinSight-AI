@@ -9,7 +9,6 @@ from app.agents.tools import FinanceToolLayer
 from app.services.llm import LLMService
 from app.services.rag import RagService
 
-
 ToolRunner = Callable[["OrchestratorAgent", AgentState], dict[str, Any]]
 
 

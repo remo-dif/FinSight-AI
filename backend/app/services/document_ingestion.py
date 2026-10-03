@@ -23,14 +23,13 @@ from app.core.openai_resilience import (
     create_async_openai_client,
     openai_circuit,
 )
-from app.models.embedding import EMBEDDING_DIMENSIONS, Embedding
 from app.models.case import InvestigationCase
+from app.models.embedding import EMBEDDING_DIMENSIONS, Embedding
 from app.models.finance import Transaction, UploadedFile
 from app.schemas.finance import TransactionCreate
 from app.services.audit import AsyncAuditService
 from app.services.categorization import CategorizationService
 from app.services.rag import LOCAL_EMBEDDING_MODEL
-
 
 _TOKEN_RE = re.compile(r"\S+")
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")

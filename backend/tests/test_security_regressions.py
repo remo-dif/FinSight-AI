@@ -1,6 +1,6 @@
+import shutil
 from io import BytesIO
 from pathlib import Path
-import shutil
 from types import SimpleNamespace
 from uuid import uuid4
 

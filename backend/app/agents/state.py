@@ -1,7 +1,6 @@
 from typing import Any, Literal, TypedDict
 from uuid import UUID
 
-
 AgentIntent = Literal["anomaly", "recurring", "budget", "merchant", "category", "summary"]
 ReviewStatus = Literal["accepted", "rejected"]
 

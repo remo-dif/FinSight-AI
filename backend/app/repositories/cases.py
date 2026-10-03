@@ -7,7 +7,6 @@ from app.models.case import CaseNote, InvestigationCase
 from app.models.finance import Transaction
 from app.models.user import User
 
-
 CaseRecord = tuple[InvestigationCase, Transaction, User | None]
 
 

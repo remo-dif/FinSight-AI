@@ -19,7 +19,13 @@ from app.core.security import (
     verify_password,
 )
 from app.models.user import RefreshToken, User
-from app.schemas.auth import LoginRequest, RefreshTokenRequest, RegisterRequest, TokenResponse, UserResponse
+from app.schemas.auth import (
+    LoginRequest,
+    RefreshTokenRequest,
+    RegisterRequest,
+    TokenResponse,
+    UserResponse,
+)
 from app.services.audit import AuditService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
