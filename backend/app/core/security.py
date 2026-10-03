@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from hashlib import sha256
 from hmac import compare_digest
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID, uuid4
 
 import bcrypt
@@ -113,7 +113,10 @@ def as_aware_utc(value: datetime) -> datetime:
     return value.astimezone(UTC)
 
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    db: Annotated[Session, Depends(get_db)],
+) -> User:
     credentials_error = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid authentication credentials",
@@ -134,8 +137,8 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
 
 async def get_current_user_async(
-    token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_async_db),
+    token: Annotated[str, Depends(oauth2_scheme)],
+    db: Annotated[AsyncSession, Depends(get_async_db)],
 ) -> User:
     credentials_error = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -157,7 +160,7 @@ async def get_current_user_async(
 
 
 def require_role(*roles: UserRole):
-    def dependency(user: User = Depends(get_current_user)) -> User:
+    def dependency(user: Annotated[User, Depends(get_current_user)]) -> User:
         if user.role not in roles:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role")
         return user
@@ -166,7 +169,7 @@ def require_role(*roles: UserRole):
 
 
 def require_role_async(*roles: UserRole):
-    async def dependency(user: User = Depends(get_current_user_async)) -> User:
+    async def dependency(user: Annotated[User, Depends(get_current_user_async)]) -> User:
         if user.role not in roles:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role")
         return user

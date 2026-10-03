@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -19,7 +21,11 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 @router.post("", response_model=ChatResponse)
-def chat(payload: ChatRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def chat(
+    payload: ChatRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
     session = None
     if payload.session_id:
         session = db.scalar(

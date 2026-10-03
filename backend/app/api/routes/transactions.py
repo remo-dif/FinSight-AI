@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy.orm import Session
@@ -15,12 +16,12 @@ router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 @router.get("", response_model=list[TransactionResponse])
 def list_transactions(
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
-    start_date: date | None = Query(default=None),
-    end_date: date | None = Query(default=None),
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    start_date: Annotated[date | None, Query()] = None,
+    end_date: Annotated[date | None, Query()] = None,
 ):
     return TransactionRepository(db).list_for_user(
         user.id,
@@ -34,8 +35,8 @@ def list_transactions(
 @router.post("", response_model=list[TransactionResponse])
 def create_transactions(
     payload: list[TransactionCreate],
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     if len(payload) > 500:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Too many transactions")
@@ -46,9 +47,9 @@ def create_transactions(
 
 @router.get("/summary/{month}", response_model=MonthlySummary)
 def monthly_summary(
-    month: str = Path(pattern=r"^\d{4}-\d{2}$"),
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    month: Annotated[str, Path(pattern=r"^\d{4}-\d{2}$")],
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     analytics = FinanceAnalyticsService(TransactionRepository(db))
     return analytics.get_monthly_summary(user.id, month)

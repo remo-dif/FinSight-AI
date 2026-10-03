@@ -69,4 +69,4 @@ class FinanceAnalyticsService:
 
     def generate_budget(self, user_id: UUID) -> dict[str, Decimal]:
         spend = self.repository.spending_by_category(user_id)
-        return {category: (amount / Decimal("3")).quantize(Decimal("0.01")) for category, amount in spend.items()}
+        return {category: (amount / Decimal(3)).quantize(Decimal("0.01")) for category, amount in spend.items()}

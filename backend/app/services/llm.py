@@ -1,6 +1,8 @@
 import json
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
+
+from openai import OpenAIError
 
 from app.core.config import settings
 from app.core.openai_resilience import CircuitOpenError, create_openai_client, openai_circuit
@@ -43,7 +45,7 @@ class LLMService:
                 temperature=0.0,
                 max_tokens=450,
             )
-        except Exception:
+        except OpenAIError:
             openai_circuit.record_failure()
             return self._synthesize_local(user_message, intent, tool_results, rag_chunks or [])
 
@@ -156,7 +158,7 @@ class LLMService:
             return "$0.00"
         try:
             return f"${Decimal(str(value)):,.2f}"
-        except Exception:
+        except (InvalidOperation, ValueError):
             return str(value)
 
     def _extract_text(self, response: Any) -> str:

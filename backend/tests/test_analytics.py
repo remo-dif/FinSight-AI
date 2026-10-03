@@ -20,8 +20,8 @@ class FakeRepository:
         return self.rows
 
     def monthly_summary(self, user_id, month):
-        income = Decimal("0")
-        spending = Decimal("0")
+        income = Decimal(0)
+        spending = Decimal(0)
         for row in self.rows:
             if row.posted_at.isoformat().startswith(month):
                 if row.amount > 0:

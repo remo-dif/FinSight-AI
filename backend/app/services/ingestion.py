@@ -3,6 +3,7 @@ import io
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from typing import ClassVar
 from uuid import UUID, uuid4
 
 import pdfplumber
@@ -15,13 +16,13 @@ from app.services.categorization import CategorizationService
 
 
 class SecureUploadService:
-    allowed_content_types = {
+    allowed_content_types: ClassVar[dict[str, str]] = {
         "text/csv": ".csv",
         "application/pdf": ".pdf",
         "image/png": ".png",
         "image/jpeg": ".jpg",
     }
-    allowed_extensions = {".csv", ".pdf", ".png", ".jpg", ".jpeg"}
+    allowed_extensions: ClassVar[set[str]] = {".csv", ".pdf", ".png", ".jpg", ".jpeg"}
 
     def validate_metadata(self, file: UploadFile) -> None:
         suffix = Path(file.filename or "").suffix.lower()

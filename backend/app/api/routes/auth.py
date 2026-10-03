@@ -1,3 +1,4 @@
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
@@ -89,7 +90,7 @@ def invalid_refresh_token_error() -> HTTPException:
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> User:
+def register(payload: RegisterRequest, db: Annotated[Session, Depends(get_db)]) -> User:
     existing = db.scalar(select(User).where(User.email == payload.email))
     if existing:
         raise HTTPException(status.HTTP_409_CONFLICT, "Email is already registered")
@@ -110,7 +111,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> User:
 def login(
     payload: LoginRequest,
     response: Response,
-    db: Session = Depends(get_db),
+    db: Annotated[Session, Depends(get_db)],
 ) -> TokenResponse:
     user = db.scalar(select(User).where(User.email == payload.email))
     if not user or not verify_password(payload.password, user.password_hash):
@@ -131,7 +132,7 @@ def login(
 def refresh(
     payload: RefreshTokenRequest,
     response: Response,
-    db: Session = Depends(get_db),
+    db: Annotated[Session, Depends(get_db)],
     cookie_token: str | None = Cookie(default=None, alias=REFRESH_COOKIE_NAME),
 ) -> TokenResponse:
     refresh_token = refresh_token_from_request(payload, cookie_token)
@@ -170,7 +171,7 @@ def refresh(
 def logout(
     payload: RefreshTokenRequest,
     response: Response,
-    db: Session = Depends(get_db),
+    db: Annotated[Session, Depends(get_db)],
     cookie_token: str | None = Cookie(default=None, alias=REFRESH_COOKIE_NAME),
 ) -> Response:
     refresh_token = refresh_token_from_request(payload, cookie_token)
@@ -178,11 +179,15 @@ def logout(
     user_id = UUID(str(decoded["sub"]))
     stored = db.scalar(select(RefreshToken).where(RefreshToken.jti == str(decoded["jti"])))
 
-    if stored is not None and stored.user_id == user_id and token_hash_matches(refresh_token, stored.token_hash):
-        if stored.revoked_at is None:
-            stored.revoked_at = utc_now()
-            AuditService(db).record("auth.logout", user_id)
-            db.commit()
+    if (
+        stored is not None
+        and stored.user_id == user_id
+        and token_hash_matches(refresh_token, stored.token_hash)
+        and stored.revoked_at is None
+    ):
+        stored.revoked_at = utc_now()
+        AuditService(db).record("auth.logout", user_id)
+        db.commit()
     clear_refresh_cookie(response)
     clear_access_cookie(response)
     response.status_code = status.HTTP_204_NO_CONTENT
@@ -190,5 +195,5 @@ def logout(
 
 
 @router.get("/me", response_model=UserResponse)
-def me(user: User = Depends(get_current_user)) -> User:
+def me(user: Annotated[User, Depends(get_current_user)]) -> User:
     return user

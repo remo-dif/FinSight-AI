@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from typing import ClassVar
 from uuid import UUID, uuid4
 
 import pdfplumber
@@ -63,13 +64,13 @@ class IngestionResult:
 
 
 class DocumentIngestionService:
-    allowed_content_types: dict[str, set[str]] = {
+    allowed_content_types: ClassVar[dict[str, set[str]]] = {
         "text/csv": {".csv"},
         "application/pdf": {".pdf"},
         "image/png": {".png"},
         "image/jpeg": {".jpg", ".jpeg"},
     }
-    magic_bytes: dict[str, tuple[bytes, ...]] = {
+    magic_bytes: ClassVar[dict[str, tuple[bytes, ...]]] = {
         ".pdf": (b"%PDF-",),
         ".png": (b"\x89PNG\r\n\x1a\n",),
         ".jpg": (b"\xff\xd8\xff",),

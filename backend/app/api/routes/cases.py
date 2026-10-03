@@ -1,3 +1,4 @@
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -51,10 +52,10 @@ def _get_case_record(case_id: UUID, user: User, db: Session) -> CaseRecord:
 
 @router.get("", response_model=list[CaseResponse])
 def list_cases(
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[CaseResponse]:
     return [_case_response(record, user) for record in CaseRepository(db).list_for_user(user.id, limit, offset)]
 
@@ -62,8 +63,8 @@ def list_cases(
 @router.get("/{case_id}", response_model=CaseDetailResponse)
 def get_case(
     case_id: UUID,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> CaseDetailResponse:
     record = _get_case_record(case_id, user, db)
     notes = CaseRepository(db).notes_for_user(case_id, user.id)
@@ -85,8 +86,8 @@ def get_case(
 def update_case(
     case_id: UUID,
     payload: CaseUpdate,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> CaseResponse:
     case, _, _ = _get_case_record(case_id, user, db)
     if payload.status is None and payload.assignee is None and payload.decision is None:
@@ -154,8 +155,8 @@ def update_case(
 def add_case_note(
     case_id: UUID,
     payload: CaseNoteCreate,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> CaseNoteResponse:
     _get_case_record(case_id, user, db)
     note = CaseNote(case_id=case_id, author_id=user.id, content=payload.content)

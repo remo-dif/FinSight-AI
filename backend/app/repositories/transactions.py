@@ -60,7 +60,7 @@ class TransactionRepository:
             start_date, end_date = self._month_range(month)
             query = query.where(Transaction.posted_at >= start_date, Transaction.posted_at < end_date)
         query = query.group_by(Transaction.category)
-        return {category: abs(total or Decimal("0")) for category, total in self.db.execute(query)}
+        return {category: abs(total or Decimal(0)) for category, total in self.db.execute(query)}
 
     def top_merchants(self, user_id: UUID, limit: int = 10) -> dict[str, Decimal]:
         rows = self.db.execute(
@@ -70,7 +70,7 @@ class TransactionRepository:
             .order_by(func.sum(-Transaction.amount).desc())
             .limit(limit)
         )
-        return {merchant: total or Decimal("0") for merchant, total in rows}
+        return {merchant: total or Decimal(0) for merchant, total in rows}
 
     @staticmethod
     def _month_range(month: str) -> tuple[date, date]:

@@ -1,6 +1,7 @@
 import json
-from datetime import date
-from typing import Any, Callable
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
 
 from langgraph.graph import END, StateGraph
 
@@ -138,11 +139,11 @@ class OrchestratorAgent:
         return self.tools.get_spending_by_category(state["user_id"])
 
     def _run_summary(self, state: AgentState) -> dict:
-        month = date.today().strftime("%Y-%m")
+        month = datetime.now(UTC).strftime("%Y-%m")
         return self.tools.get_monthly_summary(state["user_id"], month)
 
     def _answer_for_intent(self, intent: AgentIntent, tool_results: dict[str, Any]) -> str:
-        month = date.today().strftime("%Y-%m")
+        month = datetime.now(UTC).strftime("%Y-%m")
         answers = {
             "anomaly": (
                 "I reviewed your recent spending and flagged the transactions that stand out "
