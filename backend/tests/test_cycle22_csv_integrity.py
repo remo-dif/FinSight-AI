@@ -47,7 +47,7 @@ def test_missing_or_blank_amount_cell_rejected_before_categorization(parser, val
 def test_explicit_zero_and_signed_values_preserve_order_currency_and_text(parser, header):
     payload = f'date,merchant,description,{header},currency\n2025-01-01,"multi\nline",first,0,EUR\n2025-01-02,B,"two\nlines",+12.34,USD\n2025-01-03,C,third,-5.67,EUR\n'.encode()
     rows = parser.parse_csv(payload)
-    assert [row.amount for row in rows] == [Decimal("0"), Decimal("12.34"), Decimal("-5.67")]
+    assert [row.amount for row in rows] == [Decimal(0), Decimal("12.34"), Decimal("-5.67")]
     assert [row.currency for row in rows] == ["EUR", "USD", "EUR"]
     assert rows[0].merchant == "multi\nline" and rows[1].description == "two\nlines"
 
@@ -55,7 +55,11 @@ def test_explicit_zero_and_signed_values_preserve_order_currency_and_text(parser
 @pytest.mark.parametrize("field", ["merchant", "description"])
 @pytest.mark.parametrize("error", ["currency", "amount", "date", "precision", "length"])
 def test_errors_after_multiline_records_report_physical_line(parser, field, error):
-    first = '2025-01-01,"multi\nline",ok,-1.00,EUR' if field == "merchant" else '2025-01-01,A,"multi\nline",-1.00,EUR'
+    first = (
+        '2025-01-01,"multi\nline",ok,-1.00,EUR'
+        if field == "merchant"
+        else '2025-01-01,A,"multi\nline",-1.00,EUR'
+    )
     second = {
         "currency": "2025-01-02,B,ok,-2.00,",
         "amount": "2025-01-02,B,ok,not-money,EUR",
@@ -87,7 +91,9 @@ def test_late_invalid_amount_reports_line(parser, value):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("value", ["", "   ", "not-money", "NaN", "sNaN", "Infinity"])
-async def test_upload_rejects_late_invalid_amount_without_partial_persistence(monkeypatch, tmp_path, value):
+async def test_upload_rejects_late_invalid_amount_without_partial_persistence(
+    monkeypatch, tmp_path, value
+):
     configure(monkeypatch, upload_dir=tmp_path, storage_backend="local")
     sentinel = tmp_path / "existing.csv"
     sentinel.write_bytes(b"Preserve existing file")
@@ -102,8 +108,12 @@ async def test_upload_rejects_late_invalid_amount_without_partial_persistence(mo
             app.dependency_overrides[upload_user] = lambda: owner
             app.dependency_overrides[get_async_db] = lambda: AsyncAdapter(db)
             payload = f'date,merchant,amount,currency\n2025-01-01,"multi\nline",-1.20,EUR\n2025-01-02,B,{value},EUR\n'.encode()
-            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
-                response = await client.post("/api/uploads", files={"file": ("data.csv", payload, "text/csv")})
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app), base_url="http://test"
+            ) as client:
+                response = await client.post(
+                    "/api/uploads", files={"file": ("data.csv", payload, "text/csv")}
+                )
             assert response.status_code == 400, response.text
             assert "line 4" in response.json()["detail"]
             assert db.scalar(select(func.count()).select_from(Transaction)) == 0

@@ -407,8 +407,11 @@ class DocumentIngestionService:
 
         reader = csv.DictReader(io.StringIO(text))
         currencies = CsvCurrencyResolver(reader.fieldnames, import_currency)
+        if not {"amount", "Amount"}.intersection(reader.fieldnames or []):
+            raise HTTPException(400, "Missing CSV amount column. Add an amount or Amount column.")
         rows: list[TransactionCreate] = []
-        for line_number, raw in enumerate(reader, start=2):
+        for raw in reader:
+            line_number = reader.line_num  # Ending physical line, including multiline fields.
             if len(rows) >= 5000:
                 raise HTTPException(
                     status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "CSV has too many rows"
@@ -417,8 +420,15 @@ class DocumentIngestionService:
                 raw.get("merchant") or raw.get("Merchant") or raw.get("description") or "Unknown"
             )
             description = raw.get("description") or raw.get("Description") or merchant
+            raw_amount = raw.get("amount") or raw.get("Amount")
+            if raw_amount is None or not raw_amount.strip():
+                raise HTTPException(
+                    400,
+                    f"Missing or blank CSV amount on line {line_number}. "
+                    "Supply a numeric amount; use 0 only when the source explicitly specifies zero.",
+                )
             try:
-                amount = Decimal(str(raw.get("amount") or raw.get("Amount") or "0"))
+                amount = Decimal(raw_amount)
                 if not amount.is_finite():
                     raise ValueError("Non-finite monetary value")
                 posted_at = datetime.fromisoformat(raw.get("date") or raw.get("Date")).date()
