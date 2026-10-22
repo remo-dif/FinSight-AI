@@ -5,7 +5,6 @@ import csv
 import hashlib
 import io
 import logging
-import math
 import re
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -27,6 +26,7 @@ from app.core.openai_resilience import (
     CircuitOpenError,
     create_async_openai_client,
     openai_circuit,
+    validate_embedding_response,
 )
 from app.models.case import InvestigationCase
 from app.models.embedding import EMBEDDING_DIMENSIONS, Embedding
@@ -376,18 +376,9 @@ class DocumentIngestionService:
                 "Embedding provider unavailable. Retry the upload later; no embedding model was substituted.",
             ) from exc
         try:
-            if getattr(response, "model", None) != self.embedding_model:
-                raise ValueError("Unexpected embedding model identity")
-            ordered = sorted(response.data, key=lambda row: row.index)
-            if [row.index for row in ordered] != list(range(len(values))):
-                raise ValueError("Incomplete embedding response")
-            vectors = [[float(item) for item in row.embedding] for row in ordered]
-            if any(
-                len(v) != EMBEDDING_DIMENSIONS or not all(math.isfinite(x) for x in v)
-                for v in vectors
-            ):
-                raise ValueError("Invalid embedding dimensions or values")
+            vectors = validate_embedding_response(response, self.embedding_model, len(values), EMBEDDING_DIMENSIONS)
         except (AttributeError, TypeError, ValueError, OverflowError) as exc:
+            openai_circuit.record_failure()
             raise HTTPException(
                 503, "Invalid embedding provider response. Retry the upload; nothing was indexed."
             ) from exc

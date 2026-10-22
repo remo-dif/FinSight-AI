@@ -2,10 +2,24 @@
 
 from threading import Lock
 from time import monotonic
+from math import isfinite
 
 from openai import AsyncOpenAI, OpenAI
 
 from app.core.config import settings
+
+
+def validate_embedding_response(response, model: str, count: int, dimensions: int) -> list[list[float]]:
+    """One validation policy for indexing and query embeddings."""
+    if getattr(response, "model", None) != model:
+        raise ValueError("Unexpected embedding model identity")
+    ordered = sorted(response.data, key=lambda row: row.index)
+    if [row.index for row in ordered] != list(range(count)):
+        raise ValueError("Incomplete embedding response")
+    vectors = [[float(item) for item in row.embedding] for row in ordered]
+    if any(len(v) != dimensions or not all(isfinite(x) for x in v) for v in vectors):
+        raise ValueError("Invalid embedding dimensions or values")
+    return vectors
 
 
 class CircuitOpenError(RuntimeError):

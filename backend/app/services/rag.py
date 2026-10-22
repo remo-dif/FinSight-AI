@@ -14,7 +14,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.openai_resilience import CircuitOpenError, create_openai_client, openai_circuit
+from app.core.openai_resilience import CircuitOpenError, create_openai_client, openai_circuit, validate_embedding_response
 from app.models.embedding import EMBEDDING_DIMENSIONS, Embedding
 
 LOCAL_EMBEDDING_MODEL = "deterministic-local-hash-v2"
@@ -171,10 +171,10 @@ class RagService:
             )
         if self._openai_client:
             kwargs: dict[str, Any] = {
-                "model": settings.openai_embedding_model,
+                "model": self.embedding_model,
                 "input": values,
             }
-            if settings.openai_embedding_model.startswith("text-embedding-3"):
+            if self.embedding_model.startswith("text-embedding-3"):
                 kwargs["dimensions"] = EMBEDDING_DIMENSIONS
             openai_circuit.before_call()
             try:
@@ -182,8 +182,13 @@ class RagService:
             except OpenAIError:
                 openai_circuit.record_failure()
                 raise
+            try:
+                vectors = validate_embedding_response(response, self.embedding_model, len(values), EMBEDDING_DIMENSIONS)
+            except (AttributeError, TypeError, ValueError, OverflowError) as exc:
+                openai_circuit.record_failure()
+                raise OpenAIError("Invalid embedding provider response; retrieval skipped") from exc
             openai_circuit.record_success()
-            return [[float(item) for item in row.embedding] for row in response.data]
+            return vectors
         raise OpenAIError("Remote embedding provider unavailable")
 
     def _chunk_text(
