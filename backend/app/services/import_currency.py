@@ -6,8 +6,9 @@ from app.services.financial_context import SUPPORTED_CURRENCIES
 
 
 def validate_import_currency(value: str, context: str) -> str:
-    normalized = value.strip().upper()
-    if normalized not in SUPPORTED_CURRENCIES:
+    stripped = value.strip()
+    normalized = stripped.upper()
+    if not stripped.isascii() or normalized not in SUPPORTED_CURRENCIES:
         raise HTTPException(
             400,
             f"Invalid or unsupported currency in {context}. Choose one of "
