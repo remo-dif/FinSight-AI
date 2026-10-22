@@ -1,4 +1,3 @@
-from dataclasses import replace
 from io import BytesIO
 from types import SimpleNamespace
 from uuid import uuid4
@@ -146,3 +145,68 @@ async def test_staging_collision_never_appends_or_deletes_existing_file(monkeypa
     with pytest.raises(FileExistsError):
         await DocumentIngestionService().save_upload(uid, file())
     assert path.read_bytes() == b"Existing payload"
+
+
+@pytest.mark.asyncio
+async def test_conditional_s3_cleanup_only_deletes_owned_version(monkeypatch, tmp_path):
+    import boto3
+    from app.services.document_ingestion import StoredUpload
+    configure(monkeypatch, upload_dir=tmp_path, storage_backend="s3", s3_upload_bucket="synthetic-bucket")
+    calls = []
+    class S3:
+        def put_object(self, **kwargs):
+            assert kwargs["IfNoneMatch"] == "*"
+            calls.append(("put", kwargs["Key"]))
+            return {"ETag": '"synthetic-etag"', "VersionId": "synthetic-version"}
+        def delete_object(self, **kwargs): calls.append(("delete", kwargs))
+    monkeypatch.setattr(boto3, "client", lambda name: S3())
+    service = DocumentIngestionService()
+    upload = await service.save_upload(uuid4(), file())
+    await service.cleanup_upload(upload)
+    assert calls[1][1]["Key"] == calls[0][1]
+    assert calls[1][1]["IfMatch"] == '"synthetic-etag"'
+    assert calls[1][1]["VersionId"] == "synthetic-version"
+    foreign = tmp_path / "foreign.pdf"
+    foreign.write_bytes(b"Existing")
+    await service.cleanup_upload(StoredUpload(foreign, "s3://synthetic-bucket/existing", "existing.pdf", "application/pdf", ".pdf", 8))
+    assert foreign.read_bytes() == b"Existing"
+    assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_s3_collision_preserves_preexisting_object(monkeypatch, tmp_path):
+    import boto3
+    configure(monkeypatch, upload_dir=tmp_path, storage_backend="s3", s3_upload_bucket="synthetic-bucket")
+    class S3:
+        def put_object(self, **kwargs):
+            assert kwargs["IfNoneMatch"] == "*"
+            raise FileExistsError("Synthetic pre-existing object")
+        def delete_object(self, **kwargs): pytest.fail("Existing object must not be deleted")
+    monkeypatch.setattr(boto3, "client", lambda name: S3())
+    with pytest.raises(FileExistsError):
+        await DocumentIngestionService().save_upload(uuid4(), file())
+    assert list(tmp_path.rglob("*.pdf")) == []
+
+
+@pytest.mark.asyncio
+async def test_local_retrieval_excludes_legacy_or_different_embedding_models(monkeypatch):
+    from app.services.rag import RagService
+    configure(monkeypatch, embedding_backend="local")
+    from app.services.document_ingestion import settings as configured
+    monkeypatch.setattr("app.services.rag.settings", configured)
+    service = DocumentIngestionService()
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    uid = uuid4()
+    with Session(engine) as db:
+        db.add(User(id=uid, email="model@example.invalid", full_name="Synthetic", password_hash="unused"))
+        vector = (await service.embed_texts(["coffee"]))[0]
+        for model in ["deterministic-local-hash-v1", "remote-test-model", service.embedding_model]:
+            db.add(Embedding(user_id=uid, source_type="upload", source_id=uuid4(), chunk_index=0,
+                             chunk_text=model, chunk_hash=model, embedding=vector,
+                             embedding_model=model, embedding_dimensions=1536, metadata_json={}))
+        db.flush()
+        results = RagService(db).retrieve_chunks(uid, "coffee")
+        assert service.embedding_model != "deterministic-local-hash-v1"
+        assert [r.text for r in results] == [service.embedding_model]
+    engine.dispose()
