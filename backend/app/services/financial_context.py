@@ -44,6 +44,20 @@ _KNOWN_CODES = SUPPORTED_CURRENCIES | {
     "BTC",
     "ETH",
 }
+_MONTH_ABBREVIATIONS = {
+    "JAN",
+    "FEB",
+    "MAR",
+    "APR",
+    "MAY",
+    "JUN",
+    "JUL",
+    "AUG",
+    "SEP",
+    "OCT",
+    "NOV",
+    "DEC",
+}
 
 
 def reporting_currency(value: str) -> str:
@@ -56,7 +70,9 @@ def reporting_currency(value: str) -> str:
 
 
 def resolve_context(message: str, intent: str, currency: str | None = None) -> dict:
-    candidates = set(re.findall(r"\b[A-Z]{3}\b", message)) - _COMMON_UPPER_WORDS
+    candidates = (
+        set(re.findall(r"\b[A-Z]{3}\b", message)) - _COMMON_UPPER_WORDS - _MONTH_ABBREVIATIONS
+    )
     candidates.update(
         re.findall(r"\b(?:" + "|".join(sorted(_KNOWN_CODES)) + r")\b", message.upper())
     )
@@ -65,14 +81,12 @@ def resolve_context(message: str, intent: str, currency: str | None = None) -> d
         for code in re.findall(
             r"\b(?:currency|in|using)(?:\s*[:=]\s*|\s+)([a-zA-Z]{3})\b", message, re.IGNORECASE
         )
-        if code.upper()
-        not in _COMMON_UPPER_WORDS
-        | {"MAY", "JAN", "FEB", "MAR", "APR", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"}
+        if code.upper() not in _COMMON_UPPER_WORDS | _MONTH_ABBREVIATIONS
     )
     candidates.update(
         code.upper()
         for code in re.findall(r"\b([a-zA-Z]{3})\s+\d{4}-\d{2}\b", message)
-        if code.upper() not in _COMMON_UPPER_WORDS
+        if code.upper() not in _COMMON_UPPER_WORDS | _MONTH_ABBREVIATIONS
     )
     for word, code in {"euros": "EUR", "euro": "EUR", "pounds": "GBP", "yen": "JPY"}.items():
         if re.search(r"\b" + word + r"\b", message, re.IGNORECASE):
@@ -108,8 +122,12 @@ def resolve_context(message: str, intent: str, currency: str | None = None) -> d
         message,
         re.IGNORECASE,
     )
+    abbreviated_month = re.search(
+        r"\b(?:jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b", message, re.IGNORECASE
+    )
     if (
         unsupported
+        or abbreviated_month
         or re.search(r"\b\d{4}-\d{2}-\d{2}\b", message)
         or re.search(r"\b\d{4}\b", remaining)
     ):
