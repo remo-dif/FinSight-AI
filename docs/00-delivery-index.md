@@ -27,3 +27,4 @@ This repository implements the requested output order as concrete code and suppo
 23. Cycle 2 Financial Trust: [18-cycle2-financial-trust.md](./18-cycle2-financial-trust.md)
 24. Cycle 2 Validation: [19-cycle2-validation.md](./19-cycle2-validation.md)
 25. Cycle 2.1 Explicit CSV Currency: [20-cycle21-explicit-csv-currency.md](./20-cycle21-explicit-csv-currency.md)
+26. Cycle 2.2 CSV Data Integrity: [21-cycle22-csv-integrity.md](./21-cycle22-csv-integrity.md)
