@@ -102,3 +102,10 @@ def test_ordinary_words_are_not_misidentified_as_currency_or_period(message, int
     from app.services.financial_context import resolve_context
 
     assert resolve_context(message, intent)["intent"] == intent
+
+
+@pytest.mark.parametrize("message", ["summary Jan", "summary in jan", "summary JAN"])
+def test_abbreviated_months_produce_an_actionable_period_error(message):
+    from app.services.financial_context import resolve_context
+    with pytest.raises(ValueError, match="YYYY-MM"):
+        resolve_context(message, "summary")
