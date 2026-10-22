@@ -64,6 +64,12 @@ class Settings(BaseSettings):
     )
     upload_dir: Path = Field(default=Path("/app/uploads"), validation_alias="UPLOAD_DIR")
     max_upload_mb: int = Field(default=10, gt=0, validation_alias="MAX_UPLOAD_SIZE_MB")
+    document_max_extracted_chars: int = Field(
+        default=1_000_000, gt=0, le=1_000_000, validation_alias="DOCUMENT_MAX_EXTRACTED_CHARS"
+    )
+    document_max_chunks: int = Field(
+        default=128, gt=0, le=128, validation_alias="DOCUMENT_MAX_CHUNKS"
+    )
     s3_upload_bucket: str | None = Field(default=None, validation_alias="S3_UPLOAD_BUCKET")
     s3_upload_prefix: str = Field(default="uploads", validation_alias="S3_UPLOAD_PREFIX")
     s3_kms_key_id: str | None = Field(default=None, validation_alias="S3_KMS_KEY_ID")

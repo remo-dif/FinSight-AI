@@ -335,6 +335,8 @@ class DocumentIngestionService:
     def chunk_text(
         self, text: str, chunk_tokens: int = 512, overlap_tokens: int = 64
     ) -> list[DocumentChunk]:
+        if len(text) > settings.document_max_extracted_chars:
+            raise HTTPException(413, "Document has too much extracted text; split the document and retry.")
         if chunk_tokens <= 0:
             raise ValueError("chunk_tokens must be positive")
         if overlap_tokens < 0 or overlap_tokens >= chunk_tokens:
@@ -351,6 +353,8 @@ class DocumentIngestionService:
             end = min(start + chunk_tokens, len(tokens))
             chunk = " ".join(tokens[start:end])
             chunks.append(DocumentChunk(index=len(chunks), text=chunk, token_count=end - start))
+            if len(chunks) > settings.document_max_chunks:
+                raise HTTPException(413, "Document has too many text chunks; split the document and retry.")
             if end >= len(tokens):
                 break
             start = end - overlap_tokens
@@ -359,6 +363,11 @@ class DocumentIngestionService:
     async def embed_texts(self, values: list[str]) -> list[list[float]]:
         if not values:
             return []
+        if (
+            len(values) > settings.document_max_chunks
+            or sum(len(value) for value in values) > settings.document_max_extracted_chars
+        ):
+            raise HTTPException(413, "Document exceeds embedding budget; split the document and retry.")
         if self._embedding_backend == "local":
             return [self._local_embedding(value) for value in values]
         if self._openai_client is None:
@@ -492,7 +501,15 @@ class DocumentIngestionService:
                         status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                         f"PDF has too many pages; maximum is {MAX_PDF_PAGES}",
                     )
-                return "\n".join(page.extract_text() or "" for page in pdf.pages)
+                texts = []
+                total_chars = 0
+                for page in pdf.pages:
+                    value = page.extract_text() or ""
+                    total_chars += len(value) + (1 if texts else 0)
+                    if total_chars > settings.document_max_extracted_chars:
+                        raise HTTPException(413, "Document has too much extracted text; split the document and retry.")
+                    texts.append(value)
+                return "\n".join(texts)
         if suffix in {".png", ".jpg", ".jpeg"}:
             try:
                 with Image.open(path) as image:
