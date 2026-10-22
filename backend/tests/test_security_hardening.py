@@ -10,24 +10,31 @@ from app.core.database import Base, get_db
 from app.main import create_app
 from app.models.user import RefreshToken
 from app.schemas.auth import LoginRequest, RefreshTokenRequest
-from tests.test_auth import create_user, db  # noqa: F401
+from tests.test_auth import (
+    create_user,
+    db,  # noqa: F401
+)
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("password", ["A" * 73, "è" * 40])
-async def test_oversize_password_is_client_error_not_server_error(db, password):
+async def test_oversize_password_is_client_error_not_server_error(db, password):  # noqa: F811
     create_user(db)
     app = create_app()
     app.dependency_overrides[get_db] = lambda: db
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test"
+    ) as client:
         for path in ["/api/auth/register", "/api/auth/login"]:
             email = "new@example.com" if path.endswith("register") else "user@example.com"
-            response = await client.post(path, json={"email": email, "password": password, "full_name": "Synthetic"})
+            response = await client.post(
+                path, json={"email": email, "password": password, "full_name": "Synthetic"}
+            )
             assert response.status_code == 422, response.text
     assert db.scalar(select(func.count()).select_from(RefreshToken)) == 0
 
 
-def test_disabled_login_never_issues_cookies_or_tokens(db):
+def test_disabled_login_never_issues_cookies_or_tokens(db):  # noqa: F811
     user = create_user(db)
     user.is_active = False
     db.commit()
@@ -45,7 +52,11 @@ def test_stale_refresh_reader_cannot_rotate_consumed_token(tmp_path):
     try:
         with Session(engine) as first, Session(engine) as stale:
             user = create_user(first)
-            tokens = login(LoginRequest(email=user.email, password="correct horse battery staple"), Response(), first)
+            tokens = login(
+                LoginRequest(email=user.email, password="correct horse battery staple"),
+                Response(),
+                first,
+            )
             # Both contenders have observed the same unrevoked token.
             cached = stale.scalar(select(RefreshToken))
             assert cached.revoked_at is None

@@ -336,7 +336,9 @@ class DocumentIngestionService:
         self, text: str, chunk_tokens: int = 512, overlap_tokens: int = 64
     ) -> list[DocumentChunk]:
         if len(text) > settings.document_max_extracted_chars:
-            raise HTTPException(413, "Document has too much extracted text; split the document and retry.")
+            raise HTTPException(
+                413, "Document has too much extracted text; split the document and retry."
+            )
         if chunk_tokens <= 0:
             raise ValueError("chunk_tokens must be positive")
         if overlap_tokens < 0 or overlap_tokens >= chunk_tokens:
@@ -354,7 +356,9 @@ class DocumentIngestionService:
             chunk = " ".join(tokens[start:end])
             chunks.append(DocumentChunk(index=len(chunks), text=chunk, token_count=end - start))
             if len(chunks) > settings.document_max_chunks:
-                raise HTTPException(413, "Document has too many text chunks; split the document and retry.")
+                raise HTTPException(
+                    413, "Document has too many text chunks; split the document and retry."
+                )
             if end >= len(tokens):
                 break
             start = end - overlap_tokens
@@ -367,7 +371,9 @@ class DocumentIngestionService:
             len(values) > settings.document_max_chunks
             or sum(len(value) for value in values) > settings.document_max_extracted_chars
         ):
-            raise HTTPException(413, "Document exceeds embedding budget; split the document and retry.")
+            raise HTTPException(
+                413, "Document exceeds embedding budget; split the document and retry."
+            )
         if self._embedding_backend == "local":
             return [self._local_embedding(value) for value in values]
         if self._openai_client is None:
@@ -408,7 +414,9 @@ class DocumentIngestionService:
     async def extract_document_text(self, path: Path) -> str:
         return await asyncio.to_thread(self._extract_document_text_sync, path)
 
-    def parse_csv(self, payload: bytes, import_currency: str | None = None) -> list[TransactionCreate]:
+    def parse_csv(
+        self, payload: bytes, import_currency: str | None = None
+    ) -> list[TransactionCreate]:
         try:
             text = payload.decode("utf-8-sig")
         except UnicodeDecodeError as exc:
@@ -507,7 +515,10 @@ class DocumentIngestionService:
                     value = page.extract_text() or ""
                     total_chars += len(value) + (1 if texts else 0)
                     if total_chars > settings.document_max_extracted_chars:
-                        raise HTTPException(413, "Document has too much extracted text; split the document and retry.")
+                        raise HTTPException(
+                            413,
+                            "Document has too much extracted text; split the document and retry.",
+                        )
                     texts.append(value)
                 return "\n".join(texts)
         if suffix in {".png", ".jpg", ".jpeg"}:
