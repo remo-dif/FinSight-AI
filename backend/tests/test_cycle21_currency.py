@@ -49,6 +49,14 @@ def test_absent_column_requires_selection(parser):
     assert parser.parse_csv(payload, import_currency="EUR")[0].currency == "EUR"
 
 
+def test_blank_cells_and_matching_rows_use_explicit_selection(parser):
+    rows = parser.parse_csv(
+        csv("2025-01-01,A,-1.20,\n2025-01-02,B,-2.30, eur \n", " CuRrEnCy "),
+        import_currency=" eur ",
+    )
+    assert [row.currency for row in rows] == ["EUR", "EUR"]
+
+
 @pytest.mark.parametrize("code", ["XYZ", "SEK", "12A", "EURO", "€"])
 def test_invalid_row_is_not_replaced_by_selection(parser, code):
     with pytest.raises(HTTPException) as exc:
@@ -82,7 +90,21 @@ def test_duplicate_currency_headers_rejected_even_without_rows(parser, header):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "bad_code,selection", [("", None), ("XYZ", None), ("12A", None), ("USD", "EUR"), (None, "EUR")]
+    "bad_code,selection",
+    [
+        ("", None),
+        ("XYZ", None),
+        ("SEK", None),
+        ("12A", None),
+        ("USD", "EUR"),
+        (None, "EUR"),
+        ("blank-selected", "EUR"),
+        ("mixed", None),
+        ("duplicate", None),
+        ("no-column", "EUR"),
+        ("no-column", None),
+        (None, "XYZ"),
+    ],
 )
 async def test_upload_atomic_currency_validation_and_user_isolation(
     monkeypatch, tmp_path, bad_code, selection
@@ -111,8 +133,17 @@ async def test_upload_atomic_currency_validation_and_user_isolation(
             app = create_app()
             app.dependency_overrides[upload_user] = lambda: owner
             app.dependency_overrides[get_async_db] = lambda: AsyncAdapter(db)
-            second = "EUR" if bad_code is None else bad_code
+            success = (
+                (bad_code is None and selection == "EUR")
+                or bad_code in {"blank-selected", "mixed"}
+                or (bad_code == "no-column" and selection == "EUR")
+            )
+            second = {None: "EUR", "blank-selected": "", "mixed": "USD"}.get(bad_code, bad_code)
             payload = csv(f"2025-01-01,A,-1.20,EUR\n2025-01-02,B,-2.30,{second}\n")
+            if bad_code == "duplicate":
+                payload = csv("2025-01-01,A,-1.20,EUR,USD\n", " Currency ,currency")
+            elif bad_code == "no-column":
+                payload = b"date,merchant,amount\n2025-01-01,A,-1.20\n2025-01-02,B,-2.30\n"
             async with httpx.AsyncClient(
                 transport=httpx.ASGITransport(app=app), base_url="http://test"
             ) as client:
@@ -121,16 +152,19 @@ async def test_upload_atomic_currency_validation_and_user_isolation(
                     files={"file": ("data.csv", payload, "text/csv")},
                     data={} if selection is None else {"import_currency": selection},
                 )
-            assert response.status_code == (200 if bad_code is None else 400), response.text
+            assert response.status_code == (200 if success else 400), response.text
             assert db.scalar(select(func.count()).select_from(UploadedFile)) == (
-                1 if bad_code is None else 0
+                1 if success else 0
             )
             owned = list(db.scalars(select(Transaction).where(Transaction.user_id == owner.id)))
-            assert len(owned) == (2 if bad_code is None else 0)
-            assert all(row.currency == "EUR" for row in owned)
+            assert len(owned) == (2 if success else 0)
+            if success:
+                assert sorted(row.currency for row in owned) == (
+                    ["EUR", "USD"] if bad_code == "mixed" else ["EUR", "EUR"]
+                )
             assert db.get(Transaction, existing.id).currency == "USD"
             assert sentinel.read_bytes() == b"Keep existing upload"
-            if bad_code is not None:
+            if not success:
                 assert list((tmp_path / "staging").rglob("*.csv")) == []
     finally:
         engine.dispose()
