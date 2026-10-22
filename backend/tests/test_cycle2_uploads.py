@@ -81,7 +81,7 @@ async def test_invalid_remote_embedding_response_is_not_indexed(monkeypatch, row
     async def create(**kwargs):
         return SimpleNamespace(
             model=service.embedding_model,
-            data=[SimpleNamespace(index=i, embedding=row) for i, row in enumerate(rows)]
+            data=[SimpleNamespace(index=i, embedding=row) for i, row in enumerate(rows)],
         )
 
     service._openai_client = SimpleNamespace(embeddings=SimpleNamespace(create=create))
@@ -287,7 +287,10 @@ async def test_local_retrieval_excludes_legacy_or_different_embedding_models(mon
 @pytest.mark.parametrize("failure", [None, "provider", "storage", "flush", "commit", "cleanup"])
 async def test_s3_cross_system_failure_boundaries(monkeypatch, tmp_path, failure):
     import boto3
-    configure(monkeypatch, upload_dir=tmp_path, storage_backend="s3", s3_upload_bucket="synthetic-bucket")
+
+    configure(
+        monkeypatch, upload_dir=tmp_path, storage_backend="s3", s3_upload_bucket="synthetic-bucket"
+    )
     engine = create_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
     objects = {"pre-existing": b"Never remove"}
@@ -297,27 +300,36 @@ async def test_s3_cross_system_failure_boundaries(monkeypatch, tmp_path, failure
         sync.commit()
         sync.refresh(user)
         db = AsyncAdapter(sync, "flush" if failure == "cleanup" else failure)
+
         class S3:
             def put_object(self, **kwargs):
                 assert not db.in_transaction(), "Transaction held during S3 publication"
                 assert kwargs["IfNoneMatch"] == "*" and kwargs["Key"] not in objects
                 objects[kwargs["Key"]] = kwargs["Body"].read()
-                if failure == "storage": raise TimeoutError("Uncertain storage acknowledgement")
+                if failure == "storage":
+                    raise TimeoutError("Uncertain storage acknowledgement")
                 return {"ETag": '"created"', "VersionId": "created-version"}
+
             def delete_object(self, **kwargs):
                 assert not db.in_transaction(), "Transaction held during storage cleanup"
                 assert kwargs["Key"] != "pre-existing" and kwargs["IfMatch"] == '"created"'
                 assert kwargs["VersionId"] == "created-version"
-                if failure == "cleanup": raise OSError("Synthetic cleanup failure")
+                if failure == "cleanup":
+                    raise OSError("Synthetic cleanup failure")
                 objects.pop(kwargs["Key"])
+
         monkeypatch.setattr(boto3, "client", lambda name: S3())
+
         async def text(self, path):
             assert not db.in_transaction()
             return "Synthetic statement"
+
         async def embeddings(self, values):
             assert not db.in_transaction()
-            if failure == "provider": raise HTTPException(503, "Provider unavailable; retry")
+            if failure == "provider":
+                raise HTTPException(503, "Provider unavailable; retry")
             return [[0.0] * 1536 for _ in values]
+
         monkeypatch.setattr(DocumentIngestionService, "extract_document_text", text)
         monkeypatch.setattr(DocumentIngestionService, "embed_texts", embeddings)
         if failure:
@@ -339,9 +351,14 @@ async def test_s3_cross_system_failure_boundaries(monkeypatch, tmp_path, failure
 @pytest.mark.asyncio
 async def test_open_circuit_does_not_extend_the_provider_failure_window(monkeypatch):
     configure(monkeypatch)
+
     class Circuit:
-        def before_call(self): raise CircuitOpenError("Synthetic open circuit")
-        def record_failure(self): pytest.fail("A blocked call is not a new provider failure")
+        def before_call(self):
+            raise CircuitOpenError("Synthetic open circuit")
+
+        def record_failure(self):
+            pytest.fail("A blocked call is not a new provider failure")
+
     monkeypatch.setattr("app.services.document_ingestion.openai_circuit", Circuit())
     with pytest.raises(HTTPException) as exc:
         await DocumentIngestionService().embed_texts(["Synthetic"])
@@ -352,8 +369,12 @@ async def test_open_circuit_does_not_extend_the_provider_failure_window(monkeypa
 async def test_remote_provider_cannot_substitute_a_different_model(monkeypatch):
     configure(monkeypatch)
     service = DocumentIngestionService()
+
     async def create(**kwargs):
-        return SimpleNamespace(model="unexpected-model", data=[SimpleNamespace(index=0, embedding=[0.0] * 1536)])
+        return SimpleNamespace(
+            model="unexpected-model", data=[SimpleNamespace(index=0, embedding=[0.0] * 1536)]
+        )
+
     service._openai_client = SimpleNamespace(embeddings=SimpleNamespace(create=create))
     with pytest.raises(HTTPException) as exc:
         await service.embed_texts(["Synthetic"])
@@ -364,10 +385,16 @@ async def test_remote_provider_cannot_substitute_a_different_model(monkeypatch):
 async def test_valid_remote_response_preserves_input_order(monkeypatch):
     configure(monkeypatch)
     service = DocumentIngestionService()
+
     async def create(**kwargs):
-        return SimpleNamespace(model=service.embedding_model, data=[
-            SimpleNamespace(index=1, embedding=[2.0] * 1536),
-            SimpleNamespace(index=0, embedding=[1.0] * 1536)])
+        return SimpleNamespace(
+            model=service.embedding_model,
+            data=[
+                SimpleNamespace(index=1, embedding=[2.0] * 1536),
+                SimpleNamespace(index=0, embedding=[1.0] * 1536),
+            ],
+        )
+
     service._openai_client = SimpleNamespace(embeddings=SimpleNamespace(create=create))
     vectors = await service.embed_texts(["first", "second"])
     assert [v[0] for v in vectors] == [1.0, 2.0]
@@ -375,14 +402,39 @@ async def test_valid_remote_response_preserves_input_order(monkeypatch):
 
 def test_rag_does_not_query_with_an_unexpected_remote_model(monkeypatch):
     from app.services.rag import RagService
+
     service = object.__new__(RagService)
     service._embedding_backend = "openai"
     service._embedding_model = "expected-model"
+
     class NoDatabaseAccess:
-        def get_bind(self): pytest.fail("Unexpected-model embeddings reached the database query")
+        def get_bind(self):
+            pytest.fail("Unexpected-model embeddings reached the database query")
+
     service.db = NoDatabaseAccess()
+
     def create(**kwargs):
-        return SimpleNamespace(model="unexpected-model", data=[SimpleNamespace(index=0, embedding=[0.0] * 1536)])
+        return SimpleNamespace(
+            model="unexpected-model", data=[SimpleNamespace(index=0, embedding=[0.0] * 1536)]
+        )
+
     service._openai_client = SimpleNamespace(embeddings=SimpleNamespace(create=create))
     monkeypatch.setattr("app.services.rag.openai_circuit", CircuitBreaker(5, 30))
     assert service.retrieve_chunks(uuid4(), "Synthetic") == []
+
+
+@pytest.mark.asyncio
+async def test_textless_document_is_rejected_without_a_new_persistent_state(monkeypatch, tmp_path):
+    configure(monkeypatch, upload_dir=tmp_path, storage_backend="local")
+    service = DocumentIngestionService()
+    upload = await service.save_upload(uuid4(), file(), stage_only=True)
+    async def empty_text(path): return ""
+    monkeypatch.setattr(service, "extract_document_text", empty_text)
+    try:
+        with pytest.raises(HTTPException) as exc:
+            await service.prepare_upload(upload)
+        assert exc.value.status_code == 400
+        assert "text" in exc.value.detail.lower()
+    finally:
+        await service.cleanup_upload(upload)
+    assert not upload.path.exists()
