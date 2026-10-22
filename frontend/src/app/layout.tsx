@@ -3,6 +3,9 @@ import type { ReactNode } from "react";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 
+// Per-request CSP nonces cannot be embedded into prerendered/cached HTML.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
   title: {
