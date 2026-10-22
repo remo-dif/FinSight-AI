@@ -80,6 +80,7 @@ async def test_invalid_remote_embedding_response_is_not_indexed(monkeypatch, row
 
     async def create(**kwargs):
         return SimpleNamespace(
+            model=service.embedding_model,
             data=[SimpleNamespace(index=i, embedding=row) for i, row in enumerate(rows)]
         )
 
@@ -370,3 +371,18 @@ async def test_valid_remote_response_preserves_input_order(monkeypatch):
     service._openai_client = SimpleNamespace(embeddings=SimpleNamespace(create=create))
     vectors = await service.embed_texts(["first", "second"])
     assert [v[0] for v in vectors] == [1.0, 2.0]
+
+
+def test_rag_does_not_query_with_an_unexpected_remote_model(monkeypatch):
+    from app.services.rag import RagService
+    service = object.__new__(RagService)
+    service._embedding_backend = "openai"
+    service._embedding_model = "expected-model"
+    class NoDatabaseAccess:
+        def get_bind(self): pytest.fail("Unexpected-model embeddings reached the database query")
+    service.db = NoDatabaseAccess()
+    def create(**kwargs):
+        return SimpleNamespace(model="unexpected-model", data=[SimpleNamespace(index=0, embedding=[0.0] * 1536)])
+    service._openai_client = SimpleNamespace(embeddings=SimpleNamespace(create=create))
+    monkeypatch.setattr("app.services.rag.openai_circuit", CircuitBreaker(5, 30))
+    assert service.retrieve_chunks(uuid4(), "Synthetic") == []
