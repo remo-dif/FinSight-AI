@@ -3,6 +3,8 @@
 import json
 from decimal import Decimal, InvalidOperation
 
+from app.services.financial_validation import validate_financial_report
+
 
 def render_fact(fact: dict) -> str:
     """Assertion wording is code-owned; imported names are explicitly quoted data."""
@@ -11,11 +13,16 @@ def render_fact(fact: dict) -> str:
     base_key = key.removeprefix("delta:")
     kind, _, name = base_key.partition(":")
     titles = {
-        "income": "Gross income", "spending": "Gross spending", "net_cash_flow": "Net cash flow",
+        "income": "Gross income",
+        "spending": "Gross spending",
+        "net_cash_flow": "Net cash flow",
         "net_spending": "Spending excluding internal transfers, less explicit refunds",
-        "refunds": "Explicit refunds", "category": "Category spending",
-        "merchant": "Gross merchant spending", "budget": "Estimated budget (all-history spending / 3)",
-        "recurring": "Repeated-charge average (cadence unverified)", "anomaly": "Unusual transaction",
+        "refunds": "Explicit refunds",
+        "category": "Category spending",
+        "merchant": "Gross merchant spending",
+        "budget": "Estimated budget (all-history spending / 3)",
+        "recurring": "Repeated-charge average (cadence unverified)",
+        "anomaly": "Unusual transaction",
         "summary": "Summary value",
     }
     title = titles.get(kind, "Financial value")
@@ -23,7 +30,10 @@ def render_fact(fact: dict) -> str:
         title = f"Change in {title}"
     entity = fact.get("entity")
     if entity is None and name and kind in {"category", "budget", "merchant", "recurring"}:
-        entity = {"kind": "category" if kind in {"category", "budget"} else "merchant", "name": name}
+        entity = {
+            "kind": "category" if kind in {"category", "budget"} else "merchant",
+            "name": name,
+        }
     data = ""
     if entity:
         entity_kind = "category" if entity.get("kind") == "category" else "merchant"
@@ -46,30 +56,9 @@ def review_financial_draft(tool_results: dict, draft: str) -> tuple[str, str, st
             "Rejected: invalid financial evidence.",
             "I could not validate the financial evidence.",
         )
-    by_id = {}
     try:
-        if (
-            not isinstance(evidence.get("source_transaction_ids"), list)
-            or not isinstance(evidence.get("currency"), str)
-            or not isinstance(evidence.get("period"), str)
-        ):
-            raise TypeError("Missing evidence context")
-        source_ids = set(evidence["source_transaction_ids"])
-        for fact in facts:
-            amount = Decimal(fact["amount"])
-            if (
-                not amount.is_finite()
-                or amount != amount.quantize(Decimal("0.01"))
-                or fact["currency"] != evidence["currency"]
-                or fact["period"] != evidence["period"]
-                or not isinstance(fact["transaction_ids"], list)
-                or not set(fact["transaction_ids"]) <= source_ids
-                or (amount != 0 and not fact["transaction_ids"])
-                or fact["key"] in by_id
-            ):
-                raise ValueError("Invalid fact")
-            by_id[fact["key"]] = fact
-    except (KeyError, TypeError, InvalidOperation, ValueError):
+        by_id = validate_financial_report(tool_results)
+    except (KeyError, TypeError, AttributeError, InvalidOperation, ValueError):
         return (
             "rejected",
             "Rejected: inconsistent financial evidence.",

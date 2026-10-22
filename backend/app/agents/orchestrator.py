@@ -7,8 +7,8 @@ from langgraph.graph import END, StateGraph
 
 from app.agents.state import AgentIntent, AgentState
 from app.agents.tools import FinanceToolLayer
-from app.services.financial_review import review_financial_draft
 from app.services.financial_context import resolve_context
+from app.services.financial_review import review_financial_draft
 from app.services.llm import LLMService
 from app.services.rag import RagService
 
@@ -87,7 +87,9 @@ class OrchestratorAgent:
 
     def run(self, state: AgentState) -> AgentState:
         state["_agent"] = self
-        context = resolve_context(state["message"], self.route(state["message"]), state.get("currency"))
+        context = resolve_context(
+            state["message"], self.route(state["message"]), state.get("currency")
+        )
         state.update({k: v for k, v in context.items() if k != "month"})
         if hasattr(self.tools, "configure_context"):
             self.tools.configure_context(context["month"], context["currency"])
@@ -194,6 +196,15 @@ class OrchestratorAgent:
 
 class ReviewerAgent:
     def run(self, state: AgentState) -> AgentState:
+        agent = state.get("_agent")
+        matches = getattr(getattr(agent, "tools", None), "matches_snapshot", None)
+        if matches is not None and not matches(state.get("tool_results", {})):
+            return {
+                **state,
+                "review_status": "rejected",
+                "review": "Rejected: financial evidence differs from its canonical calculation.",
+                "final_answer": "I could not validate the financial evidence. Please retry the report.",
+            }
         evidence = state.get("tool_results", {}).get("_evidence", {})
         if not isinstance(evidence, dict):
             evidence = {}

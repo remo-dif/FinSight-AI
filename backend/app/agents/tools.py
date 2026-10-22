@@ -1,3 +1,4 @@
+import json
 from collections import defaultdict
 from decimal import Decimal
 from uuid import UUID
@@ -10,6 +11,21 @@ class FinanceToolLayer:
         self.analytics = analytics
         self.month: str | None = None
         self.currency: str | None = None
+        self._trusted_payload_json: str | None = None
+
+    def _publish(self, result: dict) -> dict:
+        # Capture the one calculation before passing a mutable projection to generation.
+        self._trusted_payload_json = json.dumps(result, sort_keys=True)
+        return result
+
+    def matches_snapshot(self, result: dict) -> bool:
+        try:
+            return (
+                self._trusted_payload_json is not None
+                and json.dumps(result, sort_keys=True) == self._trusted_payload_json
+            )
+        except (TypeError, ValueError):
+            return False
 
     def configure_context(self, month: str | None, currency: str | None) -> None:
         self.month, self.currency = month, currency
@@ -31,16 +47,19 @@ class FinanceToolLayer:
         }
 
     def get_monthly_summary(self, user_id: UUID, month: str) -> dict:
-        return self.analytics.get_spending_report(user_id, month, self.currency)
+        return self._publish(self.analytics.get_spending_report(user_id, month, self.currency))
 
     def compare_months(self, user_id: UUID, left_month: str, right_month: str) -> dict:
-        return self.analytics.compare_spending(user_id, left_month, right_month, self.currency)
+        return self._publish(
+            self.analytics.compare_spending(user_id, left_month, right_month, self.currency)
+        )
 
     def get_spending_by_category(self, user_id: UUID) -> dict:
         report = self.analytics.get_spending_report(user_id, self.month, self.currency)
         evidence = dict(report["_evidence"])
+        evidence["kind"] = "category"
         evidence["facts"] = [f for f in evidence["facts"] if f["key"].startswith("category:")]
-        return {**report["categories"], "_evidence": evidence}
+        return self._publish({**report["categories"], "_evidence": evidence})
 
     def detect_anomalies(self, user_id: UUID) -> dict:
         currency, rows = self.analytics.repository.rows_for_analysis(
@@ -59,10 +78,14 @@ class FinanceToolLayer:
             }
             for item in items
         ]
-        return {
-            "anomalies": items,
-            "_evidence": self._evidence(currency, self.month or "all history", facts, rows),
-        }
+        return self._publish(
+            {
+                "anomalies": items,
+                "_evidence": self._evidence(
+                    currency, self.month or "all history", facts, rows, "anomaly"
+                ),
+            }
+        )
 
     def generate_budget(self, user_id: UUID) -> dict:
         # Preserve the legacy history / 3 rule, explicitly labelled as an estimate.
@@ -87,10 +110,12 @@ class FinanceToolLayer:
             }
             for k, v in sorted(values.items())
         ]
-        return {
-            **{k: str(v) for k, v in values.items()},
-            "_evidence": self._evidence(currency, "all history", facts, rows),
-        }
+        return self._publish(
+            {
+                **{k: str(v) for k, v in values.items()},
+                "_evidence": self._evidence(currency, "all history", facts, rows, "budget"),
+            }
+        )
 
     def get_top_merchants(self, user_id: UUID) -> dict:
         currency, rows = self.analytics.repository.rows_for_analysis(
@@ -114,10 +139,14 @@ class FinanceToolLayer:
             }
             for k, v in values.items()
         ]
-        return {
-            **{k: str(v) for k, v in values.items()},
-            "_evidence": self._evidence(currency, self.month or "all history", facts, rows),
-        }
+        return self._publish(
+            {
+                **{k: str(v) for k, v in values.items()},
+                "_evidence": self._evidence(
+                    currency, self.month or "all history", facts, rows, "merchant"
+                ),
+            }
+        )
 
     def get_recurring_payments(self, user_id: UUID) -> dict:
         currency, rows = self.analytics.repository.rows_for_analysis(
@@ -137,14 +166,17 @@ class FinanceToolLayer:
             }
             for item in items
         ]
-        return {
-            "recurring": items,
-            "_evidence": self._evidence(currency, "all history", facts, rows),
-        }
+        return self._publish(
+            {
+                "recurring": items,
+                "_evidence": self._evidence(currency, "all history", facts, rows, "recurring"),
+            }
+        )
 
     @staticmethod
-    def _evidence(currency, period, facts, rows):
+    def _evidence(currency, period, facts, rows, kind):
         return {
+            "kind": kind,
             "rule_version": "cash-flow-v1",
             "currency": currency,
             "period": period,

@@ -43,6 +43,7 @@ def spending_report(rows, currency: str, month: str | None) -> dict:
             category_ids[row.category].append(row_id)
             spending_ids.append(row_id)
     net_spending = sum(categories.values(), zero)
+    net_cash_flow = income - spending
     facts = []
 
     def fact(key, label, amount, ids):
@@ -59,7 +60,7 @@ def spending_report(rows, currency: str, month: str | None) -> dict:
 
     fact("income", "Gross income", income, [str(r.id) for r in rows if r.amount > 0])
     fact("spending", "Gross spending", spending, [str(r.id) for r in rows if r.amount < 0])
-    fact("net_cash_flow", "Net cash flow", income - spending, [str(r.id) for r in rows])
+    fact("net_cash_flow", "Net cash flow", net_cash_flow, [str(r.id) for r in rows])
     fact(
         "net_spending",
         "Spending excluding internal transfers, less explicit refunds",
@@ -85,20 +86,21 @@ def spending_report(rows, currency: str, month: str | None) -> dict:
             amount,
             category_ids[category],
         )
+    fact_values = {f["key"]: f["amount"] for f in facts}
     return {
         "month": month,
         "currency": currency,
-        "income": f"{income:.2f}",
-        "spending": f"{spending:.2f}",
-        "net_cash_flow": f"{income - spending:.2f}",
-        "net_spending": f"{net_spending:.2f}",
-        "refunds": f"{refunds:.2f}",
-        "categories": {k: f"{v:.2f}" for k, v in sorted(categories.items())},
+        **{
+            k: fact_values[k]
+            for k in ("income", "spending", "net_cash_flow", "net_spending", "refunds")
+        },
+        "categories": {k: fact_values[f"category:{k}"] for k in sorted(categories)},
         "internal_transfer_ids": sorted(transfer_ids),
         "suspected_duplicate_ids": sorted(
             i for group in fingerprints.values() if len(group) > 1 for i in group
         ),
         "_evidence": {
+            "kind": "summary",
             "rule_version": RULE_VERSION,
             "currency": currency,
             "period": month or "all history",
@@ -130,13 +132,15 @@ def comparison_report(left: dict, right: dict) -> dict:
                 "right_transaction_ids": b["transaction_ids"] if b else [],
             }
         )
+    fact_values = {f["key"]: f["amount"] for f in facts}
     return {
         "left": left,
         "right": right,
-        "spending_delta": f"{Decimal(right['spending']) - Decimal(left['spending']):.2f}",
-        "cash_flow_delta": f"{Decimal(right['net_cash_flow']) - Decimal(left['net_cash_flow']):.2f}",
-        "net_spending_delta": f"{Decimal(right['net_spending']) - Decimal(left['net_spending']):.2f}",
+        "spending_delta": fact_values["delta:spending"],
+        "cash_flow_delta": fact_values["delta:net_cash_flow"],
+        "net_spending_delta": fact_values["delta:net_spending"],
         "_evidence": {
+            "kind": "comparison",
             "rule_version": RULE_VERSION,
             "currency": left["currency"],
             "period": f"{left['month']} to {right['month']}",
