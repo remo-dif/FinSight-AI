@@ -12,7 +12,7 @@ from starlette.datastructures import Headers, UploadFile
 import app.models  # noqa: F401
 from app.api.routes.uploads import upload_file
 from app.core.database import Base
-from app.core.openai_resilience import CircuitBreaker
+from app.core.openai_resilience import CircuitBreaker, CircuitOpenError
 from app.models.embedding import Embedding
 from app.models.finance import UploadedFile
 from app.models.user import User
@@ -280,3 +280,93 @@ async def test_local_retrieval_excludes_legacy_or_different_embedding_models(mon
         assert service.embedding_model != "deterministic-local-hash-v1"
         assert [r.text for r in results] == [service.embedding_model]
     engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", [None, "provider", "storage", "flush", "commit", "cleanup"])
+async def test_s3_cross_system_failure_boundaries(monkeypatch, tmp_path, failure):
+    import boto3
+    configure(monkeypatch, upload_dir=tmp_path, storage_backend="s3", s3_upload_bucket="synthetic-bucket")
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    objects = {"pre-existing": b"Never remove"}
+    with Session(engine, expire_on_commit=False) as sync:
+        user = User(email="s3@example.invalid", full_name="Synthetic", password_hash="unused")
+        sync.add(user)
+        sync.commit()
+        sync.refresh(user)
+        db = AsyncAdapter(sync, "flush" if failure == "cleanup" else failure)
+        class S3:
+            def put_object(self, **kwargs):
+                assert not db.in_transaction(), "Transaction held during S3 publication"
+                assert kwargs["IfNoneMatch"] == "*" and kwargs["Key"] not in objects
+                objects[kwargs["Key"]] = kwargs["Body"].read()
+                if failure == "storage": raise TimeoutError("Uncertain storage acknowledgement")
+                return {"ETag": '"created"', "VersionId": "created-version"}
+            def delete_object(self, **kwargs):
+                assert not db.in_transaction(), "Transaction held during storage cleanup"
+                assert kwargs["Key"] != "pre-existing" and kwargs["IfMatch"] == '"created"'
+                assert kwargs["VersionId"] == "created-version"
+                if failure == "cleanup": raise OSError("Synthetic cleanup failure")
+                objects.pop(kwargs["Key"])
+        monkeypatch.setattr(boto3, "client", lambda name: S3())
+        async def text(self, path):
+            assert not db.in_transaction()
+            return "Synthetic statement"
+        async def embeddings(self, values):
+            assert not db.in_transaction()
+            if failure == "provider": raise HTTPException(503, "Provider unavailable; retry")
+            return [[0.0] * 1536 for _ in values]
+        monkeypatch.setattr(DocumentIngestionService, "extract_document_text", text)
+        monkeypatch.setattr(DocumentIngestionService, "embed_texts", embeddings)
+        if failure:
+            with pytest.raises((HTTPException, RuntimeError, OSError)):
+                await upload_file(file(), user, db)
+            assert sync.scalar(select(func.count()).select_from(UploadedFile)) == 0
+            assert sync.scalar(select(func.count()).select_from(Embedding)) == 0
+        else:
+            result = await upload_file(file(), user, db)
+            row = sync.get(UploadedFile, result.file_id)
+            assert row.user_id == user.id and row.storage_path.startswith("s3://synthetic-bucket/")
+            assert sync.scalar(select(Embedding.user_id)) == user.id
+        assert objects["pre-existing"] == b"Never remove"
+        assert len(objects) == (1 if failure in {"provider", "flush"} else 2)
+        assert list(tmp_path.rglob("*.pdf")) == []
+    engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_open_circuit_does_not_extend_the_provider_failure_window(monkeypatch):
+    configure(monkeypatch)
+    class Circuit:
+        def before_call(self): raise CircuitOpenError("Synthetic open circuit")
+        def record_failure(self): pytest.fail("A blocked call is not a new provider failure")
+    monkeypatch.setattr("app.services.document_ingestion.openai_circuit", Circuit())
+    with pytest.raises(HTTPException) as exc:
+        await DocumentIngestionService().embed_texts(["Synthetic"])
+    assert exc.value.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_remote_provider_cannot_substitute_a_different_model(monkeypatch):
+    configure(monkeypatch)
+    service = DocumentIngestionService()
+    async def create(**kwargs):
+        return SimpleNamespace(model="unexpected-model", data=[SimpleNamespace(index=0, embedding=[0.0] * 1536)])
+    service._openai_client = SimpleNamespace(embeddings=SimpleNamespace(create=create))
+    with pytest.raises(HTTPException) as exc:
+        await service.embed_texts(["Synthetic"])
+    assert exc.value.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_valid_remote_response_preserves_input_order(monkeypatch):
+    configure(monkeypatch)
+    service = DocumentIngestionService()
+    async def create(**kwargs):
+        return SimpleNamespace(model=service.embedding_model, data=[
+            SimpleNamespace(index=1, embedding=[2.0] * 1536),
+            SimpleNamespace(index=0, embedding=[1.0] * 1536)])
+    service._openai_client = SimpleNamespace(embeddings=SimpleNamespace(create=create))
+    vectors = await service.embed_texts(["first", "second"])
+    assert [v[0] for v in vectors] == [1.0, 2.0]
