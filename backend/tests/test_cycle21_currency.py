@@ -73,6 +73,15 @@ def test_conflict_and_invalid_import_selection(parser):
         assert exc.value.status_code == 400
 
 
+@pytest.mark.parametrize("selection", [False, True])
+def test_nonascii_currency_cannot_normalize_into_supported_code(parser, selection):
+    # Unicode long-s uppercases to ASCII S, but is not an ISO currency-code letter.
+    payload = csv(f"2025-01-01,A,-1.20,{'USD' if selection else 'uſd'}\n")
+    with pytest.raises(HTTPException) as exc:
+        parser.parse_csv(payload, import_currency="uſd" if selection else None)
+    assert exc.value.status_code == 400
+
+
 def test_mixed_explicit_currencies_without_selection(parser):
     rows = parser.parse_csv(csv("2025-01-01,A,-1.20,EUR\n2025-01-02,B,-2.30,USD\n"))
     assert [row.currency for row in rows] == ["EUR", "USD"]
