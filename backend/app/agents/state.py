@@ -6,6 +6,7 @@ ReviewStatus = Literal["accepted", "rejected"]
 
 
 class AgentState(TypedDict, total=False):
+    reporting_period: str
     months: list[str]
     currency: str | None
     release_database: Any

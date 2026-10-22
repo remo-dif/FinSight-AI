@@ -11,7 +11,7 @@ class FinanceToolLayer:
         self.month: str | None = None
         self.currency: str | None = None
 
-    def configure_context(self, month: str, currency: str | None) -> None:
+    def configure_context(self, month: str | None, currency: str | None) -> None:
         self.month, self.currency = month, currency
 
     def get_transactions(self, user_id: UUID) -> dict:
@@ -44,7 +44,7 @@ class FinanceToolLayer:
 
     def detect_anomalies(self, user_id: UUID) -> dict:
         currency, rows = self.analytics.repository.rows_for_analysis(
-            user_id, currency=self.currency
+            user_id, month=self.month, currency=self.currency
         )
         items = [item.model_dump(mode="json") for item in self.analytics.anomalies_for_rows(rows)]
         facts = [
@@ -54,14 +54,14 @@ class FinanceToolLayer:
                 "entity": {"kind": "merchant", "name": item["merchant"]},
                 "amount": str(item["amount"]),
                 "currency": currency,
-                "period": "all history",
+                "period": self.month or "all history",
                 "transaction_ids": [item["transaction_id"]],
             }
             for item in items
         ]
         return {
             "anomalies": items,
-            "_evidence": self._evidence(currency, "all history", facts, rows),
+            "_evidence": self._evidence(currency, self.month or "all history", facts, rows),
         }
 
     def generate_budget(self, user_id: UUID) -> dict:
@@ -94,7 +94,7 @@ class FinanceToolLayer:
 
     def get_top_merchants(self, user_id: UUID) -> dict:
         currency, rows = self.analytics.repository.rows_for_analysis(
-            user_id, currency=self.currency
+            user_id, month=self.month, currency=self.currency
         )
         totals = defaultdict(lambda: Decimal("0.00"))
         for row in rows:
@@ -107,7 +107,7 @@ class FinanceToolLayer:
                 "label": f"Gross merchant spending ({k})",
                 "amount": str(v),
                 "currency": currency,
-                "period": "all history",
+                "period": self.month or "all history",
                 "transaction_ids": sorted(
                     str(r.id) for r in rows if r.merchant == k and r.amount < 0
                 ),
@@ -116,7 +116,7 @@ class FinanceToolLayer:
         ]
         return {
             **{k: str(v) for k, v in values.items()},
-            "_evidence": self._evidence(currency, "all history", facts, rows),
+            "_evidence": self._evidence(currency, self.month or "all history", facts, rows),
         }
 
     def get_recurring_payments(self, user_id: UUID) -> dict:

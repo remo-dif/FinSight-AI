@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.case import InvestigationCase
 from app.models.finance import Transaction
 from app.schemas.finance import TransactionCreate
+from app.services.financial_context import reporting_currency
 
 
 class TransactionRepository:
@@ -34,10 +35,10 @@ class TransactionRepository:
         if currency is not None:
             if len(currency) != 3 or not currency.isascii() or not currency.isalpha():
                 raise ValueError("Invalid currency code")
-            return currency.upper()
+            return reporting_currency(currency)
         if len(currencies) > 1:
             raise ValueError("Select a currency; mixed currencies cannot be combined")
-        return next(iter(currencies), "USD")
+        return reporting_currency(next(iter(currencies), "USD"))
 
     def rows_for_analysis(
         self, user_id: UUID, month: str | None = None, currency: str | None = None

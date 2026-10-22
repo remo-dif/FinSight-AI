@@ -25,6 +25,8 @@ def grounded(values, label="budget", period="all history"):
 
 
 class FakeTools:
+    def configure_context(self, month, currency):
+        self.month = month
     def detect_anomalies(self, user_id):
         return grounded({"anomalies": []}, "anomaly")
 
@@ -38,7 +40,7 @@ class FakeTools:
         return grounded({"Rent": "1500.00"}, "merchant")
 
     def get_spending_by_category(self, user_id):
-        return grounded({"Housing": "1500.00"}, "category")
+        return grounded({"Housing": "1500.00"}, "category", self.month)
 
     def get_monthly_summary(self, user_id, month):
         return grounded(

@@ -1,7 +1,6 @@
 import json
-import re
 from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from langgraph.graph import END, StateGraph
@@ -9,6 +8,7 @@ from langgraph.graph import END, StateGraph
 from app.agents.state import AgentIntent, AgentState
 from app.agents.tools import FinanceToolLayer
 from app.services.financial_review import review_financial_draft
+from app.services.financial_context import resolve_context
 from app.services.llm import LLMService
 from app.services.rag import RagService
 
@@ -71,8 +71,6 @@ class OrchestratorAgent:
 
     def route(self, message: str) -> AgentIntent:
         lower = message.lower()
-        if "compar" in lower or "increas" in lower or "decreas" in lower:
-            return "summary"
         if "anomal" in lower or "unusual" in lower:
             return "anomaly"
         if "recurring" in lower or "subscription" in lower:
@@ -81,29 +79,18 @@ class OrchestratorAgent:
             return "budget"
         if "merchant" in lower or "top" in lower:
             return "merchant"
+        if "compar" in lower or "increas" in lower or "decreas" in lower:
+            return "summary"
         if "category" in lower or "spending" in lower:
             return "category"
         return "summary"
 
     def run(self, state: AgentState) -> AgentState:
         state["_agent"] = self
-        months = re.findall(r"(?<!\d)\d{4}-\d{2}(?!\d)", state["message"])
-        for month in months:
-            date.fromisoformat(f"{month}-01")
-        state["months"] = list(dict.fromkeys(months))
-        if len(state["months"]) > 2:
-            raise ValueError("Select at most two reporting months")
-        month = months[-1] if months else datetime.now(UTC).strftime("%Y-%m")
-        currencies = set(
-            re.findall(r"\b(?:EUR|USD|GBP|CHF|JPY|CAD|AUD)\b", state["message"].upper())
-        )
-        currency = state.get("currency")
-        if len(currencies) > 1 or (currency and currencies and currency.upper() not in currencies):
-            raise ValueError("Select a single currency")
-        currency = currency or next(iter(currencies), None)
-        state["currency"] = currency.upper() if currency else None
+        context = resolve_context(state["message"], self.route(state["message"]), state.get("currency"))
+        state.update({k: v for k, v in context.items() if k != "month"})
         if hasattr(self.tools, "configure_context"):
-            self.tools.configure_context(month, currency)
+            self.tools.configure_context(context["month"], context["currency"])
         # Authentication and chat ownership checks may already have begun a read transaction.
         boundary = state.get("release_database")
         if boundary:
@@ -115,11 +102,7 @@ class OrchestratorAgent:
 
     @staticmethod
     def _supervisor_node(state: AgentState) -> AgentState:
-        return {
-            "intent": "summary"
-            if len(state.get("months", [])) == 2
-            else state["_agent"].route(state["message"])
-        }
+        return {"intent": state["intent"]}
 
     @staticmethod
     def _select_specialist(state: AgentState) -> AgentIntent:
@@ -217,11 +200,8 @@ class ReviewerAgent:
         months = state.get("months", [])
         expected_period = " to ".join(months)
         wrong_currency = state.get("currency") and evidence.get("currency") != state["currency"]
-        wrong_period = (
-            months
-            and state.get("intent") in {"summary", "category"}
-            and evidence.get("period") != expected_period
-        )
+        expected_period = state.get("reporting_period") or expected_period
+        wrong_period = bool(expected_period and evidence.get("period") != expected_period)
         if wrong_currency or wrong_period:
             return {
                 **state,
