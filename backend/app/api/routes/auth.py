@@ -2,7 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -114,7 +114,7 @@ def login(
     db: Annotated[Session, Depends(get_db)],
 ) -> TokenResponse:
     user = db.scalar(select(User).where(User.email == payload.email))
-    if not user or not verify_password(payload.password, user.password_hash):
+    if not user or not user.is_active or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
     refresh_token = create_persisted_refresh_token(user.id, db)
     set_refresh_cookie(response, refresh_token)
@@ -153,6 +153,23 @@ def refresh(
 
     user = db.get(User, user_id)
     if user is None or not user.is_active:
+        raise invalid_refresh_token_error()
+
+    # Compare-and-set consumption wins once even if another reader cached the old state.
+    consumed = db.execute(
+        update(RefreshToken)
+        .where(
+            RefreshToken.jti == jti,
+            RefreshToken.user_id == user_id,
+            RefreshToken.token_hash == stored.token_hash,
+            RefreshToken.revoked_at.is_(None),
+            RefreshToken.expires_at > now,
+        )
+        .values(revoked_at=now)
+        .execution_options(synchronize_session=False)
+    )
+    if consumed.rowcount != 1:
+        db.rollback()
         raise invalid_refresh_token_error()
 
     next_refresh_token = create_persisted_refresh_token(user.id, db)
