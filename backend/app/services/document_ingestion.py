@@ -34,6 +34,7 @@ from app.models.finance import Transaction, UploadedFile
 from app.schemas.finance import TransactionCreate
 from app.services.audit import AsyncAuditService
 from app.services.categorization import CategorizationService
+from app.services.import_currency import CsvCurrencyResolver
 from app.services.rag import LOCAL_EMBEDDING_MODEL, RagService
 
 logger = logging.getLogger(__name__)
@@ -223,10 +224,12 @@ class DocumentIngestionService:
 
         boto3.client("s3").delete_object(**receipt)
 
-    async def prepare_upload(self, upload: StoredUpload) -> PreparedIngestion:
+    async def prepare_upload(
+        self, upload: StoredUpload, import_currency: str | None = None
+    ) -> PreparedIngestion:
         if upload.suffix == ".csv":
             payload = await asyncio.to_thread(upload.path.read_bytes)
-            transactions = await asyncio.to_thread(self.parse_csv, payload)
+            transactions = await asyncio.to_thread(self.parse_csv, payload, import_currency)
             return PreparedIngestion(transactions=tuple(transactions), status="processed")
         text = await self.extract_document_text(upload.path)
         chunks = tuple(self.chunk_text(text))
@@ -396,13 +399,14 @@ class DocumentIngestionService:
     async def extract_document_text(self, path: Path) -> str:
         return await asyncio.to_thread(self._extract_document_text_sync, path)
 
-    def parse_csv(self, payload: bytes) -> list[TransactionCreate]:
+    def parse_csv(self, payload: bytes, import_currency: str | None = None) -> list[TransactionCreate]:
         try:
             text = payload.decode("utf-8-sig")
         except UnicodeDecodeError as exc:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "CSV must be UTF-8 encoded") from exc
 
         reader = csv.DictReader(io.StringIO(text))
+        currencies = CsvCurrencyResolver(reader.fieldnames, import_currency)
         rows: list[TransactionCreate] = []
         for line_number, raw in enumerate(reader, start=2):
             if len(rows) >= 5000:
@@ -423,6 +427,7 @@ class DocumentIngestionService:
                     status.HTTP_400_BAD_REQUEST,
                     f"Invalid CSV transaction data on line {line_number}",
                 ) from exc
+            currency = currencies.resolve(raw, line_number)
             category = raw.get("category") or self.categorizer.categorize(
                 merchant, description, amount
             )
@@ -432,7 +437,7 @@ class DocumentIngestionService:
                     merchant=merchant,
                     description=description,
                     amount=amount,
-                    currency=raw.get("currency") or raw.get("Currency") or "USD",
+                    currency=currency,
                     category=category,
                     source="csv",
                 )

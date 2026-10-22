@@ -106,7 +106,7 @@ async def test_ingest_upload_imports_csv_transactions_and_audits():
     service = DocumentIngestionService()
     user_id = uuid4()
     path = Path("pytest-document-ingestion.csv")
-    path.write_bytes(b"date,merchant,amount,category\n2026-05-01,Cafe,-4.25,Dining\n")
+    path.write_bytes(b"date,merchant,amount,category,currency\n2026-05-01,Cafe,-4.25,Dining,EUR\n")
     try:
         upload = StoredUpload(
             path=path,

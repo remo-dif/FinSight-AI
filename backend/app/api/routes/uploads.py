@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_async_db
@@ -20,6 +20,7 @@ async def upload_file(
     file: Annotated[UploadFile, File()],
     user: Annotated[User, Depends(upload_user)],
     db: Annotated[AsyncSession, Depends(get_async_db)],
+    import_currency: Annotated[str | None, Form()] = None,
 ) -> UploadResponse:
     user_id = user.id
     await db.rollback()  # End authentication's read transaction before I/O/provider calls.
@@ -28,7 +29,7 @@ async def upload_file(
     commit_attempted = False
     try:
         upload = await service.save_upload(user_id, file, stage_only=True)
-        prepared = await service.prepare_upload(upload)
+        prepared = await service.prepare_upload(upload, import_currency)
         upload = await service.finalize_storage(user_id, upload)
         file_id = uuid4()
         record = UploadedFile(

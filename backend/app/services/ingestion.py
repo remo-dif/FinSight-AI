@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from app.core.config import settings
 from app.schemas.finance import TransactionCreate
 from app.services.categorization import CategorizationService
+from app.services.import_currency import CsvCurrencyResolver
 
 
 class SecureUploadService:
@@ -65,12 +66,13 @@ class IngestionService:
     def __init__(self, categorizer: CategorizationService | None = None) -> None:
         self.categorizer = categorizer or CategorizationService()
 
-    def parse_csv(self, payload: bytes) -> list[TransactionCreate]:
+    def parse_csv(self, payload: bytes, import_currency: str | None = None) -> list[TransactionCreate]:
         try:
             text = payload.decode("utf-8-sig")
         except UnicodeDecodeError as exc:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "CSV must be UTF-8 encoded") from exc
         reader = csv.DictReader(io.StringIO(text))
+        currencies = CsvCurrencyResolver(reader.fieldnames, import_currency)
         rows: list[TransactionCreate] = []
         for line_number, raw in enumerate(reader, start=2):
             if len(rows) >= self.max_csv_rows:
@@ -91,6 +93,7 @@ class IngestionService:
                     status.HTTP_400_BAD_REQUEST,
                     f"Invalid CSV transaction data on line {line_number}",
                 ) from exc
+            currency = currencies.resolve(raw, line_number)
             category = raw.get("category") or self.categorizer.categorize(
                 merchant, description, amount
             )
@@ -100,7 +103,7 @@ class IngestionService:
                     merchant=merchant,
                     description=description,
                     amount=amount,
-                    currency=raw.get("currency") or raw.get("Currency") or "USD",
+                    currency=currency,
                     category=category,
                     source="csv",
                 )
