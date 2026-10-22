@@ -1,0 +1,148 @@
+from dataclasses import replace
+from io import BytesIO
+from types import SimpleNamespace
+from uuid import uuid4
+
+import pytest
+from fastapi import HTTPException
+from openai import OpenAIError
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import Session
+from starlette.datastructures import Headers, UploadFile
+
+import app.models  # noqa: F401
+from app.api.routes.uploads import upload_file
+from app.core.database import Base
+from app.core.openai_resilience import CircuitBreaker
+from app.models.embedding import Embedding
+from app.models.finance import UploadedFile
+from app.models.user import User
+from app.services.document_ingestion import DocumentIngestionService
+from app.services.rag import LOCAL_EMBEDDING_MODEL
+
+
+def file():
+    return UploadFile(BytesIO(b"%PDF-1.4 Synthetic"), filename="synthetic.pdf", headers=Headers({"content-type": "application/pdf"}))
+
+
+def configure(monkeypatch, **values):
+    from app.core.config import settings
+    namespace = SimpleNamespace(**{**settings.model_dump(), "embedding_backend": "openai", **values})
+    monkeypatch.setattr("app.services.document_ingestion.settings", namespace)
+    monkeypatch.setattr("app.services.document_ingestion.openai_circuit", CircuitBreaker(5, 30))
+
+
+@pytest.mark.asyncio
+async def test_remote_failure_never_switches_embedding_model(monkeypatch):
+    configure(monkeypatch)
+    service = DocumentIngestionService()
+    async def fail(**kwargs):
+        raise OpenAIError("Synthetic unavailable provider")
+    service._openai_client = SimpleNamespace(embeddings=SimpleNamespace(create=fail))
+    with pytest.raises(HTTPException) as exc:
+        await service.embed_texts(["Synthetic"])
+    assert exc.value.status_code == 503 and "retry" in exc.value.detail.lower()
+    assert service.embedding_model != LOCAL_EMBEDDING_MODEL
+
+
+@pytest.mark.asyncio
+async def test_explicit_local_backend_does_not_use_remote_provider(monkeypatch):
+    configure(monkeypatch, embedding_backend="local")
+    service = DocumentIngestionService()
+    assert service._openai_client is None
+    assert service.embedding_model == LOCAL_EMBEDDING_MODEL
+    assert len((await service.embed_texts(["Synthetic"]))[0]) == 1536
+
+
+@pytest.mark.asyncio
+async def test_missing_remote_client_is_not_implicit_local_mode(monkeypatch):
+    configure(monkeypatch)
+    service = DocumentIngestionService()
+    service._openai_client = None
+    with pytest.raises(HTTPException) as exc:
+        await service.embed_texts(["Synthetic"])
+    assert exc.value.status_code == 503
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("rows", [[], [[0.0]], [[float("nan")] * 1536], [[float("inf")] * 1536]])
+async def test_invalid_remote_embedding_response_is_not_indexed(monkeypatch, rows):
+    configure(monkeypatch)
+    service = DocumentIngestionService()
+    async def create(**kwargs):
+        return SimpleNamespace(data=[SimpleNamespace(index=i, embedding=row) for i, row in enumerate(rows)])
+    service._openai_client = SimpleNamespace(embeddings=SimpleNamespace(create=create))
+    with pytest.raises(HTTPException) as exc:
+        await service.embed_texts(["Synthetic"])
+    assert exc.value.status_code == 503
+
+
+class AsyncAdapter:
+    """Real SQLite transaction behavior behind the route's async session protocol."""
+    def __init__(self, db, failure=None):
+        self.sync = db
+        self.failure = failure
+    def in_transaction(self): return self.sync.in_transaction()
+    def add(self, row): self.sync.add(row)
+    def add_all(self, rows): self.sync.add_all(rows)
+    async def flush(self):
+        if self.failure == "flush": raise RuntimeError("Synthetic flush failure")
+        self.sync.flush()
+    async def refresh(self, row): self.sync.refresh(row)
+    async def rollback(self): self.sync.rollback()
+    async def commit(self):
+        if self.failure == "commit": raise RuntimeError("Synthetic commit failure")
+        self.sync.commit()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", [None, "provider", "flush", "commit"])
+async def test_upload_boundaries_and_owned_cleanup(monkeypatch, tmp_path, failure):
+    configure(monkeypatch, upload_dir=tmp_path, storage_backend="local")
+    sentinel = tmp_path / "pre-existing.pdf"
+    sentinel.write_bytes(b"Never remove an existing upload")
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as sync:
+        user = User(email="synthetic@example.invalid", full_name="Synthetic", password_hash="unused")
+        sync.add(user)
+        sync.commit()
+        sync.refresh(user)  # Authentication-like read transaction must also end.
+        db = AsyncAdapter(sync, failure)
+        async def text(self, path):
+            assert not db.in_transaction(), "Transaction held during extraction"
+            return "Synthetic financial document"
+        async def embeddings(self, values):
+            assert not db.in_transaction(), "Transaction held during embedding/retries"
+            assert sync.scalar(select(func.count()).select_from(UploadedFile)) == 0
+            sync.rollback()  # Only the test's assertion query opened this transaction.
+            if failure == "provider": raise HTTPException(503, "Provider unavailable; retry")
+            return [[0.0] * 1536 for _ in values]
+        monkeypatch.setattr(DocumentIngestionService, "extract_document_text", text)
+        monkeypatch.setattr(DocumentIngestionService, "embed_texts", embeddings)
+        if failure:
+            with pytest.raises((HTTPException, RuntimeError)):
+                await upload_file(file(), user, db)
+            assert sync.scalar(select(func.count()).select_from(UploadedFile)) == 0
+            assert sync.scalar(select(func.count()).select_from(Embedding)) == 0
+        else:
+            result = await upload_file(file(), user, db)
+            assert result.status == "indexed" and result.indexed == 1
+            assert sync.scalar(select(func.count()).select_from(UploadedFile)) == 1
+        assert sentinel.read_bytes() == b"Never remove an existing upload"
+        generated = list((tmp_path / "staging").rglob("*.pdf"))
+        assert len(generated) == (1 if failure in {None, "commit"} else 0)
+    engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_staging_collision_never_appends_or_deletes_existing_file(monkeypatch, tmp_path):
+    configure(monkeypatch, upload_dir=tmp_path, storage_backend="local")
+    uid, file_id = uuid4(), uuid4()
+    path = tmp_path / "staging" / str(uid) / f"{file_id}.pdf"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"Existing payload")
+    monkeypatch.setattr("app.services.document_ingestion.uuid4", lambda: file_id)
+    with pytest.raises(FileExistsError):
+        await DocumentIngestionService().save_upload(uid, file())
+    assert path.read_bytes() == b"Existing payload"
