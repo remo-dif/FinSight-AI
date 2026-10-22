@@ -24,3 +24,5 @@ This repository implements the requested output order as concrete code and suppo
 20. Production Roadmap: [06-production-roadmap.md](./06-production-roadmap.md)
 21. Financial Correctness Cycle: [16-financial-correctness-cycle.md](./16-financial-correctness-cycle.md)
 22. Financial Cycle Validation: [17-financial-cycle-validation.md](./17-financial-cycle-validation.md)
+23. Cycle 2 Financial Trust: [18-cycle2-financial-trust.md](./18-cycle2-financial-trust.md)
+24. Cycle 2 Validation: [19-cycle2-validation.md](./19-cycle2-validation.md)
