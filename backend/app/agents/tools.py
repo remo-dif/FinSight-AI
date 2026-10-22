@@ -19,7 +19,9 @@ class FinanceToolLayer:
         kind = evidence.get("kind")
         if kind in {"category", "merchant", "budget"}:
             # Preserve every imported key, including the reserved envelope name.
-            evidence["group_totals"] = {f["key"][len(kind) + 1:]: f["amount"] for f in evidence["facts"]}
+            evidence["group_totals"] = {
+                f["key"][len(kind) + 1 :]: f["amount"] for f in evidence["facts"]
+            }
         self._trusted_payload_json = json.dumps(result, sort_keys=True)
         return result
 

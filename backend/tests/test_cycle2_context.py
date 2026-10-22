@@ -8,8 +8,11 @@ from app.agents.orchestrator import ReviewerAgent
 from app.api.routes.chat import chat
 from app.models.finance import Transaction
 from app.schemas.chat import ChatRequest
-from tests.test_chat_lifecycle import chat_db, install_providers  # noqa: F401
+from tests import test_chat_lifecycle as chat_fixtures
 from tests.test_financial_review import evidence
+
+chat_db = chat_fixtures.chat_db
+install_providers = chat_fixtures.install_providers
 
 
 @pytest.mark.parametrize(
@@ -29,7 +32,7 @@ from tests.test_financial_review import evidence
         ("compare spending", None, "two"),
     ],
 )
-def test_invalid_context_is_actionable_and_precedes_providers(  # noqa: F811
+def test_invalid_context_is_actionable_and_precedes_providers(
     chat_db, monkeypatch, message, currency, hint
 ):
     db, user = chat_db
@@ -41,7 +44,7 @@ def test_invalid_context_is_actionable_and_precedes_providers(  # noqa: F811
     assert calls == []
 
 
-def test_requested_merchant_month_is_applied(chat_db, monkeypatch):  # noqa: F811
+def test_requested_merchant_month_is_applied(chat_db, monkeypatch):
     db, user = chat_db
     for month, value in [(1, "-10.00"), (2, "-100.00")]:
         db.add(
@@ -75,14 +78,27 @@ def test_reviewer_enforces_resolved_period_for_every_intent(intent):
     assert result["review_status"] == "rejected"
 
 
-@pytest.mark.parametrize("message", ["summary xyz 2025-01", "summary currency=xyz", "summary Q1", "summary past month", "spending from 2025-01 to 2025-03"])
+@pytest.mark.parametrize(
+    "message",
+    [
+        "summary xyz 2025-01",
+        "summary currency=xyz",
+        "summary Q1",
+        "summary past month",
+        "spending from 2025-01 to 2025-03",
+    ],
+)
 def test_unsupported_context_forms_are_not_silently_defaulted(message):
     from app.services.financial_context import resolve_context
+
     with pytest.raises(ValueError):
         resolve_context(message, "summary")
 
 
-@pytest.mark.parametrize("message,intent", [("budget using all history", "budget"), ("may I see my summary?", "summary")])
+@pytest.mark.parametrize(
+    "message,intent", [("budget using all history", "budget"), ("may I see my summary?", "summary")]
+)
 def test_ordinary_words_are_not_misidentified_as_currency_or_period(message, intent):
     from app.services.financial_context import resolve_context
+
     assert resolve_context(message, intent)["intent"] == intent

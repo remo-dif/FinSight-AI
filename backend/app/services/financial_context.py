@@ -65,10 +65,15 @@ def resolve_context(message: str, intent: str, currency: str | None = None) -> d
         for code in re.findall(
             r"\b(?:currency|in|using)(?:\s*[:=]\s*|\s+)([a-zA-Z]{3})\b", message, re.IGNORECASE
         )
-        if code.upper() not in _COMMON_UPPER_WORDS | {"MAY", "JAN", "FEB", "MAR", "APR", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"}
+        if code.upper()
+        not in _COMMON_UPPER_WORDS
+        | {"MAY", "JAN", "FEB", "MAR", "APR", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"}
     )
-    candidates.update(code.upper() for code in re.findall(r"\b([a-zA-Z]{3})\s+\d{4}-\d{2}\b", message)
-                      if code.upper() not in _COMMON_UPPER_WORDS)
+    candidates.update(
+        code.upper()
+        for code in re.findall(r"\b([a-zA-Z]{3})\s+\d{4}-\d{2}\b", message)
+        if code.upper() not in _COMMON_UPPER_WORDS
+    )
     for word, code in {"euros": "EUR", "euro": "EUR", "pounds": "GBP", "yen": "JPY"}.items():
         if re.search(r"\b" + word + r"\b", message, re.IGNORECASE):
             candidates.add(code)
@@ -113,8 +118,14 @@ def resolve_context(message: str, intent: str, currency: str | None = None) -> d
         )
     history = bool(re.search(r"\ball[ -]history\b", message, re.IGNORECASE))
     comparison = bool(re.search(r"compar|increas|decreas", message, re.IGNORECASE))
-    if len(months) == 2 and not comparison and re.search(r"\b(?:from|through|between|until)\b", message, re.IGNORECASE):
-        raise ValueError("Date ranges are unsupported. Use one YYYY-MM, or explicitly compare two YYYY-MM months.")
+    if (
+        len(months) == 2
+        and not comparison
+        and re.search(r"\b(?:from|through|between|until)\b", message, re.IGNORECASE)
+    ):
+        raise ValueError(
+            "Date ranges are unsupported. Use one YYYY-MM, or explicitly compare two YYYY-MM months."
+        )
     if len(months) > 2:
         raise ValueError("Unsupported period: select at most two YYYY-MM values.")
     if history and months:

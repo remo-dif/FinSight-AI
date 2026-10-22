@@ -12,6 +12,7 @@ def test_nonfinite_amount_is_rejected_before_categorization(parser, value, expli
     class NeverCategorize:
         def categorize(self, *args):
             pytest.fail("Non-finite money reached categorization")
+
     service = parser(NeverCategorize())
     category = ",category" if explicit_category else ""
     suffix = ",Groceries" if explicit_category else ""

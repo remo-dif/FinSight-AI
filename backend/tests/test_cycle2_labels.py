@@ -8,7 +8,7 @@ import pytest
 
 from app.services.financial_evidence import spending_report
 from app.services.financial_review import review_financial_draft
-from tests.test_financial_correctness import ledger, add_row  # noqa: F401
+from tests.test_financial_correctness import add_row, ledger  # noqa: F401
 
 
 @pytest.mark.parametrize(
@@ -73,11 +73,14 @@ def test_merchant_and_category_names_cannot_override_trusted_templates(prefix):
     assert not answer.startswith(name)
 
 
-@pytest.mark.parametrize("method", ["get_spending_by_category", "generate_budget", "get_top_merchants"])
+@pytest.mark.parametrize(
+    "method", ["get_spending_by_category", "generate_budget", "get_top_merchants"]
+)
 def test_reserved_metadata_name_is_preserved_as_imported_data(ledger, method):  # noqa: F811
     from app.agents.tools import FinanceToolLayer
     from app.repositories.transactions import TransactionRepository
     from app.services.analytics import FinanceAnalyticsService
+
     db, uid = ledger
     row = add_row(db, uid, "-30.00", "_evidence")
     row.merchant = "_evidence"

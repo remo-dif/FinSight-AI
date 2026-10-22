@@ -14,7 +14,12 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.openai_resilience import CircuitOpenError, create_openai_client, openai_circuit, validate_embedding_response
+from app.core.openai_resilience import (
+    CircuitOpenError,
+    create_openai_client,
+    openai_circuit,
+    validate_embedding_response,
+)
 from app.models.embedding import EMBEDDING_DIMENSIONS, Embedding
 
 LOCAL_EMBEDDING_MODEL = "deterministic-local-hash-v2"
@@ -183,7 +188,9 @@ class RagService:
                 openai_circuit.record_failure()
                 raise
             try:
-                vectors = validate_embedding_response(response, self.embedding_model, len(values), EMBEDDING_DIMENSIONS)
+                vectors = validate_embedding_response(
+                    response, self.embedding_model, len(values), EMBEDDING_DIMENSIONS
+                )
             except (AttributeError, TypeError, ValueError, OverflowError) as exc:
                 openai_circuit.record_failure()
                 raise OpenAIError("Invalid embedding provider response; retrieval skipped") from exc

@@ -230,9 +230,12 @@ class DocumentIngestionService:
             return PreparedIngestion(transactions=tuple(transactions), status="processed")
         text = await self.extract_document_text(upload.path)
         chunks = tuple(self.chunk_text(text))
-        vectors = await self.embed_texts([chunk.text for chunk in chunks])
         if not chunks:
-            return PreparedIngestion(status="empty")
+            raise HTTPException(
+                400,
+                "No indexable text was found. Upload a text-based PDF or CSV; scanned documents may require OCR.",
+            )
+        vectors = await self.embed_texts([chunk.text for chunk in chunks])
         return PreparedIngestion(chunks=chunks, vectors=tuple(tuple(v) for v in vectors))
 
     async def ingest_upload(
@@ -368,7 +371,10 @@ class DocumentIngestionService:
                 dimensions=EMBEDDING_DIMENSIONS,
             )
         except CircuitOpenError as exc:
-            raise HTTPException(503, "Embedding provider is cooling down. Retry the upload later; no model was substituted.") from exc
+            raise HTTPException(
+                503,
+                "Embedding provider is cooling down. Retry the upload later; no model was substituted.",
+            ) from exc
         except OpenAIError as exc:
             openai_circuit.record_failure()
             raise HTTPException(
@@ -376,7 +382,9 @@ class DocumentIngestionService:
                 "Embedding provider unavailable. Retry the upload later; no embedding model was substituted.",
             ) from exc
         try:
-            vectors = validate_embedding_response(response, self.embedding_model, len(values), EMBEDDING_DIMENSIONS)
+            vectors = validate_embedding_response(
+                response, self.embedding_model, len(values), EMBEDDING_DIMENSIONS
+            )
         except (AttributeError, TypeError, ValueError, OverflowError) as exc:
             openai_circuit.record_failure()
             raise HTTPException(
@@ -501,7 +509,7 @@ class DocumentIngestionService:
             handle.write(payload)
 
     @staticmethod
-    def _upload_to_s3(path: Path, key: str, content_type: str) -> None:
+    def _upload_to_s3(path: Path, key: str, content_type: str) -> dict:
         import boto3
 
         extra_args = {"ContentType": content_type, "ServerSideEncryption": "AES256"}

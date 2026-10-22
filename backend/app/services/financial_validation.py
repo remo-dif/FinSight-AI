@@ -92,7 +92,9 @@ def validate_financial_report(report: dict) -> dict:
         values = evidence.get("group_totals", projection)
         if not isinstance(values, dict):
             raise TypeError("Invalid grouping values")
-        if {k: money(v) for k, v in values.items() if k != "_evidence"} != {k: money(v) for k, v in projection.items()}:
+        if {k: money(v) for k, v in values.items() if k != "_evidence"} != {
+            k: money(v) for k, v in projection.items()
+        }:
             raise ValueError("Grouping projection does not reconcile")
         if set(facts) != {f"{kind}:{key}" for key in values}:
             raise ValueError("Missing or unexpected grouping facts")

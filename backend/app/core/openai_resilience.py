@@ -1,15 +1,17 @@
 """Shared OpenAI client policy and a small process-local circuit breaker."""
 
+from math import isfinite
 from threading import Lock
 from time import monotonic
-from math import isfinite
 
 from openai import AsyncOpenAI, OpenAI
 
 from app.core.config import settings
 
 
-def validate_embedding_response(response, model: str, count: int, dimensions: int) -> list[list[float]]:
+def validate_embedding_response(
+    response, model: str, count: int, dimensions: int
+) -> list[list[float]]:
     """One validation policy for indexing and query embeddings."""
     if getattr(response, "model", None) != model:
         raise ValueError("Unexpected embedding model identity")

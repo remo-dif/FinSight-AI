@@ -428,7 +428,10 @@ async def test_textless_document_is_rejected_without_a_new_persistent_state(monk
     configure(monkeypatch, upload_dir=tmp_path, storage_backend="local")
     service = DocumentIngestionService()
     upload = await service.save_upload(uuid4(), file(), stage_only=True)
-    async def empty_text(path): return ""
+
+    async def empty_text(path):
+        return ""
+
     monkeypatch.setattr(service, "extract_document_text", empty_text)
     try:
         with pytest.raises(HTTPException) as exc:
