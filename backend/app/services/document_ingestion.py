@@ -367,13 +367,17 @@ class DocumentIngestionService:
                 input=values,
                 dimensions=EMBEDDING_DIMENSIONS,
             )
-        except (OpenAIError, CircuitOpenError) as exc:
+        except CircuitOpenError as exc:
+            raise HTTPException(503, "Embedding provider is cooling down. Retry the upload later; no model was substituted.") from exc
+        except OpenAIError as exc:
             openai_circuit.record_failure()
             raise HTTPException(
                 503,
                 "Embedding provider unavailable. Retry the upload later; no embedding model was substituted.",
             ) from exc
         try:
+            if getattr(response, "model", None) != self.embedding_model:
+                raise ValueError("Unexpected embedding model identity")
             ordered = sorted(response.data, key=lambda row: row.index)
             if [row.index for row in ordered] != list(range(len(values))):
                 raise ValueError("Incomplete embedding response")
