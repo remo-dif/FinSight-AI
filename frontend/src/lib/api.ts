@@ -295,9 +295,10 @@ export type UploadResponse = {
   indexed: number;
 };
 
-export function uploadFinancialFile(file: File): Promise<UploadResponse> {
+export function uploadFinancialFile(file: File, importCurrency?: string): Promise<UploadResponse> {
   const body = new FormData();
   body.append("file", file);
+  if (importCurrency) body.append("import_currency", importCurrency);
   return apiFetch<UploadResponse>("/api/uploads", {
     method: "POST",
     body,

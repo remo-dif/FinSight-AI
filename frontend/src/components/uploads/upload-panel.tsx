@@ -14,8 +14,10 @@ export function UploadPanel() {
   const statusId = useId();
   const [filename, setFilename] = useState<string>("No file selected");
   const [file, setFile] = useState<File | null>(null);
+  const [importCurrency, setImportCurrency] = useState("");
+  const isCsv = file?.name.toLowerCase().endsWith(".csv") ?? false;
   const upload = useMutation({
-    mutationFn: uploadFinancialFile,
+    mutationFn: (selected: File) => uploadFinancialFile(selected, isCsv ? importCurrency : undefined),
     onSuccess: async () => queryClient.invalidateQueries({ queryKey: caseListQueryKey() })
   });
 
@@ -30,6 +32,7 @@ export function UploadPanel() {
   function onFile(event: ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0] ?? null;
     setFile(selected);
+    setImportCurrency("");
     setFilename(selected?.name ?? "No file selected");
     upload.reset();
   }
@@ -63,6 +66,29 @@ export function UploadPanel() {
         />
         <span id={`${inputId}-hint`} className="sr-only">Accepted file types are CSV, PDF, PNG, JPG, and JPEG.</span>
       </label>
+      {isCsv && (
+        <div className="mt-4 space-y-2">
+          <label htmlFor={`${inputId}-currency`} className="block text-sm font-medium">CSV currency</label>
+          <select
+            id={`${inputId}-currency`}
+            value={importCurrency}
+            onChange={(event) => { setImportCurrency(event.target.value); upload.reset(); }}
+            disabled={upload.isPending}
+            aria-describedby={`${inputId}-currency-hint`}
+            className="min-h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+          >
+            <option value="">Use currency column</option>
+            {["AUD", "CAD", "CHF", "EUR", "GBP", "JPY", "USD"].map((currency) => (
+              <option key={currency} value={currency}>{currency}</option>
+            ))}
+          </select>
+          <p id={`${inputId}-currency-hint`} className="text-xs text-muted">
+            If your CSV has no currency column or has blank currency cells, select the statement currency, then retry.
+            For mixed-currency files, use a currency column and leave this selector on “Use currency column”.
+            Explicit row currencies must match any selection. No currencies are assumed or converted.
+          </p>
+        </div>
+      )}
       <div className="mt-4 flex items-center justify-between gap-3">
         <p
           id={statusId}

@@ -31,7 +31,7 @@ test("CSV currency selection is explicit, actionable and reset for each file", a
   await expect(selector.locator("option:checked")).toHaveText("Use currency column");
   await expect(page.getByText(/If your CSV has no currency column/)).toBeVisible();
   await page.getByRole("button", { name: "Upload", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("select the statement currency");
+  await expect(page.getByRole("region", { name: "Evidence ingestion" }).getByRole("alert")).toContainText("select the statement currency");
   expect(requests[0]).not.toContain('name="import_currency"');
   await selector.selectOption("EUR");
   await page.getByRole("button", { name: "Upload", exact: true }).click();
