@@ -50,6 +50,27 @@ def monthly_summary(
     month: Annotated[str, Path(pattern=r"^\d{4}-\d{2}$")],
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    currency: Annotated[str | None, Query(pattern=r"^[A-Za-z]{3}$")] = None,
 ):
     analytics = FinanceAnalyticsService(TransactionRepository(db))
-    return analytics.get_monthly_summary(user.id, month)
+    try:
+        return analytics.get_monthly_summary(user.id, month, currency)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@router.get("/spending/{month}")
+def spending_report(
+    month: Annotated[str, Path(pattern=r"^\d{4}-\d{2}$")],
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    currency: Annotated[str | None, Query(pattern=r"^[A-Za-z]{3}$")] = None,
+    compare_to: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
+):
+    service = FinanceAnalyticsService(TransactionRepository(db))
+    try:
+        if compare_to:
+            return service.compare_spending(user.id, compare_to, month, currency)
+        return service.get_spending_report(user.id, month, currency)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc

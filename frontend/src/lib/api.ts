@@ -5,6 +5,7 @@ export type MonthlySummary = {
   income: string;
   spending: string;
   net_cash_flow: string;
+  currency?: string | null;
 };
 
 export type Transaction = {

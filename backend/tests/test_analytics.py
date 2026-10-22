@@ -9,17 +9,53 @@ from app.services.analytics import FinanceAnalyticsService
 class FakeRepository:
     def __init__(self) -> None:
         self.rows = [
-            SimpleNamespace(id=uuid4(), posted_at=date(2026, 5, 1), merchant="Rent", amount=Decimal("-1500.00"), category="Housing"),
-            SimpleNamespace(id=uuid4(), posted_at=date(2026, 5, 2), merchant="Coffee", amount=Decimal("-5.00"), category="Dining"),
-            SimpleNamespace(id=uuid4(), posted_at=date(2026, 5, 3), merchant="Payroll", amount=Decimal("4000.00"), category="Income"),
-            SimpleNamespace(id=uuid4(), posted_at=date(2026, 4, 1), merchant="Rent", amount=Decimal("-1500.00"), category="Housing"),
-            SimpleNamespace(id=uuid4(), posted_at=date(2026, 3, 1), merchant="Rent", amount=Decimal("-1500.00"), category="Housing"),
+            SimpleNamespace(
+                id=uuid4(),
+                posted_at=date(2026, 5, 1),
+                merchant="Rent",
+                amount=Decimal("-1500.00"),
+                category="Housing",
+            ),
+            SimpleNamespace(
+                id=uuid4(),
+                posted_at=date(2026, 5, 2),
+                merchant="Coffee",
+                amount=Decimal("-5.00"),
+                category="Dining",
+            ),
+            SimpleNamespace(
+                id=uuid4(),
+                posted_at=date(2026, 5, 3),
+                merchant="Payroll",
+                amount=Decimal("4000.00"),
+                category="Income",
+            ),
+            SimpleNamespace(
+                id=uuid4(),
+                posted_at=date(2026, 4, 1),
+                merchant="Rent",
+                amount=Decimal("-1500.00"),
+                category="Housing",
+            ),
+            SimpleNamespace(
+                id=uuid4(),
+                posted_at=date(2026, 3, 1),
+                merchant="Rent",
+                amount=Decimal("-1500.00"),
+                category="Housing",
+            ),
         ]
 
     def list_for_user(self, user_id, limit=200):
         return self.rows
 
-    def monthly_summary(self, user_id, month):
+    def currency_scope(self, user_id, currency=None, months=()):
+        return currency or "USD"
+
+    def rows_for_analysis(self, user_id, month=None, currency=None):
+        return currency or "USD", self.rows
+
+    def monthly_summary(self, user_id, month, currency=None):
         income = Decimal(0)
         spending = Decimal(0)
         for row in self.rows:

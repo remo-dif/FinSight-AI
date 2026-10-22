@@ -1,12 +1,14 @@
 import json
+import re
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from langgraph.graph import END, StateGraph
 
 from app.agents.state import AgentIntent, AgentState
 from app.agents.tools import FinanceToolLayer
+from app.services.financial_review import review_financial_draft
 from app.services.llm import LLMService
 from app.services.rag import RagService
 
@@ -16,7 +18,9 @@ ToolRunner = Callable[["OrchestratorAgent", AgentState], dict[str, Any]]
 class OrchestratorAgent:
     _compiled_graph: Any | None = None
 
-    def __init__(self, tools: FinanceToolLayer, rag_service: RagService, llm_service: LLMService) -> None:
+    def __init__(
+        self, tools: FinanceToolLayer, rag_service: RagService, llm_service: LLMService
+    ) -> None:
         self.tools = tools
         self.rag_service = rag_service
         self.llm_service = llm_service
@@ -67,6 +71,8 @@ class OrchestratorAgent:
 
     def route(self, message: str) -> AgentIntent:
         lower = message.lower()
+        if "compar" in lower or "increas" in lower or "decreas" in lower:
+            return "summary"
         if "anomal" in lower or "unusual" in lower:
             return "anomaly"
         if "recurring" in lower or "subscription" in lower:
@@ -81,12 +87,39 @@ class OrchestratorAgent:
 
     def run(self, state: AgentState) -> AgentState:
         state["_agent"] = self
-        state["rag_results"] = self.rag_service.retrieve_chunks(state["user_id"], state["message"], limit=5)
+        months = re.findall(r"(?<!\d)\d{4}-\d{2}(?!\d)", state["message"])
+        for month in months:
+            date.fromisoformat(f"{month}-01")
+        state["months"] = list(dict.fromkeys(months))
+        if len(state["months"]) > 2:
+            raise ValueError("Select at most two reporting months")
+        month = months[-1] if months else datetime.now(UTC).strftime("%Y-%m")
+        currencies = set(
+            re.findall(r"\b(?:EUR|USD|GBP|CHF|JPY|CAD|AUD)\b", state["message"].upper())
+        )
+        currency = state.get("currency")
+        if len(currencies) > 1 or (currency and currencies and currency.upper() not in currencies):
+            raise ValueError("Select a single currency")
+        currency = currency or next(iter(currencies), None)
+        state["currency"] = currency.upper() if currency else None
+        if hasattr(self.tools, "configure_context"):
+            self.tools.configure_context(month, currency)
+        # Authentication and chat ownership checks may already have begun a read transaction.
+        boundary = state.get("release_database")
+        if boundary:
+            boundary()
+        state["rag_results"] = self.rag_service.retrieve_chunks(
+            state["user_id"], state["message"], limit=5
+        )
         return self.graph.invoke(state)
 
     @staticmethod
     def _supervisor_node(state: AgentState) -> AgentState:
-        return {"intent": state["_agent"].route(state["message"])}
+        return {
+            "intent": "summary"
+            if len(state.get("months", [])) == 2
+            else state["_agent"].route(state["message"])
+        }
 
     @staticmethod
     def _select_specialist(state: AgentState) -> AgentIntent:
@@ -97,6 +130,9 @@ class OrchestratorAgent:
         def node(state: AgentState) -> AgentState:
             agent = state["_agent"]
             tool_results = runner(agent, state)
+            boundary = state.get("release_database")
+            if boundary:
+                boundary()
             agent_output = agent._synthesize_answer(state["intent"], state, tool_results)
             return {
                 "tool_results": tool_results,
@@ -105,7 +141,9 @@ class OrchestratorAgent:
 
         return node
 
-    def _synthesize_answer(self, intent: AgentIntent, state: AgentState, tool_results: dict[str, Any]) -> str:
+    def _synthesize_answer(
+        self, intent: AgentIntent, state: AgentState, tool_results: dict[str, Any]
+    ) -> str:
         rag_chunks = []
         for chunk in state.get("rag_results", []):
             if hasattr(chunk, "__dict__"):
@@ -139,6 +177,13 @@ class OrchestratorAgent:
         return self.tools.get_spending_by_category(state["user_id"])
 
     def _run_summary(self, state: AgentState) -> dict:
+        months = state.get("months", [])
+        if len(months) == 2:
+            return self.tools.compare_months(state["user_id"], months[0], months[1])
+        if len(months) > 2:
+            raise ValueError("Select at most two reporting months")
+        if months:
+            return self.tools.get_monthly_summary(state["user_id"], months[0])
         month = datetime.now(UTC).strftime("%Y-%m")
         return self.tools.get_monthly_summary(state["user_id"], month)
 
@@ -166,12 +211,26 @@ class OrchestratorAgent:
 
 class ReviewerAgent:
     def run(self, state: AgentState) -> AgentState:
-        if not state.get("tool_results"):
-            state["review_status"] = "rejected"
-            state["review"] = "Rejected: response lacks tool-grounded financial data."
-            state["final_answer"] = "I need transaction data before I can answer that safely."
-            return state
-        state["review_status"] = "accepted"
-        state["review"] = "Accepted: response is grounded in approved tool output."
-        state["final_answer"] = state["agent_outputs"]["orchestrator"]
+        evidence = state.get("tool_results", {}).get("_evidence", {})
+        if not isinstance(evidence, dict):
+            evidence = {}
+        months = state.get("months", [])
+        expected_period = " to ".join(months)
+        wrong_currency = state.get("currency") and evidence.get("currency") != state["currency"]
+        wrong_period = (
+            months
+            and state.get("intent") in {"summary", "category"}
+            and evidence.get("period") != expected_period
+        )
+        if wrong_currency or wrong_period:
+            return {
+                **state,
+                "review_status": "rejected",
+                "review": "Rejected: reporting context mismatch.",
+                "final_answer": "The financial evidence does not match the requested currency or period.",
+            }
+        status, review, answer = review_financial_draft(
+            state.get("tool_results", {}), state.get("agent_outputs", {}).get("orchestrator", "")
+        )
+        state["review_status"], state["review"], state["final_answer"] = status, review, answer
         return state

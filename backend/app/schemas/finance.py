@@ -33,6 +33,7 @@ class MonthlySummary(BaseModel):
     income: Decimal
     spending: Decimal
     net_cash_flow: Decimal
+    currency: str | None = None
 
 
 class CategorySpend(BaseModel):

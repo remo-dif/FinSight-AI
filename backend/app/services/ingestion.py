@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 import pdfplumber
 from fastapi import HTTPException, UploadFile, status
 from PIL import Image
+from pydantic import ValidationError
 
 from app.core.config import settings
 from app.schemas.finance import TransactionCreate
@@ -40,7 +41,9 @@ class SecureUploadService:
         }
         expected = signatures.get(suffix)
         if expected and not payload.startswith(expected):
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "File content does not match extension")
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, "File content does not match extension"
+            )
 
     async def save(self, user_id: UUID, file: UploadFile) -> Path:
         self.validate_metadata(file)
@@ -71,8 +74,12 @@ class IngestionService:
         rows: list[TransactionCreate] = []
         for line_number, raw in enumerate(reader, start=2):
             if len(rows) >= self.max_csv_rows:
-                raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "CSV has too many rows")
-            merchant = raw.get("merchant") or raw.get("Merchant") or raw.get("description") or "Unknown"
+                raise HTTPException(
+                    status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "CSV has too many rows"
+                )
+            merchant = (
+                raw.get("merchant") or raw.get("Merchant") or raw.get("description") or "Unknown"
+            )
             description = raw.get("description") or raw.get("Description") or merchant
             try:
                 amount = Decimal(str(raw.get("amount") or raw.get("Amount") or "0"))
@@ -82,17 +89,25 @@ class IngestionService:
                     status.HTTP_400_BAD_REQUEST,
                     f"Invalid CSV transaction data on line {line_number}",
                 ) from exc
-            category = raw.get("category") or self.categorizer.categorize(merchant, description, amount)
-            rows.append(
-                TransactionCreate(
+            category = raw.get("category") or self.categorizer.categorize(
+                merchant, description, amount
+            )
+            try:
+                item = TransactionCreate(
                     posted_at=posted_at,
                     merchant=merchant,
                     description=description,
                     amount=amount,
+                    currency=raw.get("currency") or raw.get("Currency") or "USD",
                     category=category,
                     source="csv",
                 )
-            )
+            except ValidationError as exc:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    f"Invalid CSV transaction data on line {line_number}",
+                ) from exc
+            rows.append(item)
         return rows
 
     def extract_document_text(self, path: Path) -> str:

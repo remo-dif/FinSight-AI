@@ -16,6 +16,7 @@ import pdfplumber
 from fastapi import HTTPException, UploadFile, status
 from openai import OpenAIError
 from PIL import Image, UnidentifiedImageError
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -101,7 +102,9 @@ class DocumentIngestionService:
                     first_bytes = chunk[:16]
                 total_bytes += len(chunk)
                 if total_bytes > max_bytes:
-                    raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File is too large")
+                    raise HTTPException(
+                        status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File is too large"
+                    )
                 await asyncio.to_thread(self._append_bytes, path, chunk)
         except Exception:
             await asyncio.to_thread(path.unlink, missing_ok=True)
@@ -140,7 +143,11 @@ class DocumentIngestionService:
         await audit.record(
             "document_ingestion.started",
             user_id,
-            {"file_id": str(record.id), "content_type": upload.content_type, "size_bytes": upload.size_bytes},
+            {
+                "file_id": str(record.id),
+                "content_type": upload.content_type,
+                "size_bytes": upload.size_bytes,
+            },
         )
 
         try:
@@ -206,7 +213,9 @@ class DocumentIngestionService:
         await db.flush()
         return len(records)
 
-    def chunk_text(self, text: str, chunk_tokens: int = 512, overlap_tokens: int = 64) -> list[DocumentChunk]:
+    def chunk_text(
+        self, text: str, chunk_tokens: int = 512, overlap_tokens: int = 64
+    ) -> list[DocumentChunk]:
         if chunk_tokens <= 0:
             raise ValueError("chunk_tokens must be positive")
         if overlap_tokens < 0 or overlap_tokens >= chunk_tokens:
@@ -265,8 +274,12 @@ class DocumentIngestionService:
         rows: list[TransactionCreate] = []
         for line_number, raw in enumerate(reader, start=2):
             if len(rows) >= 5000:
-                raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "CSV has too many rows")
-            merchant = raw.get("merchant") or raw.get("Merchant") or raw.get("description") or "Unknown"
+                raise HTTPException(
+                    status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "CSV has too many rows"
+                )
+            merchant = (
+                raw.get("merchant") or raw.get("Merchant") or raw.get("description") or "Unknown"
+            )
             description = raw.get("description") or raw.get("Description") or merchant
             try:
                 amount = Decimal(str(raw.get("amount") or raw.get("Amount") or "0"))
@@ -276,17 +289,25 @@ class DocumentIngestionService:
                     status.HTTP_400_BAD_REQUEST,
                     f"Invalid CSV transaction data on line {line_number}",
                 ) from exc
-            category = raw.get("category") or self.categorizer.categorize(merchant, description, amount)
-            rows.append(
-                TransactionCreate(
+            category = raw.get("category") or self.categorizer.categorize(
+                merchant, description, amount
+            )
+            try:
+                item = TransactionCreate(
                     posted_at=posted_at,
                     merchant=merchant,
                     description=description,
                     amount=amount,
+                    currency=raw.get("currency") or raw.get("Currency") or "USD",
                     category=category,
                     source="csv",
                 )
-            )
+            except ValidationError as exc:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    f"Invalid CSV transaction data on line {line_number}",
+                ) from exc
+            rows.append(item)
         return rows
 
     @property
@@ -300,12 +321,16 @@ class DocumentIngestionService:
         if allowed_suffixes is None:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unsupported content type")
         if suffix not in allowed_suffixes:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "File extension does not match content type")
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, "File extension does not match content type"
+            )
 
     def _validate_magic_bytes(self, suffix: str, first_bytes: bytes) -> None:
         expected = self.magic_bytes.get(suffix)
         if expected and not any(first_bytes.startswith(signature) for signature in expected):
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "File content does not match extension")
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, "File content does not match extension"
+            )
 
     def _extract_document_text_sync(self, path: Path) -> str:
         suffix = path.suffix.lower()
@@ -327,7 +352,9 @@ class DocumentIngestionService:
                     width, height = image.size
                     image.verify()
             except (UnidentifiedImageError, OSError) as exc:
-                raise HTTPException(status.HTTP_400_BAD_REQUEST, "Image could not be parsed") from exc
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST, "Image could not be parsed"
+                ) from exc
             if width * height > MAX_IMAGE_PIXELS:
                 raise HTTPException(
                     status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,

@@ -26,26 +26,47 @@ def chat(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
+    user_id = user.id
     session = None
     if payload.session_id:
         session = db.scalar(
             select(ChatSession).where(
                 ChatSession.id == payload.session_id,
-                ChatSession.user_id == user.id,
+                ChatSession.user_id == user_id,
             )
         )
         if session is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Chat session not found")
-    if session is None:
-        session = ChatSession(user_id=user.id, title=payload.message[:80])
-        db.add(session)
-        db.flush()
-        db.refresh(session)
-
     tools = FinanceToolLayer(FinanceAnalyticsService(TransactionRepository(db)))
     rag_service = RagService(db)
     llm_service = LLMService()
-    state = OrchestratorAgent(tools, rag_service, llm_service).run({"user_id": user.id, "message": payload.message})
+    try:
+        state = OrchestratorAgent(tools, rag_service, llm_service).run(
+            {
+                "user_id": user_id,
+                "message": payload.message,
+                "currency": payload.currency,
+                "release_database": db.rollback,
+            }
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+    # Persist the complete turn atomically only after all provider calls finish.
+    # Recheck ownership because the earlier read transaction has ended.
+    if payload.session_id:
+        session = db.scalar(
+            select(ChatSession).where(
+                ChatSession.id == payload.session_id,
+                ChatSession.user_id == user_id,
+            )
+        )
+        if session is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Chat session not found")
+    else:
+        session = ChatSession(user_id=user_id, title=payload.message[:80])
+        db.add(session)
+        db.flush()
 
     db.add_all(
         [
@@ -53,10 +74,11 @@ def chat(
             ChatMessage(session_id=session.id, role="assistant", content=state["final_answer"]),
         ]
     )
-    AuditService(db).record("ai.chat", user.id, {"intent": state["intent"]})
+    AuditService(db).record("ai.chat", user_id, {"intent": state["intent"]})
+    session_id = session.id
     db.commit()
     return ChatResponse(
-        session_id=session.id,
+        session_id=session_id,
         answer=state["final_answer"],
         review=state["review"],
         tool_results=state["tool_results"],
