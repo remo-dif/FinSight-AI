@@ -80,6 +80,7 @@ async def test_save_upload_persists_to_private_s3_uri(monkeypatch):
 @pytest.mark.asyncio
 async def test_embed_texts_uses_local_embedding_without_api_key(monkeypatch):
     monkeypatch.setattr("app.services.document_ingestion.settings.openai_api_key", None)
+    monkeypatch.setattr("app.services.document_ingestion.settings.embedding_backend", "local")
     service = DocumentIngestionService()
 
     embeddings = await service.embed_texts(["rent payment", "grocery store"])

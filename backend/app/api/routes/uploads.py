@@ -1,4 +1,5 @@
 from typing import Annotated
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,26 +21,45 @@ async def upload_file(
     user: Annotated[User, Depends(upload_user)],
     db: Annotated[AsyncSession, Depends(get_async_db)],
 ) -> UploadResponse:
+    user_id = user.id
+    await db.rollback()  # End authentication's read transaction before I/O/provider calls.
     service = DocumentIngestionService()
-    upload = await service.save_upload(user.id, file)
-    record = UploadedFile(
-        user_id=user.id,
-        filename=upload.filename,
-        content_type=upload.content_type,
-        storage_path=upload.storage_uri,
-        status="stored",
-    )
-    db.add(record)
-    await db.flush()
-    await db.refresh(record)
-
-    result = await service.ingest_upload(db, user.id, upload, record)
-    record.status = result.status
-    await db.commit()
-    await db.refresh(record)
-    return UploadResponse(
-        file_id=record.id,
-        status=record.status,
-        imported=result.imported,
-        indexed=result.indexed,
-    )
+    upload = None
+    commit_attempted = False
+    try:
+        upload = await service.save_upload(user_id, file, stage_only=True)
+        prepared = await service.prepare_upload(upload)
+        upload = await service.finalize_storage(user_id, upload)
+        file_id = uuid4()
+        record = UploadedFile(
+            id=file_id,
+            user_id=user_id,
+            filename=upload.filename,
+            content_type=upload.content_type,
+            storage_path=upload.storage_uri,
+            status=prepared.status,
+        )
+        db.add(record)
+        await db.flush()
+        result = await service.ingest_upload(db, user_id, upload, record, prepared)
+        response = UploadResponse(
+            file_id=file_id, status=result.status, imported=result.imported, indexed=result.indexed
+        )
+        commit_attempted = True
+        await db.commit()
+    except BaseException:
+        rollback_succeeded = False
+        try:
+            await db.rollback()
+            rollback_succeeded = True
+        finally:
+            if upload:
+                if commit_attempted or not rollback_succeeded:
+                    # A lost commit acknowledgement does not prove that the DB rolled back.
+                    # Preserve final storage for reconciliation rather than risk data loss.
+                    await service.release_upload(upload)
+                else:
+                    await service.cleanup_upload(upload)
+        raise
+    await service.release_upload(upload)
+    return response

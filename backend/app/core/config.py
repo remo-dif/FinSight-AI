@@ -39,6 +39,9 @@ class Settings(BaseSettings):
         default="text-embedding-3-large",
         validation_alias="OPENAI_EMBEDDING_MODEL",
     )
+    embedding_backend: Literal["openai", "local"] = Field(
+        default="openai", validation_alias="EMBEDDING_BACKEND"
+    )
     openai_timeout_seconds: float = Field(
         default=20.0,
         gt=0,

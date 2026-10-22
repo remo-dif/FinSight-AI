@@ -17,7 +17,7 @@ from app.core.config import settings
 from app.core.openai_resilience import CircuitOpenError, create_openai_client, openai_circuit
 from app.models.embedding import EMBEDDING_DIMENSIONS, Embedding
 
-LOCAL_EMBEDDING_MODEL = "deterministic-local-hash-v1"
+LOCAL_EMBEDDING_MODEL = "deterministic-local-hash-v2"
 logger = logging.getLogger(__name__)
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9._%+-]*")
@@ -41,7 +41,13 @@ class RagChunkResult:
 class RagService:
     def __init__(self, db: Session) -> None:
         self.db = db
-        self._openai_client = create_openai_client()
+        self._embedding_backend = settings.embedding_backend
+        self._embedding_model = (
+            LOCAL_EMBEDDING_MODEL
+            if self._embedding_backend == "local"
+            else settings.openai_embedding_model
+        )
+        self._openai_client = None if self._embedding_backend == "local" else create_openai_client()
 
     def chunk_text(self, text: str, max_chars: int = 1200, overlap_chars: int = 160) -> list[str]:
         return [chunk.text for chunk in self._chunk_text(text, max_chars, overlap_chars)]
@@ -102,6 +108,7 @@ class RagService:
                     SELECT chunk_text, metadata_json, 1 - (embedding <=> CAST(:embedding AS vector)) AS score
                     FROM embeddings
                     WHERE user_id = :user_id
+                      AND embedding_model = :model AND embedding_dimensions = :dimensions
                     ORDER BY embedding <=> CAST(:embedding AS vector)
                     LIMIT :limit
                     """
@@ -110,6 +117,8 @@ class RagService:
                     "user_id": str(user_id),
                     "embedding": self._format_pgvector(query_embedding),
                     "limit": limit,
+                    "model": self.embedding_model,
+                    "dimensions": EMBEDDING_DIMENSIONS,
                 },
             ).mappings()
             return [
@@ -121,7 +130,15 @@ class RagService:
                 for row in rows
             ]
 
-        rows = self.db.query(Embedding).filter(Embedding.user_id == user_id).all()
+        rows = (
+            self.db.query(Embedding)
+            .filter(
+                Embedding.user_id == user_id,
+                Embedding.embedding_model == self.embedding_model,
+                Embedding.embedding_dimensions == EMBEDDING_DIMENSIONS,
+            )
+            .all()
+        )
         ranked = sorted(
             (
                 RagChunkResult(
@@ -138,9 +155,7 @@ class RagService:
 
     @property
     def embedding_model(self) -> str:
-        if self._openai_client:
-            return settings.openai_embedding_model
-        return LOCAL_EMBEDDING_MODEL
+        return self._embedding_model
 
     def embed_text(self, value: str) -> list[float]:
         return self.embed_texts([value])[0]
@@ -148,6 +163,12 @@ class RagService:
     def embed_texts(self, values: list[str]) -> list[list[float]]:
         if not values:
             return []
+        if self._embedding_backend == "local":
+            return [self._local_embedding(value) for value in values]
+        if self._openai_client is None:
+            raise OpenAIError(
+                "Remote embedding provider unavailable; configure credentials or explicitly select local embeddings"
+            )
         if self._openai_client:
             kwargs: dict[str, Any] = {
                 "model": settings.openai_embedding_model,
@@ -163,7 +184,7 @@ class RagService:
                 raise
             openai_circuit.record_success()
             return [[float(item) for item in row.embedding] for row in response.data]
-        return [self._local_embedding(value) for value in values]
+        raise OpenAIError("Remote embedding provider unavailable")
 
     def _chunk_text(
         self,
@@ -203,7 +224,11 @@ class RagService:
         candidates = [
             value.rfind("\n\n", minimum, hard_end),
             value.rfind("\n", minimum, hard_end),
-            max(value.rfind(". ", minimum, hard_end), value.rfind("? ", minimum, hard_end), value.rfind("! ", minimum, hard_end)),
+            max(
+                value.rfind(". ", minimum, hard_end),
+                value.rfind("? ", minimum, hard_end),
+                value.rfind("! ", minimum, hard_end),
+            ),
             value.rfind(" ", minimum, hard_end),
         ]
         split_at = max(candidates)
@@ -225,7 +250,8 @@ class RagService:
             position += 1
         return position
 
-    def _local_embedding(self, value: str) -> list[float]:
+    @staticmethod
+    def _local_embedding(value: str) -> list[float]:
         vector = [0.0] * EMBEDDING_DIMENSIONS
         tokens = _TOKEN_RE.findall(value.lower())
         if not tokens:

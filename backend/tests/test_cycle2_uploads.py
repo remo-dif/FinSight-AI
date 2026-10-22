@@ -21,12 +21,19 @@ from app.services.rag import LOCAL_EMBEDDING_MODEL
 
 
 def file():
-    return UploadFile(BytesIO(b"%PDF-1.4 Synthetic"), filename="synthetic.pdf", headers=Headers({"content-type": "application/pdf"}))
+    return UploadFile(
+        BytesIO(b"%PDF-1.4 Synthetic"),
+        filename="synthetic.pdf",
+        headers=Headers({"content-type": "application/pdf"}),
+    )
 
 
 def configure(monkeypatch, **values):
     from app.core.config import settings
-    namespace = SimpleNamespace(**{**settings.model_dump(), "embedding_backend": "openai", **values})
+
+    namespace = SimpleNamespace(
+        **{**settings.model_dump(), "embedding_backend": "openai", **values}
+    )
     monkeypatch.setattr("app.services.document_ingestion.settings", namespace)
     monkeypatch.setattr("app.services.document_ingestion.openai_circuit", CircuitBreaker(5, 30))
 
@@ -35,8 +42,10 @@ def configure(monkeypatch, **values):
 async def test_remote_failure_never_switches_embedding_model(monkeypatch):
     configure(monkeypatch)
     service = DocumentIngestionService()
+
     async def fail(**kwargs):
         raise OpenAIError("Synthetic unavailable provider")
+
     service._openai_client = SimpleNamespace(embeddings=SimpleNamespace(create=fail))
     with pytest.raises(HTTPException) as exc:
         await service.embed_texts(["Synthetic"])
@@ -68,8 +77,12 @@ async def test_missing_remote_client_is_not_implicit_local_mode(monkeypatch):
 async def test_invalid_remote_embedding_response_is_not_indexed(monkeypatch, rows):
     configure(monkeypatch)
     service = DocumentIngestionService()
+
     async def create(**kwargs):
-        return SimpleNamespace(data=[SimpleNamespace(index=i, embedding=row) for i, row in enumerate(rows)])
+        return SimpleNamespace(
+            data=[SimpleNamespace(index=i, embedding=row) for i, row in enumerate(rows)]
+        )
+
     service._openai_client = SimpleNamespace(embeddings=SimpleNamespace(create=create))
     with pytest.raises(HTTPException) as exc:
         await service.embed_texts(["Synthetic"])
@@ -78,19 +91,34 @@ async def test_invalid_remote_embedding_response_is_not_indexed(monkeypatch, row
 
 class AsyncAdapter:
     """Real SQLite transaction behavior behind the route's async session protocol."""
+
     def __init__(self, db, failure=None):
         self.sync = db
         self.failure = failure
-    def in_transaction(self): return self.sync.in_transaction()
-    def add(self, row): self.sync.add(row)
-    def add_all(self, rows): self.sync.add_all(rows)
+
+    def in_transaction(self):
+        return self.sync.in_transaction()
+
+    def add(self, row):
+        self.sync.add(row)
+
+    def add_all(self, rows):
+        self.sync.add_all(rows)
+
     async def flush(self):
-        if self.failure == "flush": raise RuntimeError("Synthetic flush failure")
+        if self.failure == "flush":
+            raise RuntimeError("Synthetic flush failure")
         self.sync.flush()
-    async def refresh(self, row): self.sync.refresh(row)
-    async def rollback(self): self.sync.rollback()
+
+    async def refresh(self, row):
+        self.sync.refresh(row)
+
+    async def rollback(self):
+        self.sync.rollback()
+
     async def commit(self):
-        if self.failure == "commit": raise RuntimeError("Synthetic commit failure")
+        if self.failure == "commit":
+            raise RuntimeError("Synthetic commit failure")
         self.sync.commit()
 
 
@@ -103,20 +131,26 @@ async def test_upload_boundaries_and_owned_cleanup(monkeypatch, tmp_path, failur
     engine = create_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine, expire_on_commit=False) as sync:
-        user = User(email="synthetic@example.invalid", full_name="Synthetic", password_hash="unused")
+        user = User(
+            email="synthetic@example.invalid", full_name="Synthetic", password_hash="unused"
+        )
         sync.add(user)
         sync.commit()
         sync.refresh(user)  # Authentication-like read transaction must also end.
         db = AsyncAdapter(sync, failure)
+
         async def text(self, path):
             assert not db.in_transaction(), "Transaction held during extraction"
             return "Synthetic financial document"
+
         async def embeddings(self, values):
             assert not db.in_transaction(), "Transaction held during embedding/retries"
             assert sync.scalar(select(func.count()).select_from(UploadedFile)) == 0
             sync.rollback()  # Only the test's assertion query opened this transaction.
-            if failure == "provider": raise HTTPException(503, "Provider unavailable; retry")
+            if failure == "provider":
+                raise HTTPException(503, "Provider unavailable; retry")
             return [[0.0] * 1536 for _ in values]
+
         monkeypatch.setattr(DocumentIngestionService, "extract_document_text", text)
         monkeypatch.setattr(DocumentIngestionService, "embed_texts", embeddings)
         if failure:
@@ -150,15 +184,23 @@ async def test_staging_collision_never_appends_or_deletes_existing_file(monkeypa
 @pytest.mark.asyncio
 async def test_conditional_s3_cleanup_only_deletes_owned_version(monkeypatch, tmp_path):
     import boto3
+
     from app.services.document_ingestion import StoredUpload
-    configure(monkeypatch, upload_dir=tmp_path, storage_backend="s3", s3_upload_bucket="synthetic-bucket")
+
+    configure(
+        monkeypatch, upload_dir=tmp_path, storage_backend="s3", s3_upload_bucket="synthetic-bucket"
+    )
     calls = []
+
     class S3:
         def put_object(self, **kwargs):
             assert kwargs["IfNoneMatch"] == "*"
             calls.append(("put", kwargs["Key"]))
             return {"ETag": '"synthetic-etag"', "VersionId": "synthetic-version"}
-        def delete_object(self, **kwargs): calls.append(("delete", kwargs))
+
+        def delete_object(self, **kwargs):
+            calls.append(("delete", kwargs))
+
     monkeypatch.setattr(boto3, "client", lambda name: S3())
     service = DocumentIngestionService()
     upload = await service.save_upload(uuid4(), file())
@@ -168,7 +210,11 @@ async def test_conditional_s3_cleanup_only_deletes_owned_version(monkeypatch, tm
     assert calls[1][1]["VersionId"] == "synthetic-version"
     foreign = tmp_path / "foreign.pdf"
     foreign.write_bytes(b"Existing")
-    await service.cleanup_upload(StoredUpload(foreign, "s3://synthetic-bucket/existing", "existing.pdf", "application/pdf", ".pdf", 8))
+    await service.cleanup_upload(
+        StoredUpload(
+            foreign, "s3://synthetic-bucket/existing", "existing.pdf", "application/pdf", ".pdf", 8
+        )
+    )
     assert foreign.read_bytes() == b"Existing"
     assert len(calls) == 2
 
@@ -176,12 +222,19 @@ async def test_conditional_s3_cleanup_only_deletes_owned_version(monkeypatch, tm
 @pytest.mark.asyncio
 async def test_s3_collision_preserves_preexisting_object(monkeypatch, tmp_path):
     import boto3
-    configure(monkeypatch, upload_dir=tmp_path, storage_backend="s3", s3_upload_bucket="synthetic-bucket")
+
+    configure(
+        monkeypatch, upload_dir=tmp_path, storage_backend="s3", s3_upload_bucket="synthetic-bucket"
+    )
+
     class S3:
         def put_object(self, **kwargs):
             assert kwargs["IfNoneMatch"] == "*"
             raise FileExistsError("Synthetic pre-existing object")
-        def delete_object(self, **kwargs): pytest.fail("Existing object must not be deleted")
+
+        def delete_object(self, **kwargs):
+            pytest.fail("Existing object must not be deleted")
+
     monkeypatch.setattr(boto3, "client", lambda name: S3())
     with pytest.raises(FileExistsError):
         await DocumentIngestionService().save_upload(uuid4(), file())
@@ -191,20 +244,37 @@ async def test_s3_collision_preserves_preexisting_object(monkeypatch, tmp_path):
 @pytest.mark.asyncio
 async def test_local_retrieval_excludes_legacy_or_different_embedding_models(monkeypatch):
     from app.services.rag import RagService
+
     configure(monkeypatch, embedding_backend="local")
     from app.services.document_ingestion import settings as configured
+
     monkeypatch.setattr("app.services.rag.settings", configured)
     service = DocumentIngestionService()
     engine = create_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
     uid = uuid4()
     with Session(engine) as db:
-        db.add(User(id=uid, email="model@example.invalid", full_name="Synthetic", password_hash="unused"))
+        db.add(
+            User(
+                id=uid, email="model@example.invalid", full_name="Synthetic", password_hash="unused"
+            )
+        )
         vector = (await service.embed_texts(["coffee"]))[0]
         for model in ["deterministic-local-hash-v1", "remote-test-model", service.embedding_model]:
-            db.add(Embedding(user_id=uid, source_type="upload", source_id=uuid4(), chunk_index=0,
-                             chunk_text=model, chunk_hash=model, embedding=vector,
-                             embedding_model=model, embedding_dimensions=1536, metadata_json={}))
+            db.add(
+                Embedding(
+                    user_id=uid,
+                    source_type="upload",
+                    source_id=uuid4(),
+                    chunk_index=0,
+                    chunk_text=model,
+                    chunk_hash=model,
+                    embedding=vector,
+                    embedding_model=model,
+                    embedding_dimensions=1536,
+                    metadata_json={},
+                )
+            )
         db.flush()
         results = RagService(db).retrieve_chunks(uid, "coffee")
         assert service.embedding_model != "deterministic-local-hash-v1"
