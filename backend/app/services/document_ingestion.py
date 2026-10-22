@@ -283,6 +283,8 @@ class DocumentIngestionService:
             description = raw.get("description") or raw.get("Description") or merchant
             try:
                 amount = Decimal(str(raw.get("amount") or raw.get("Amount") or "0"))
+                if not amount.is_finite():
+                    raise ValueError("Non-finite monetary value")
                 posted_at = datetime.fromisoformat(raw.get("date") or raw.get("Date")).date()
             except (InvalidOperation, TypeError, ValueError) as exc:
                 raise HTTPException(
