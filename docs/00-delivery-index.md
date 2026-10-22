@@ -26,3 +26,4 @@ This repository implements the requested output order as concrete code and suppo
 22. Financial Cycle Validation: [17-financial-cycle-validation.md](./17-financial-cycle-validation.md)
 23. Cycle 2 Financial Trust: [18-cycle2-financial-trust.md](./18-cycle2-financial-trust.md)
 24. Cycle 2 Validation: [19-cycle2-validation.md](./19-cycle2-validation.md)
+25. Cycle 2.1 Explicit CSV Currency: [20-cycle21-explicit-csv-currency.md](./20-cycle21-explicit-csv-currency.md)
