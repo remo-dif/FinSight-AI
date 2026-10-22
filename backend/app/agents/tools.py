@@ -51,6 +51,7 @@ class FinanceToolLayer:
             {
                 "key": f"anomaly:{item['transaction_id']}",
                 "label": f"Unusual transaction ({item['merchant']})",
+                "entity": {"kind": "merchant", "name": item["merchant"]},
                 "amount": str(item["amount"]),
                 "currency": currency,
                 "period": "all history",

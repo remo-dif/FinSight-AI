@@ -4,6 +4,33 @@ import json
 from decimal import Decimal, InvalidOperation
 
 
+def render_fact(fact: dict) -> str:
+    """Assertion wording is code-owned; imported names are explicitly quoted data."""
+    key = fact["key"]
+    delta = key.startswith("delta:")
+    base_key = key.removeprefix("delta:")
+    kind, _, name = base_key.partition(":")
+    titles = {
+        "income": "Gross income", "spending": "Gross spending", "net_cash_flow": "Net cash flow",
+        "net_spending": "Spending excluding internal transfers, less explicit refunds",
+        "refunds": "Explicit refunds", "category": "Category spending",
+        "merchant": "Gross merchant spending", "budget": "Estimated budget (all-history spending / 3)",
+        "recurring": "Repeated-charge average (cadence unverified)", "anomaly": "Unusual transaction",
+        "summary": "Summary value",
+    }
+    title = titles.get(kind, "Financial value")
+    if delta:
+        title = f"Change in {title}"
+    entity = fact.get("entity")
+    if entity is None and name and kind in {"category", "budget", "merchant", "recurring"}:
+        entity = {"kind": "category" if kind in {"category", "budget"} else "merchant", "name": name}
+    data = ""
+    if entity:
+        entity_kind = "category" if entity.get("kind") == "category" else "merchant"
+        data = f" Imported {entity_kind} (untrusted data): {json.dumps(str(entity.get('name', '')), ensure_ascii=True)}."
+    return f"{title}: {fact['currency']} {Decimal(fact['amount']):,.2f} ({fact['period']}).{data}"
+
+
 def review_financial_draft(tool_results: dict, draft: str) -> tuple[str, str, str]:
     evidence = tool_results.get("_evidence")
     if not isinstance(evidence, dict):
@@ -71,10 +98,7 @@ def review_financial_draft(tool_results: dict, draft: str) -> tuple[str, str, st
     if not facts:
         answer = f"No matching financial facts for {evidence['period']} ({evidence['currency']})."
     else:
-        answer = " ".join(
-            f"{f['label']}: {f['currency']} {Decimal(f['amount']):,.2f} ({f['period']})."
-            for f in selected_facts
-        )
+        answer = " ".join(render_fact(f) for f in selected_facts)
     review = "Accepted: amounts, currency, periods and transaction references come from deterministic tool evidence."
     if used_fallback:
         review += " Unverified AI draft replaced with a deterministic explanation."
