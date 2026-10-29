@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from hashlib import sha256
 from hmac import compare_digest
+from secrets import token_urlsafe
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
@@ -26,6 +27,10 @@ class TokenType(StrEnum):
 
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+# One valid same-algorithm/cost hash per worker, never a credential or a user row.
+DUMMY_PASSWORD_HASH = hash_password(token_urlsafe(32))
 
 
 def verify_password(password: str, password_hash: str) -> bool:

@@ -88,6 +88,9 @@ class Settings(BaseSettings):
     )
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
     rate_limit_per_minute: int = Field(default=20, gt=0, validation_alias="RATE_LIMIT_PER_MINUTE")
+    login_rate_limit_per_minute: int = Field(
+        default=10, gt=0, le=1000, validation_alias="LOGIN_RATE_LIMIT_PER_MINUTE"
+    )
 
     @field_validator("jwt_secret_key", "jwt_refresh_secret_key", mode="before")
     @classmethod

@@ -83,6 +83,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         rate_limit_middleware,
         requests_per_minute=settings.rate_limit_per_minute,
+        login_requests_per_minute=settings.login_rate_limit_per_minute,
         trusted_proxy_cidrs=settings.trusted_proxy_cidrs,
     )
     app.include_router(api_router)

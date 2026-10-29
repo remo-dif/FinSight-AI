@@ -76,9 +76,11 @@ class InMemoryRateLimitMiddleware(BaseHTTPMiddleware):
         app,
         requests_per_minute: int = 120,
         trusted_proxy_cidrs: list[str] | None = None,
+        login_requests_per_minute: int = 10,
     ) -> None:
         super().__init__(app)
         self.requests_per_minute = requests_per_minute
+        self.login_requests_per_minute = login_requests_per_minute
         self.trusted_proxy_cidrs = trusted_proxy_cidrs or []
         self.requests: dict[str, deque[float]] = defaultdict(deque)
 
@@ -88,12 +90,16 @@ class InMemoryRateLimitMiddleware(BaseHTTPMiddleware):
 
         client = get_client_ip(request, self.trusted_proxy_cidrs)
         now = monotonic()
-        bucket = self.requests[client]
-        while bucket and now - bucket[0] > 60:
-            bucket.popleft()
-        if len(bucket) >= self.requests_per_minute:
-            return _limit_response()
-        bucket.append(now)
+        budgets = [(client, self.requests_per_minute)]
+        if request.method == "POST" and request.url.path == "/api/auth/login":
+            budgets.append((f"login:{client}", self.login_requests_per_minute))
+        for key, limit in budgets:
+            bucket = self.requests[key]
+            while bucket and now - bucket[0] > 60:
+                bucket.popleft()
+            if len(bucket) >= limit:
+                return _limit_response()
+            bucket.append(now)
         return await call_next(request)
 
 
@@ -103,9 +109,11 @@ class RedisRateLimitMiddleware(BaseHTTPMiddleware):
         app,
         requests_per_minute: int = 120,
         trusted_proxy_cidrs: list[str] | None = None,
+        login_requests_per_minute: int = 10,
     ) -> None:
         super().__init__(app)
         self.requests_per_minute = requests_per_minute
+        self.login_requests_per_minute = login_requests_per_minute
         self.trusted_proxy_cidrs = trusted_proxy_cidrs or []
 
     async def dispatch(self, request: Request, call_next) -> Response:
@@ -116,21 +124,24 @@ class RedisRateLimitMiddleware(BaseHTTPMiddleware):
         identity = hashlib.sha256(client.encode("utf-8")).hexdigest()
         window = int(time() // 60)
         key = f"rate-limit:{identity}:{window}"
+        budgets = [(key, self.requests_per_minute)]
+        if request.method == "POST" and request.url.path == "/api/auth/login":
+            budgets.append((f"login-rate-limit:{identity}:{window}", self.login_requests_per_minute))
 
         try:
-            current = int(
-                await request.app.state.redis.eval(RATE_LIMIT_SCRIPT, 1, key, 60)
-            )
+            for bucket, limit in budgets:
+                count = int(await request.app.state.redis.eval(RATE_LIMIT_SCRIPT, 1, bucket, 60))
+                if count > limit:
+                    return _limit_response()
+                if bucket == key:
+                    current = count
         except (AttributeError, RedisError):
-            logger.exception("Redis rate-limit storage is unavailable")
+            logger.warning("Redis rate-limit storage is unavailable")
             return JSONResponse(
                 {"detail": "Rate-limit service unavailable"},
                 status_code=503,
                 headers={"Retry-After": "1"},
             )
-
-        if current > self.requests_per_minute:
-            return _limit_response()
 
         response = await call_next(request)
         response.headers["X-RateLimit-Limit"] = str(self.requests_per_minute)

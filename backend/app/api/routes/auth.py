@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import (
+    DUMMY_PASSWORD_HASH,
     TokenType,
     as_aware_utc,
     create_persisted_refresh_token,
@@ -114,7 +115,9 @@ def login(
     db: Annotated[Session, Depends(get_db)],
 ) -> TokenResponse:
     user = db.scalar(select(User).where(User.email == payload.email))
-    if not user or not user.is_active or not verify_password(payload.password, user.password_hash):
+    password_hash = user.password_hash if user is not None and user.is_active else DUMMY_PASSWORD_HASH
+    password_valid = verify_password(payload.password, password_hash)
+    if user is None or not user.is_active or not password_valid:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
     refresh_token = create_persisted_refresh_token(user.id, db)
     set_refresh_cookie(response, refresh_token)
