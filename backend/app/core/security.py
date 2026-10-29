@@ -83,7 +83,9 @@ def create_persisted_refresh_token(
     jti = str(uuid4())
     lifetime = expires_delta or timedelta(days=settings.refresh_token_days)
     token = create_token(user_id, TokenType.REFRESH, lifetime, jti=jti)
-    payload = jwt.decode(token, settings.jwt_refresh_secret_key, algorithms=[settings.jwt_algorithm])
+    payload = jwt.decode(
+        token, settings.jwt_refresh_secret_key, algorithms=[settings.jwt_algorithm]
+    )
     refresh_token = RefreshToken(
         user_id=user_id,
         jti=jti,

@@ -115,7 +115,9 @@ def login(
     db: Annotated[Session, Depends(get_db)],
 ) -> TokenResponse:
     user = db.scalar(select(User).where(User.email == payload.email))
-    password_hash = user.password_hash if user is not None and user.is_active else DUMMY_PASSWORD_HASH
+    password_hash = (
+        user.password_hash if user is not None and user.is_active else DUMMY_PASSWORD_HASH
+    )
     password_valid = verify_password(payload.password, password_hash)
     if user is None or not user.is_active or not password_valid:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")

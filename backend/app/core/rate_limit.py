@@ -126,7 +126,9 @@ class RedisRateLimitMiddleware(BaseHTTPMiddleware):
         key = f"rate-limit:{identity}:{window}"
         budgets = [(key, self.requests_per_minute)]
         if request.method == "POST" and request.url.path == "/api/auth/login":
-            budgets.append((f"login-rate-limit:{identity}:{window}", self.login_requests_per_minute))
+            budgets.append(
+                (f"login-rate-limit:{identity}:{window}", self.login_requests_per_minute)
+            )
 
         try:
             for bucket, limit in budgets:
@@ -145,9 +147,7 @@ class RedisRateLimitMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
         response.headers["X-RateLimit-Limit"] = str(self.requests_per_minute)
-        response.headers["X-RateLimit-Remaining"] = str(
-            max(0, self.requests_per_minute - current)
-        )
+        response.headers["X-RateLimit-Remaining"] = str(max(0, self.requests_per_minute - current))
         return response
 
 
