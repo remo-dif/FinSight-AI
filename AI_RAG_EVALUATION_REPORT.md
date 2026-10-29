@@ -193,6 +193,19 @@ workflow is AWS production deployment, not an appropriate validation dispatch.
 No CI triggers or AWS configuration were changed to manufacture a green run.
 Remote execution, if absent after push, remains unavailable rather than passed.
 
+Post-push verification of checkpoint `c34decd` using the GitHub Actions API
+returned `total_count: 0`. No CI run URL or job outcomes exist for that checkpoint.
+
+Changed files (15): this report; six application files
+(`backend/app/core/ai_observability.py`, `backend/app/core/logging.py`,
+`backend/app/main.py`, `backend/app/services/rag.py`, `backend/app/services/llm.py`,
+`backend/app/services/document_ingestion.py`); four evaluation artifacts
+(`backend/evaluation/__init__.py`, `backend/evaluation/runner.py`,
+`backend/evaluation/data/rag_cases.json`, `backend/evaluation/baseline.json`);
+and four tests (`backend/tests/test_ai_observability.py`,
+`backend/tests/test_ai_rag_integration.py`, `backend/tests/test_rag.py`,
+`backend/tests/test_rag_evaluation.py`).
+
 ## 9. Three prioritized next steps
 
 1. Agree an explicit document-answer/abstention/citation contract and align UI
