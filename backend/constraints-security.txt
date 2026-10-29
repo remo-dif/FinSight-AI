@@ -1,0 +1,5 @@
+# Security floors for existing transitive/build dependencies, not new app features.
+# Apply with pip install -c constraints-security.txt -e ".[dev]".
+msgpack>=1.2.3
+urllib3>=2.8.0
+setuptools>=78.1.1

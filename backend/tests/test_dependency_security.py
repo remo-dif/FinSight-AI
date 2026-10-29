@@ -20,6 +20,10 @@ ROOT = Path(__file__).resolve().parents[2]
         ("postcss", (8, 5, 18)),
         ("sharp", (0, 35, 5)),
         ("source-map-js", (1, 2, 2)),
+        ("baseline-browser-mapping", (2, 11, 0)),
+        ("browserslist", (4, 28, 7)),
+        ("js-yaml", (4, 3, 2)),
+        ("postcss-selector-parser", (6, 1, 5)),
     ],
 )
 def test_frontend_lock_excludes_reported_vulnerable_versions(package, minimum):
@@ -33,6 +37,20 @@ def test_frontend_lock_excludes_reported_vulnerable_versions(package, minimum):
     for version in versions:
         assert "-" not in version, f"Do not substitute a prerelease for {package}"
         assert tuple(map(int, version.split("."))) >= minimum, (package, version)
+
+
+def test_brace_expansion_security_floors_preserve_both_supported_major_versions():
+    lock = json.loads((ROOT / "frontend/package-lock.json").read_text())
+    versions = [
+        entry["version"]
+        for path, entry in lock["packages"].items()
+        if path.endswith("node_modules/brace-expansion")
+    ]
+    assert versions
+    for version in versions:
+        parts = tuple(map(int, version.split(".")))
+        minimum = (1, 1, 21) if parts[0] == 1 else (5, 0, 12)
+        assert parts >= minimum, version
 
 
 def test_runtime_does_not_ship_pip_vendored_dependencies():

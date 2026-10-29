@@ -10,8 +10,13 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -e .
+COPY constraints-security.txt ./
+# Upgrade the build tooling, enforce transitive security floors, then remove pip
+# (including its vendored libraries) from the runtime image.
+RUN pip install --no-cache-dir --upgrade pip "setuptools>=78.1.1" \
+    && pip install --no-cache-dir -e . -c constraints-security.txt \
+    && pip check \
+    && pip uninstall --yes pip
 
 COPY alembic.ini ./
 COPY alembic ./alembic
