@@ -31,7 +31,7 @@ dev = [
 ]
 
 [build-system]
-requires = ["setuptools>=75.0"]
+requires = ["setuptools>=78.1.1"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]

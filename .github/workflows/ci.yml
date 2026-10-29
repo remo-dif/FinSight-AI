@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, fix/ci-playwright-runner]
   pull_request:
 
 concurrency:
@@ -53,7 +53,9 @@ jobs:
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
       - name: Install backend dependencies
-        run: pip install -e ".[dev]"
+        run: pip install -c constraints-security.txt -e ".[dev]"
+      - name: Check backend dependency compatibility
+        run: python -m pip check
       - name: Lint backend
         run: ruff check .
       - name: Smoke test migrations
@@ -65,7 +67,7 @@ jobs:
         run: pytest
 
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
@@ -78,6 +80,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install frontend dependencies
         run: npm ci
+      - name: Audit frontend dependencies
+        run: npm audit --audit-level=high
       - name: Lint frontend
         run: npm run lint
       - name: Typecheck frontend
