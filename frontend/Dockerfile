@@ -21,5 +21,10 @@ COPY --from=builder /app/public ./public
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-v* \
     && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
         /usr/local/bin/yarn /usr/local/bin/yarnpkg
+RUN addgroup -g 10001 finsight \
+    && adduser -D -u 10001 -G finsight finsight \
+    && mkdir -p /app/.next/cache \
+    && chown -R 10001:10001 /app/.next/cache
+USER 10001:10001
 EXPOSE 3000
 CMD ["node", "server.js"]

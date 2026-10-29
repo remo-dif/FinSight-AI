@@ -22,6 +22,12 @@ COPY alembic.ini ./
 COPY alembic ./alembic
 COPY app ./app
 
+RUN groupadd --gid 10001 finsight \
+    && useradd --uid 10001 --gid 10001 --no-log-init --create-home \
+        --shell /usr/sbin/nologin finsight \
+    && install -d -o 10001 -g 10001 -m 0700 /app/uploads
+
+USER 10001:10001
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]

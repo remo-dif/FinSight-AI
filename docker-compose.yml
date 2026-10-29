@@ -40,6 +40,9 @@ services:
           cpus: "0.5"
 
   backend:
+    user: "10001:10001"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     build:
       context: ./backend
     env_file:
@@ -71,6 +74,9 @@ services:
           cpus: "2.0"
 
   frontend:
+    user: "10001:10001"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     build:
       context: ./frontend
       args:
