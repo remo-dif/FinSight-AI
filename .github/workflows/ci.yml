@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, fix/ci-playwright-runner]
   pull_request:
 
 concurrency:
@@ -65,7 +65,7 @@ jobs:
         run: pytest
 
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
