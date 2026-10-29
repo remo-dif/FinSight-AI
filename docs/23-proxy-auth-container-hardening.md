@@ -4,6 +4,11 @@ Date: 2026-10-29. Baseline: `83127be250477f122e650eea173edf05b874ee3f`.
 Branch: `security/proxy-auth-hardening`, created from freshly fetched `origin/master`
 after checking a clean working tree. No push, deployment, migration or dependency change.
 
+This document records the original local checkpoint. See
+[the integration follow-up](24-security-integration-follow-up.md) for subsequent
+complete browser passes, the reused-volume permission reproduction and AWS checks
+deferred by the user. Later remote branch/CI status is recorded there separately.
+
 ## Verified findings
 
 | Finding | Classification and evidence | Resolution |
