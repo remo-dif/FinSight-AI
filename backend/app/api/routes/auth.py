@@ -59,7 +59,7 @@ def set_refresh_cookie(response: Response, token: str) -> None:
     response.set_cookie(
         key=REFRESH_COOKIE_NAME,
         value=token,
-        max_age=60 * 60 * 24 * 30,
+        max_age=settings.refresh_token_days * 60 * 60 * 24,
         httponly=True,
         secure=settings.app_env == "production",
         samesite="lax",
