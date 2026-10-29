@@ -4,6 +4,7 @@ from typing import Any
 
 from openai import OpenAIError
 
+from app.core.ai_observability import ai_operation, capture_usage
 from app.core.config import settings
 from app.core.openai_resilience import CircuitOpenError, create_openai_client, openai_circuit
 
@@ -12,6 +13,12 @@ class LLMService:
     def __init__(self) -> None:
         self._client = create_openai_client()
         self.model = settings.openai_model
+
+    def _complete(self, **kwargs):
+        with ai_operation("llm.complete", provider="openai", model=self.model) as fields:
+            response = self._client.chat.completions.create(**kwargs)
+            capture_usage(fields, response)
+            return response
 
     def synthesize_financial_answer(
         self,
@@ -31,7 +38,7 @@ class LLMService:
         except CircuitOpenError:
             return self._synthesize_local(user_message, intent, tool_results, rag_chunks or [])
         try:
-            response = self._client.chat.completions.create(
+            response = self._complete(
                 model=self.model,
                 messages=[
                     {
@@ -60,7 +67,7 @@ class LLMService:
             return fallback
         try:
             openai_circuit.before_call()
-            response = self._client.chat.completions.create(
+            response = self._complete(
                 model=self.model,
                 temperature=0.0,
                 max_tokens=450,

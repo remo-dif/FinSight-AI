@@ -1,6 +1,5 @@
 import asyncio
 from contextlib import asynccontextmanager
-from uuid import uuid4
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +9,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app.api.router import api_router
+from app.core.ai_observability import ai_operation, request_correlation
 from app.core.config import settings
 from app.core.database import engine
 from app.core.logging import configure_logging
@@ -35,8 +35,15 @@ async def lifespan(app: FastAPI):
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
-        request_id = request.headers.get("x-request-id", str(uuid4()))
-        response = await call_next(request)
+        with request_correlation(request.headers.get("x-request-id")) as request_id:
+            if request.url.path in {"/api/chat", "/api/uploads"}:
+                with ai_operation("http.ai_request") as fields:
+                    response = await call_next(request)
+                    fields["status_code"] = response.status_code
+                    if response.status_code >= 400:
+                        fields.update(outcome="error", error_category="http")
+            else:
+                response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
