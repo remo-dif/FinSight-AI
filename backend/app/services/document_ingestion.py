@@ -21,6 +21,7 @@ from PIL import Image, UnidentifiedImageError
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.ai_observability import ai_operation, capture_usage
 from app.core.config import settings
 from app.core.openai_resilience import (
     CircuitOpenError,
@@ -365,6 +366,15 @@ class DocumentIngestionService:
         return chunks
 
     async def embed_texts(self, values: list[str]) -> list[list[float]]:
+        with ai_operation(
+            "ingestion.embed",
+            provider=self._embedding_backend,
+            model=self._embedding_model,
+            input_count=len(values),
+        ) as fields:
+            return await self._embed_texts(values, fields)
+
+    async def _embed_texts(self, values: list[str], fields: dict) -> list[list[float]]:
         if not values:
             return []
         if (
@@ -388,6 +398,7 @@ class DocumentIngestionService:
                 input=values,
                 dimensions=EMBEDDING_DIMENSIONS,
             )
+            capture_usage(fields, response)
         except CircuitOpenError as exc:
             raise HTTPException(
                 503,

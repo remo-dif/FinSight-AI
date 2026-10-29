@@ -13,6 +13,7 @@ from openai import OpenAIError
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.ai_observability import ai_operation, capture_usage
 from app.core.config import settings
 from app.core.openai_resilience import (
     CircuitOpenError,
@@ -94,6 +95,12 @@ class RagService:
         return [row.text for row in self.retrieve_chunks(user_id, query, limit)]
 
     def retrieve_chunks(self, user_id: UUID, query: str, limit: int = 5) -> list[RagChunkResult]:
+        with ai_operation("rag.retrieve") as fields:
+            rows = self._retrieve_chunks(user_id, query, limit)
+            fields["retrieved_count"] = len(rows)
+            return rows
+
+    def _retrieve_chunks(self, user_id: UUID, query: str, limit: int) -> list[RagChunkResult]:
         if limit <= 0 or not query.strip():
             return []
 
@@ -153,7 +160,7 @@ class RagService:
                 )
                 for row in rows
             ),
-            key=lambda item: item.score or -1.0,
+            key=lambda item: item.score if item.score is not None else -1.0,
             reverse=True,
         )
         return ranked[:limit]
@@ -166,6 +173,15 @@ class RagService:
         return self.embed_texts([value])[0]
 
     def embed_texts(self, values: list[str]) -> list[list[float]]:
+        with ai_operation(
+            "rag.embed",
+            provider=self._embedding_backend,
+            model=self._embedding_model,
+            input_count=len(values),
+        ) as fields:
+            return self._embed_texts(values, fields)
+
+    def _embed_texts(self, values: list[str], fields: dict) -> list[list[float]]:
         if not values:
             return []
         if self._embedding_backend == "local":
@@ -184,6 +200,7 @@ class RagService:
             openai_circuit.before_call()
             try:
                 response = self._openai_client.embeddings.create(**kwargs)
+                capture_usage(fields, response)
             except OpenAIError:
                 openai_circuit.record_failure()
                 raise
