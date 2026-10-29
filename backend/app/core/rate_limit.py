@@ -23,27 +23,51 @@ EXCLUDED_PATHS = frozenset({"/health", "/readyz"})
 
 
 def get_client_ip(request: Request, trusted_proxy_cidrs: list[str]) -> str:
+    """Resolve the first untrusted hop, provided ASGI client is the socket peer.
+
+    Malformed/ambiguous chains collapse to the peer, never a header-selected IP.
+    Uvicorn proxy-header rewriting must be disabled (see the image command).
+    """
     peer = request.client.host if request.client else "unknown"
     try:
         peer_address = ip_address(peer)
+        networks = [ip_network(cidr, strict=False) for cidr in trusted_proxy_cidrs]
     except ValueError:
         return peer
+    fallback = str(peer_address)
+    if not any(peer_address in network for network in networks):
+        return fallback
 
-    trusted = any(
-        peer_address in ip_network(cidr, strict=False) for cidr in trusted_proxy_cidrs
-    )
-    if not trusted:
-        return peer
-
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if not forwarded_for:
-        return peer
-
-    candidate = forwarded_for.split(",", maxsplit=1)[0].strip()
+    headers = request.headers.getlist("x-forwarded-for")
+    if len(headers) != 1 or len(headers[0]) > 4096:
+        return fallback
+    hops = [hop.strip() for hop in headers[0].split(",")]
+    if len(hops) > 32 or any(not hop or "%" in hop for hop in hops):
+        return fallback
     try:
-        return str(ip_address(candidate))
+        addresses = [ip_address(hop) for hop in hops]
     except ValueError:
-        return peer
+        return fallback
+    for address in reversed(addresses):
+        if not any(address in network for network in networks):
+            return str(address)
+    # An all-trusted chain does not establish an untrusted client boundary.
+    return fallback
+
+
+def get_trusted_forwarded_scheme(request: Request, trusted_proxy_cidrs: list[str]) -> str | None:
+    """Keep HTTPS redirects without allowing a second client-IP rewrite layer."""
+    if request.client is None:
+        return None
+    try:
+        peer = ip_address(request.client.host)
+        trusted = any(peer in ip_network(cidr, strict=False) for cidr in trusted_proxy_cidrs)
+    except ValueError:
+        return None
+    values = request.headers.getlist("x-forwarded-proto")
+    if trusted and len(values) == 1 and values[0] in {"http", "https"}:
+        return values[0]
+    return None
 
 
 class InMemoryRateLimitMiddleware(BaseHTTPMiddleware):

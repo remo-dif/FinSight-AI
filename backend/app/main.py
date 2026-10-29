@@ -13,7 +13,11 @@ from app.core.ai_observability import ai_operation, request_correlation
 from app.core.config import settings
 from app.core.database import engine
 from app.core.logging import configure_logging
-from app.core.rate_limit import InMemoryRateLimitMiddleware, RedisRateLimitMiddleware
+from app.core.rate_limit import (
+    InMemoryRateLimitMiddleware,
+    RedisRateLimitMiddleware,
+    get_trusted_forwarded_scheme,
+)
 from app.core.redis import create_redis_client
 
 configure_logging()
@@ -35,6 +39,9 @@ async def lifespan(app: FastAPI):
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
+        scheme = get_trusted_forwarded_scheme(request, settings.trusted_proxy_cidrs)
+        if scheme is not None:
+            request.scope["scheme"] = scheme
         with request_correlation(request.headers.get("x-request-id")) as request_id:
             if request.url.path in {"/api/chat", "/api/uploads"}:
                 with ai_operation("http.ai_request") as fields:
