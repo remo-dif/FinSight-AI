@@ -8,8 +8,8 @@ import pytest
 from fastapi import HTTPException
 from openai import APITimeoutError, OpenAIError
 from sqlalchemy import create_engine
-from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
 
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 os.environ.setdefault("JWT_SECRET_KEY", "abcdefghijklmnopqrstuvwxyz1234567890")

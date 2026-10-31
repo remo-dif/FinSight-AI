@@ -18,6 +18,7 @@ type Message = {
   role: "user" | "assistant";
   content: string;
   review?: string;
+  reviewLabel?: "Reviewer: ";
   tone?: "default" | "error";
   status?: "ok" | "abstained" | "provider_error" | "insufficient_evidence" | "extractive_preview";
   citations?: DocumentCitation[];
@@ -75,6 +76,7 @@ export function ChatPanel() {
           role: "assistant",
           content: data.answer,
           review: data.grounding_note ?? data.review,
+          reviewLabel: variables.mode === "finance" ? "Reviewer: " : undefined,
           status: variables.mode === "document_qa" ? data.status : undefined,
           citations: data.citations,
           sources: data.sources
@@ -235,7 +237,7 @@ export function ChatPanel() {
             ) : null}
             {message.review ? (
               <p className="mt-2 border-t border-border pt-2 text-xs leading-5 text-muted">
-                {message.review}
+                {message.reviewLabel}{message.review}
               </p>
             ) : null}
             {message.citations?.length ? (
