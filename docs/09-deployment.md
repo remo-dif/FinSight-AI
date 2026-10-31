@@ -10,7 +10,11 @@ secrets nor migrates an empty database. pgvector initialization is not schema cr
 `/readyz` checks database/Redis/storage availability, not migration revision or
 provider health. Back up and review reused volume ownership before non-root rollout.
 
-## Production Shape
+## Deployment status
+
+The previous AWS account is closed. No AWS deployment or resource is currently asserted operational or verified. No account recovery, paid infrastructure, provisioning or deployment is authorized. AWS diagrams and the manual-only workflow remain historical/design portfolio evidence. Future hosting and its strict cost budget will be evaluated separately; no VPS deployment has been implemented.
+
+## Historical / repository-supported AWS shape
 
 - Configured deployment target: ECS Fargate frontend/backend behind CloudFront/ALB.
 - Managed PostgreSQL/pgvector, Redis and private S3 uploads; Secrets Manager and GitHub OIDC.
@@ -26,3 +30,7 @@ provider health. Back up and review reused volume ownership before non-root roll
 - Run CI checks.
 - Run smoke tests against `/readyz` for backend readiness and `/` for the frontend.
 - Verify upload and chat flows with non-sensitive sample data.
+
+## Portability boundary
+
+The application runs as containers with PostgreSQL/pgvector and Redis; authentication and session-family correctness do not depend on AWS APIs. Future hosting must provide TLS termination, explicit trusted proxy CIDRs, durable evidence storage, secrets, backups/restore validation and appropriate database/Redis permissions. Current production configuration still requires the S3 storage backend; a future non-AWS storage policy or S3-compatible configuration must be evaluated explicitly, rather than assuming local ephemeral uploads are production-safe. No hosting-provider migration is implemented here.

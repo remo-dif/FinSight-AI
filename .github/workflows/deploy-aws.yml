@@ -1,9 +1,6 @@
 name: deploy-aws
 
 on:
-  workflow_run:
-    workflows: [ci]
-    types: [completed]
   workflow_dispatch:
     inputs:
       image_sha:
@@ -21,11 +18,8 @@ permissions:
 
 jobs:
   deploy:
-    if: >-
-      vars.AWS_DEPLOY_ENABLED == 'true' &&
-      (github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'master'))
+    # Historical deployment design only; ordinary CI completion cannot deploy.
+    if: github.event_name == 'workflow_dispatch' && vars.AWS_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     environment: production
     env:
@@ -44,7 +38,7 @@ jobs:
       CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
       RDS_DB_INSTANCE_ID: ${{ vars.RDS_DB_INSTANCE_ID }}
       S3_UPLOAD_BUCKET: ${{ vars.S3_UPLOAD_BUCKET }}
-      IMAGE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.image_sha || github.event.workflow_run.head_sha }}
+      IMAGE_SHA: ${{ inputs.image_sha }}
       BACKEND_IMAGE: ghcr.io/remo-dif/finsight-ai-backend
       FRONTEND_IMAGE: ghcr.io/remo-dif/finsight-ai-frontend
     steps:
