@@ -159,11 +159,24 @@ async def test_concurrent_requests_are_bounded_by_each_quota(
     assert calls == ["login"] * 5
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("middleware", MIDDLEWARES)
+async def test_successful_responses_report_the_same_general_quota_headers(monkeypatch, middleware):
+    controlled_clock(monkeypatch)
+    app, _ = quota_app(middleware, global_limit=3)
+    async with quota_client(app) as client:
+        first = await client.get("/ordinary")
+        second = await client.get("/ordinary")
+    assert first.headers["X-RateLimit-Limit"] == second.headers["X-RateLimit-Limit"] == "3"
+    assert first.headers["X-RateLimit-Remaining"] == "2"
+    assert second.headers["X-RateLimit-Remaining"] == "1"
+
+
 class UnavailableOnLoginBudget(FakeRedis):
-    async def eval(self, script, numkeys, key, ttl):
+    async def eval(self, script, numkeys, key, ttl, limit):
         if key.startswith("login-rate-limit:"):
             raise RedisError("synthetic second-budget failure")
-        return await super().eval(script, numkeys, key, ttl)
+        return await super().eval(script, numkeys, key, ttl, limit)
 
 
 @pytest.mark.asyncio
@@ -206,6 +219,8 @@ async def test_real_redis_concurrency_and_rejections_do_not_refresh_ttl(
             assert [response.status_code for response in responses].count(200) == 5
             assert [response.status_code for response in responses].count(429) == 11
             assert calls == ["login"] * 5
+            assert await redis.get(keys[0]) == str(min(16, global_limit))
+            assert await redis.get(keys[1]) == str(min(16, global_limit, login_limit))
             for key in keys:
                 assert 0 < await redis.pttl(key) <= 60000
                 # Shorten only this test's keys. A buggy reset to 60s is detectable

@@ -118,10 +118,13 @@ capability matrix, validation evidence and remaining limitations.
 The general default is 20 attempts per client IP per minute; POST `/api/auth/login`
 has an additional default budget of 10. Successes, failed credentials and malformed
 requests count. A request rejected by the login-specific limit can still consume
-available general quota. Memory uses a process-local sliding window; Redis uses
-fixed minute windows and expiring keys. Redis failures return 503 (`Retry-After: 1`),
-with no memory fallback. Exhausted quotas return 429 (`Retry-After: 60`). Limits are
-per IP, not account lockouts; shared NATs share budgets. Production requires Redis.
+available general quota. Requests rejected because that quota is already exhausted
+do not increment its counter or extend its expiry. Both backends report the general
+limit and remaining count on admitted responses. Memory uses a process-local sliding
+window; Redis uses fixed minute windows and expiring keys. Redis failures return 503
+(`Retry-After: 1`), with no memory fallback. Exhausted quotas return 429
+(`Retry-After: 60`). Limits are per IP, not account lockouts; shared NATs share
+budgets. Production requires Redis.
 
 Validation failures return 422; malformed CSV data returns controlled 400 errors.
 Auth validation keeps error locations/messages/types but omits submitted input to

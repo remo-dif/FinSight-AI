@@ -12,7 +12,12 @@ from starlette.responses import JSONResponse, Response
 logger = logging.getLogger(__name__)
 
 RATE_LIMIT_SCRIPT = """
-local current = redis.call('INCR', KEYS[1])
+local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+local limit = tonumber(ARGV[2])
+if current >= limit then
+    return current + 1
+end
+current = redis.call('INCR', KEYS[1])
 if current == 1 then
     redis.call('EXPIRE', KEYS[1], ARGV[1])
 end
@@ -100,7 +105,11 @@ class InMemoryRateLimitMiddleware(BaseHTTPMiddleware):
             if len(bucket) >= limit:
                 return _limit_response()
             bucket.append(now)
-        return await call_next(request)
+        current = len(self.requests[client])
+        response = await call_next(request)
+        response.headers["X-RateLimit-Limit"] = str(self.requests_per_minute)
+        response.headers["X-RateLimit-Remaining"] = str(max(0, self.requests_per_minute - current))
+        return response
 
 
 class RedisRateLimitMiddleware(BaseHTTPMiddleware):
@@ -132,7 +141,9 @@ class RedisRateLimitMiddleware(BaseHTTPMiddleware):
 
         try:
             for bucket, limit in budgets:
-                count = int(await request.app.state.redis.eval(RATE_LIMIT_SCRIPT, 1, bucket, 60))
+                count = int(
+                    await request.app.state.redis.eval(RATE_LIMIT_SCRIPT, 1, bucket, 60, limit)
+                )
                 if count > limit:
                     return _limit_response()
                 if bucket == key:
