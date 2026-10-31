@@ -176,3 +176,10 @@ Exact files in this cycle:
 - `frontend/src/components/auth/auth-panel.tsx`
 - `frontend/src/lib/api.ts`
 - `frontend/tests/e2e/auth/registration-privacy.spec.ts`
+
+
+## Additional finding discovered during publication
+
+GitHub reported an open moderate Dependabot alert on the default branch during push: [alert #54](https://github.com/remo-dif/FinSight-AI/security/dependabot/54), GHSA-g3hv-75wg-m249, minimatch globparts-amplification denial of service. The alert API reports affected versions `< 11.0.1` and first patched version `11.0.1`.
+
+`npm ls minimatch --all` and the unchanged lockfile identify minimatch 3.1.5 via ESLint/import/React/accessibility lint tooling and 10.2.5 via the TypeScript ESLint parser; both lockfile entries are development dependencies. This establishes a tooling/dependency risk, not a demonstrated remotely exploitable application path. Production image inclusion/exploitability was not investigated in this focused auth cycle. The lockfile/dependency manifests are unchanged from the base, so this issue was not introduced by the branch. It remains open and needs a dedicated compatible dependency remediation and validation; blindly overriding multiple incompatible major versions was intentionally deferred. Do not treat successful lint/build or prior high/critical scans as closing this moderate advisory.
