@@ -1,18 +1,45 @@
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_async_db
 from app.core.security import require_role_async
 from app.models.finance import UploadedFile
 from app.models.user import User, UserRole
-from app.schemas.uploads import UploadResponse
+from app.schemas.uploads import UploadedDocumentResponse, UploadResponse
 from app.services.document_ingestion import DocumentIngestionService
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 upload_user = require_role_async(UserRole.USER, UserRole.ADMIN)
+UPLOAD_LIST_PAGE_SIZE = 100
+
+
+@router.get("", response_model=list[UploadedDocumentResponse])
+async def list_uploads(
+    user: Annotated[User, Depends(upload_user)],
+    db: Annotated[AsyncSession, Depends(get_async_db)],
+    limit: Annotated[int, Query(ge=1, le=UPLOAD_LIST_PAGE_SIZE)] = UPLOAD_LIST_PAGE_SIZE,
+    offset: Annotated[int, Query(ge=0, le=1_000_000)] = 0,
+) -> list[UploadedDocumentResponse]:
+    result = await db.scalars(
+        select(UploadedFile)
+        .where(UploadedFile.user_id == user.id)
+        .order_by(UploadedFile.created_at, UploadedFile.id)
+        .limit(limit)
+        .offset(offset)
+    )
+    return [
+        UploadedDocumentResponse(
+            id=record.id,
+            filename=record.filename,
+            status=record.status,
+            created_at=record.created_at,
+        )
+        for record in result
+    ]
 
 
 @router.post("", response_model=UploadResponse)

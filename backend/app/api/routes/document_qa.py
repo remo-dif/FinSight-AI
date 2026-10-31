@@ -1,5 +1,4 @@
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -33,7 +32,9 @@ def ask_document_question(
     service = DocumentQAService(db, user.id)
     result = service.answer(
         question,
-        document_ids=payload.document_ids or payload.document_scope,
+        document_ids=(
+            payload.document_ids if payload.document_ids is not None else payload.document_scope
+        ),
         limit=payload.limit,
         min_score=payload.min_score,
     )

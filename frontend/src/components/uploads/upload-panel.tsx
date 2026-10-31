@@ -5,7 +5,7 @@ import { FileUp, LoaderCircle, Lock, UploadCloud } from "lucide-react";
 import { ChangeEvent, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
-import { caseListQueryKey, uploadFinancialFile } from "@/lib/api";
+import { caseListQueryKey, uploadedDocumentsQueryKey, uploadFinancialFile } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export function UploadPanel() {
@@ -18,7 +18,12 @@ export function UploadPanel() {
   const isCsv = file?.name.toLowerCase().endsWith(".csv") ?? false;
   const upload = useMutation({
     mutationFn: (selected: File) => uploadFinancialFile(selected, isCsv ? importCurrency : undefined),
-    onSuccess: async () => queryClient.invalidateQueries({ queryKey: caseListQueryKey() })
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: caseListQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: uploadedDocumentsQueryKey })
+      ]);
+    }
   });
 
   const statusMessage = upload.isSuccess
