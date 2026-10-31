@@ -2,11 +2,14 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.encoders import jsonable_encoder
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 
 from app.api.router import api_router
 from app.core.ai_observability import ai_operation, request_correlation
@@ -67,6 +70,18 @@ def create_app() -> FastAPI:
         redoc_url=None,
         lifespan=lifespan,
     )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(request: Request, exc: RequestValidationError):
+        if request.url.path.startswith("/api/auth/"):
+            # Validation input may contain passwords, refresh tokens or a whole body.
+            errors = [
+                {key: value for key, value in error.items() if key != "input"}
+                for error in exc.errors()
+            ]
+            return JSONResponse(status_code=422, content=jsonable_encoder({"detail": errors}))
+        return await request_validation_exception_handler(request, exc)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,

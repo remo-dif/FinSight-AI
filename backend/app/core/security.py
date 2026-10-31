@@ -8,16 +8,37 @@ from uuid import UUID, uuid4
 
 import bcrypt
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer
+from fastapi.security.utils import get_authorization_scheme_param
 from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
+from starlette.requests import Request
 
 from app.core.config import settings
 from app.core.database import get_async_db, get_db
 from app.models.user import RefreshToken, User, UserRole
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+class AccessTokenBearer(HTTPBearer):
+    async def __call__(self, request: Request) -> str:
+        # Keep the existing header parsing and 401 bodies, including empty Bearer.
+        authorization = request.headers.get("Authorization")
+        scheme, token = get_authorization_scheme_param(authorization)
+        if not authorization or scheme.lower() != "bearer":
+            raise HTTPException(
+                status.HTTP_401_UNAUTHORIZED,
+                "Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return token
+
+
+bearer_scheme = AccessTokenBearer(
+    scheme_name="BearerAuth",
+    bearerFormat="JWT",
+    description="Obtain an access_token with JSON POST /api/auth/login, then send Authorization: Bearer <access_token>.",
+)
 
 
 class TokenType(StrEnum):
@@ -127,7 +148,7 @@ def as_aware_utc(value: datetime) -> datetime:
 
 
 def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
+    token: Annotated[str, Depends(bearer_scheme)],
     db: Annotated[Session, Depends(get_db)],
 ) -> User:
     credentials_error = HTTPException(
@@ -150,7 +171,7 @@ def get_current_user(
 
 
 async def get_current_user_async(
-    token: Annotated[str, Depends(oauth2_scheme)],
+    token: Annotated[str, Depends(bearer_scheme)],
     db: Annotated[AsyncSession, Depends(get_async_db)],
 ) -> User:
     credentials_error = HTTPException(
