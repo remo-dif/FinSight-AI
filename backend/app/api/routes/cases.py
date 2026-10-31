@@ -2,16 +2,20 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.case import CaseNote
+from app.models.case import CaseFollowUp, CaseNote
 from app.models.user import User
 from app.repositories.cases import CaseRecord, CaseRepository
 from app.schemas.cases import (
+    CaseClose,
     CaseDecision,
     CaseDetailResponse,
+    CaseFollowUpCreate,
+    CaseFollowUpResponse,
     CaseNoteCreate,
     CaseNoteResponse,
     CaseResponse,
@@ -19,7 +23,12 @@ from app.schemas.cases import (
     CaseUpdate,
 )
 from app.services.audit import AuditService
-from app.services.case_workflow import DECISION_STATUSES, validate_case_update
+from app.services.case_workflow import (
+    DECISION_STATUSES,
+    FOLLOW_UP_ACTIONS,
+    ensure_case_not_closed,
+    validate_case_update,
+)
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 
@@ -27,6 +36,7 @@ router = APIRouter(prefix="/cases", tags=["cases"])
 def _case_response(record: CaseRecord, user: User) -> CaseResponse:
     case, transaction, assignee = record
     return CaseResponse(
+        revision=case.revision,
         id=transaction.id,
         posted_at=transaction.posted_at,
         merchant=transaction.merchant,
@@ -74,6 +84,7 @@ def get_case(
     notes = CaseRepository(db).notes_for_user(case_id, user.id)
     return CaseDetailResponse(
         **_case_response(record, user).model_dump(),
+        follow_ups=list_case_follow_ups(case_id, user, db),
         notes=[
             CaseNoteResponse(
                 id=note.id,
@@ -169,11 +180,18 @@ def add_case_note(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> CaseNoteResponse:
-    _get_case_record(case_id, user, db)
+    case, _, _ = _get_case_record(case_id, user, db)
+    ensure_case_not_closed(case)
     note = CaseNote(case_id=case_id, author_id=user.id, content=payload.content)
-    db.add(note)
-    AuditService(db).record("case.note_added", user.id, {"case_id": str(case_id)})
-    db.commit()
+    try:
+        if not CaseRepository(db).update_if_unchanged(case, user.id, {}):
+            raise HTTPException(409, "Case changed while saving. Refresh the case and retry")
+        db.add(note)
+        AuditService(db).record("case.note_added", user.id, {"case_id": str(case_id)})
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(note)
     return CaseNoteResponse(
         id=note.id,
@@ -181,3 +199,97 @@ def add_case_note(
         content=note.content,
         created_at=note.created_at,
     )
+
+
+@router.get("/{case_id}/follow-ups", response_model=list[CaseFollowUpResponse])
+def list_case_follow_ups(
+    case_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> list[CaseFollowUpResponse]:
+    _get_case_record(case_id, user, db)
+    rows = db.scalars(
+        select(CaseFollowUp).where(CaseFollowUp.case_id == case_id).order_by(CaseFollowUp.revision)
+    )
+    return [CaseFollowUpResponse.model_validate(row) for row in rows]
+
+
+def _record_lifecycle_action(
+    case_id: UUID, payload: CaseClose, action: str, user: User, db: Session
+) -> CaseFollowUpResponse:
+    """CAS serializes legacy PATCH, notes, outcome and closure in one DB transaction."""
+    case, _, _ = _get_case_record(case_id, user, db)
+    expected_action = FOLLOW_UP_ACTIONS.get(case.decision)
+    expected_status = DECISION_STATUSES.get(case.decision)
+    if (
+        expected_action is None
+        or case.status != expected_status
+        or not (case.decision_reason or "").strip()
+    ):
+        raise HTTPException(409, "Case is closed or does not have a valid follow-up decision")
+    if payload.expected_revision != case.revision:
+        raise HTTPException(409, "Case changed while saving. Refresh the case and retry")
+    existing = list(db.scalars(select(CaseFollowUp).where(CaseFollowUp.case_id == case_id)))
+    if action == "close":
+        if len(existing) != 1 or existing[0].action != expected_action:
+            raise HTTPException(
+                409, "Record the required investigation outcome before closing this case"
+            )
+    elif action != expected_action or existing:
+        raise HTTPException(409, "This outcome is not permitted or has already been recorded")
+    previous_status = case.status
+    next_status = "resolved" if action == "close" else previous_status
+    revision = case.revision + 1
+    record = CaseFollowUp(
+        case_id=case_id,
+        actor_id=user.id,
+        action=action,
+        reason=payload.reason,
+        previous_status=previous_status,
+        resulting_status=next_status,
+        revision=revision,
+    )
+    try:
+        if not CaseRepository(db).update_if_unchanged(case, user.id, {"status": next_status}):
+            raise HTTPException(409, "Case changed while saving. Refresh the case and retry")
+        db.add(record)
+        db.flush()
+        AuditService(db).record(
+            "case.closed" if action == "close" else "case.follow_up_recorded",
+            user.id,
+            {
+                "case_id": str(case_id),
+                "follow_up_id": str(record.id),
+                "action": action,
+                "from_status": previous_status,
+                "to_status": next_status,
+                "revision": revision,
+            },
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(record)
+    return CaseFollowUpResponse.model_validate(record)
+
+
+@router.post("/{case_id}/follow-ups", response_model=CaseFollowUpResponse, status_code=201)
+def record_case_follow_up(
+    case_id: UUID,
+    payload: CaseFollowUpCreate,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> CaseFollowUpResponse:
+    return _record_lifecycle_action(case_id, payload, payload.action, user, db)
+
+
+@router.post("/{case_id}/close", response_model=CaseResponse)
+def close_case(
+    case_id: UUID,
+    payload: CaseClose,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> CaseResponse:
+    _record_lifecycle_action(case_id, payload, "close", user, db)
+    return _case_response(_get_case_record(case_id, user, db), user)

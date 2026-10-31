@@ -55,6 +55,7 @@ class CaseNoteCreate(BaseModel):
 
 
 class CaseResponse(BaseModel):
+    revision: int = 0
     id: UUID
     posted_at: date
     merchant: str
@@ -80,3 +81,34 @@ class CaseNoteResponse(BaseModel):
 
 class CaseDetailResponse(CaseResponse):
     notes: list[CaseNoteResponse]
+    follow_ups: list["CaseFollowUpResponse"] = Field(default_factory=list)
+
+
+class CaseClose(BaseModel):
+    reason: str = Field(min_length=1, max_length=4000)
+    expected_revision: int = Field(ge=0)
+
+    @field_validator("reason")
+    @classmethod
+    def require_reason(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("A non-blank reason or outcome is required")
+        return value
+
+
+class CaseFollowUpCreate(CaseClose):
+    action: Literal["escalation_outcome", "verification_outcome"]
+
+
+class CaseFollowUpResponse(BaseModel):
+    model_config = {"from_attributes": True}
+    id: UUID
+    case_id: UUID
+    actor_id: UUID
+    action: Literal["escalation_outcome", "verification_outcome", "close"]
+    reason: str
+    previous_status: CaseStatus
+    resulting_status: CaseStatus
+    revision: int
+    created_at: datetime

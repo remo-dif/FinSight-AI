@@ -11,6 +11,17 @@ DECISION_STATUSES = {
     CaseDecision.FALSE_POSITIVE: CaseStatus.RESOLVED,
 }
 
+FOLLOW_UP_ACTIONS = {
+    CaseDecision.ESCALATE: "escalation_outcome",
+    CaseDecision.REQUEST_VERIFICATION: "verification_outcome",
+}
+
+
+def ensure_case_not_closed(case: InvestigationCase) -> None:
+    if case.status == CaseStatus.RESOLVED and case.decision in FOLLOW_UP_ACTIONS:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This case is closed and cannot be modified")
+
+
 STATUS_TRANSITIONS = {
     CaseStatus.NEW: {CaseStatus.NEW, CaseStatus.NEEDS_EVIDENCE, CaseStatus.ESCALATED},
     CaseStatus.NEEDS_EVIDENCE: {CaseStatus.NEEDS_EVIDENCE, CaseStatus.ESCALATED},
@@ -29,6 +40,7 @@ def validate_case_update(case: InvestigationCase, payload: CaseUpdate) -> None:
         raise HTTPException(
             status.HTTP_409_CONFLICT, "A decision has already been recorded for this case"
         )
+    ensure_case_not_closed(case)
     if case.decision is not None:
         expected = DECISION_STATUSES.get(case.decision)
         if expected != case.status or not (case.decision_reason or "").strip():
