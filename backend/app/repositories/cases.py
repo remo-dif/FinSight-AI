@@ -49,12 +49,13 @@ class CaseRepository:
                 InvestigationCase.transaction_id.in_(
                     select(Transaction.id).where(Transaction.user_id == user_id)
                 ),
+                InvestigationCase.revision == case.revision,
                 InvestigationCase.status == case.status,
                 InvestigationCase.decision == case.decision,
                 InvestigationCase.decision_reason == case.decision_reason,
                 InvestigationCase.assignee_user_id == case.assignee_user_id,
             )
-            .values(**changes)
+            .values(**{**changes, "revision": case.revision + 1})
             .execution_options(synchronize_session=False)
         )
         return self.db.execute(statement).rowcount == 1
