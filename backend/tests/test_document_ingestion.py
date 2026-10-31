@@ -41,7 +41,9 @@ def upload_file(filename: str, content_type: str, payload: bytes) -> UploadFile:
 @pytest.mark.asyncio
 async def test_save_upload_rejects_mismatched_extension_and_content_type():
     service = DocumentIngestionService()
-    file = upload_file("statement.pdf", "text/csv", b"date,merchant,amount\n2026-05-01,Cafe,-4.25\n")
+    file = upload_file(
+        "statement.pdf", "text/csv", b"date,merchant,amount\n2026-05-01,Cafe,-4.25\n"
+    )
 
     with pytest.raises(HTTPException) as exc:
         await service.save_upload(uuid4(), file)
@@ -55,7 +57,9 @@ async def test_save_upload_persists_to_private_s3_uri(monkeypatch):
     uploaded: list[tuple[Path, str, str]] = []
     upload_root = Path(__file__).parent / ".upload-test-output" / str(uuid4())
     monkeypatch.setattr("app.services.document_ingestion.settings.storage_backend", "s3")
-    monkeypatch.setattr("app.services.document_ingestion.settings.s3_upload_bucket", "evidence-private")
+    monkeypatch.setattr(
+        "app.services.document_ingestion.settings.s3_upload_bucket", "evidence-private"
+    )
     monkeypatch.setattr("app.services.document_ingestion.settings.s3_upload_prefix", "evidence")
     monkeypatch.setattr("app.services.document_ingestion.settings.upload_dir", upload_root)
     monkeypatch.setattr(

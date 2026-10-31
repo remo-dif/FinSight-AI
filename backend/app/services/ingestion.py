@@ -66,7 +66,9 @@ class IngestionService:
     def __init__(self, categorizer: CategorizationService | None = None) -> None:
         self.categorizer = categorizer or CategorizationService()
 
-    def parse_csv(self, payload: bytes, import_currency: str | None = None) -> list[TransactionCreate]:
+    def parse_csv(
+        self, payload: bytes, import_currency: str | None = None
+    ) -> list[TransactionCreate]:
         try:
             text = payload.decode("utf-8-sig")
         except UnicodeDecodeError as exc:

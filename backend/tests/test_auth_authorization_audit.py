@@ -80,7 +80,9 @@ def test_refresh_cookie_lifetime_matches_configured_refresh_token_lifetime(monke
 
 
 @pytest.mark.asyncio
-async def test_protected_route_rejects_missing_malformed_expired_and_wrong_signature_tokens(api, db):
+async def test_protected_route_rejects_missing_malformed_expired_and_wrong_signature_tokens(
+    api, db
+):
     user = make_user(db, "jwt-audit@example.test")
     expired = create_token(user.id, TokenType.ACCESS, timedelta(seconds=-1))
     incorrectly_signed = jwt.encode(
@@ -188,7 +190,9 @@ async def test_user_cannot_access_or_mutate_another_users_case_notes_or_transact
 
     api.dependency_overrides[get_current_user] = lambda: other
     before_case = (foreign_case.status, foreign_case.assignee_user_id, foreign_case.decision)
-    before_note_count = db.query(CaseNote).filter(CaseNote.case_id == foreign_transaction.id).count()
+    before_note_count = (
+        db.query(CaseNote).filter(CaseNote.case_id == foreign_transaction.id).count()
+    )
     before_audit_count = db.query(AuditLog).count()
 
     async with httpx.AsyncClient(
@@ -207,7 +211,12 @@ async def test_user_cannot_access_or_mutate_another_users_case_notes_or_transact
 
     assert list_response.status_code == 200
     assert [row["id"] for row in list_response.json()] == [str(owned_transaction.id)]
-    assert detail_response.status_code == update_response.status_code == note_response.status_code == 404
+    assert (
+        detail_response.status_code
+        == update_response.status_code
+        == note_response.status_code
+        == 404
+    )
     assert transaction_response.status_code == 200
     assert [row["id"] for row in transaction_response.json()] == [str(owned_transaction.id)]
     assert all(row["id"] != str(foreign_transaction.id) for row in transaction_response.json())
@@ -219,7 +228,13 @@ async def test_user_cannot_access_or_mutate_another_users_case_notes_or_transact
 
     db.expire_all()
     persisted_case = db.get(InvestigationCase, foreign_transaction.id)
-    assert (persisted_case.status, persisted_case.assignee_user_id, persisted_case.decision) == before_case
-    assert db.query(CaseNote).filter(CaseNote.case_id == foreign_transaction.id).count() == before_note_count
+    assert (
+        persisted_case.status,
+        persisted_case.assignee_user_id,
+        persisted_case.decision,
+    ) == before_case
+    assert (
+        db.query(CaseNote).filter(CaseNote.case_id == foreign_transaction.id).count()
+        == before_note_count
+    )
     assert db.query(AuditLog).count() == before_audit_count
-

@@ -34,7 +34,9 @@ def upgrade() -> None:
     op.create_table(
         "transactions",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("posted_at", sa.Date(), nullable=False),
         sa.Column("merchant", sa.String(length=200), nullable=False),
         sa.Column("description", sa.Text(), nullable=False),
@@ -52,7 +54,9 @@ def upgrade() -> None:
     op.create_table(
         "uploaded_files",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("filename", sa.String(length=255), nullable=False),
         sa.Column("content_type", sa.String(length=120), nullable=False),
         sa.Column("storage_path", sa.String(length=500), nullable=False),
@@ -64,7 +68,9 @@ def upgrade() -> None:
     op.create_table(
         "chat_sessions",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("title", sa.String(length=160), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
@@ -73,7 +79,12 @@ def upgrade() -> None:
     op.create_table(
         "chat_messages",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("session_id", sa.Uuid(), sa.ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "session_id",
+            sa.Uuid(),
+            sa.ForeignKey("chat_sessions.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("role", sa.String(length=20), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -82,7 +93,9 @@ def upgrade() -> None:
     op.create_table(
         "budgets",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("month", sa.String(length=7), nullable=False),
         sa.Column("category", sa.String(length=80), nullable=False),
         sa.Column("limit_amount", sa.Numeric(12, 2), nullable=False),
@@ -94,7 +107,9 @@ def upgrade() -> None:
     op.create_table(
         "embeddings",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("source_type", sa.String(length=40), nullable=False),
         sa.Column("source_id", sa.Uuid(), nullable=True),
         sa.Column("chunk_text", sa.Text(), nullable=False),
@@ -106,7 +121,9 @@ def upgrade() -> None:
     op.create_table(
         "audit_logs",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        ),
         sa.Column("action", sa.String(length=80), nullable=False),
         sa.Column("metadata_json", sa.JSON(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
