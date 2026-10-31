@@ -34,9 +34,9 @@ export function AuthPanel() {
 
   const registerMutation = useMutation({
     mutationFn: () => register(email, password, fullName),
-    onSuccess: () => {
+    onSuccess: (data) => {
       setMode("login");
-      setMessage("Account created. Sign in to enable live data.");
+      setMessage(data.message);
     },
     onError: (error) => setMessage(error instanceof Error ? error.message : "Registration failed.")
   });

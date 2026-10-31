@@ -17,7 +17,7 @@ from starlette.requests import Request
 
 from app.core.config import settings
 from app.core.database import get_async_db, get_db
-from app.models.user import RefreshToken, User, UserRole
+from app.models.user import RefreshToken, RefreshTokenFamily, User, UserRole
 
 
 class AccessTokenBearer(HTTPBearer):
@@ -100,7 +100,13 @@ def create_persisted_refresh_token(
     user_id: UUID,
     db: Session,
     expires_delta: timedelta | None = None,
+    family_id: UUID | None = None,
 ) -> str:
+    if family_id is None:
+        family = RefreshTokenFamily(user_id=user_id)
+        db.add(family)
+        db.flush()
+        family_id = family.id
     jti = str(uuid4())
     lifetime = expires_delta or timedelta(days=settings.refresh_token_days)
     token = create_token(user_id, TokenType.REFRESH, lifetime, jti=jti)
@@ -108,6 +114,7 @@ def create_persisted_refresh_token(
         token, settings.jwt_refresh_secret_key, algorithms=[settings.jwt_algorithm]
     )
     refresh_token = RefreshToken(
+        family_id=family_id,
         user_id=user_id,
         jti=jti,
         token_hash=hash_token(token),

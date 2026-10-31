@@ -343,8 +343,8 @@ export function login(email: string, password: string): Promise<TokenResponse> {
   });
 }
 
-export function register(email: string, password: string, fullName: string): Promise<UserResponse> {
-  return apiFetch<UserResponse>("/api/auth/register", {
+export function register(email: string, password: string, fullName: string): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>("/api/auth/register", {
     method: "POST",
     body: JSON.stringify({ email, password, full_name: fullName })
   });

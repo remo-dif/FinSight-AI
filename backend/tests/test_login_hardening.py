@@ -70,17 +70,19 @@ def test_dummy_hash_is_valid_bcrypt_with_current_hashing_cost():
     assert hashed.split("$")[1:3] == security.hash_password("synthetic non-secret").split("$")[1:3]
 
 
-def test_registration_enumeration_contract_remains_explicit(db):
-    create_user(db)
-    with pytest.raises(HTTPException) as exc:
-        auth.register(
-            RegisterRequest(
-                email="user@example.com", password="synthetic password", full_name="Synthetic"
-            ),
-            db,
-        )
-    assert exc.value.status_code == 409
-    assert exc.value.detail == "Email is already registered"
+def test_registration_duplicate_is_generic_and_does_not_modify_existing_account(db):
+    user = create_user(db)
+    original_hash = user.password_hash
+    response = auth.register(
+        RegisterRequest(
+            email="user@example.com", password="synthetic password", full_name="Synthetic"
+        ),
+        db,
+    )
+    assert set(response.model_dump()) == {"message"}
+    db.refresh(user)
+    assert user.password_hash == original_hash
+    assert user.full_name == "Test User"
 
 
 @pytest.mark.asyncio
