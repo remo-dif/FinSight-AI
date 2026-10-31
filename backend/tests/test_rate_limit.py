@@ -21,7 +21,9 @@ class FakeRedis:
         self.pings = 0
         self.closed = False
 
-    async def eval(self, _script: str, _numkeys: int, key: str, _ttl: int) -> int:
+    async def eval(self, _script: str, _numkeys: int, key: str, _ttl: int, limit: int) -> int:
+        if self.counts[key] >= limit:
+            return self.counts[key] + 1
         self.counts[key] += 1
         return self.counts[key]
 
@@ -34,7 +36,7 @@ class FakeRedis:
 
 
 class UnavailableRedis(FakeRedis):
-    async def eval(self, _script: str, _numkeys: int, key: str, _ttl: int) -> int:
+    async def eval(self, _script: str, _numkeys: int, key: str, _ttl: int, _limit: int) -> int:
         raise RedisError("unavailable")
 
 
@@ -86,6 +88,19 @@ async def test_untrusted_peer_cannot_spoof_forwarded_client_ip() -> None:
 
     assert first.status_code == 200
     assert limited.status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_redis_quota_headers_report_general_budget() -> None:
+    app = rate_limited_app(FakeRedis(), trusted_proxy_cidrs=[])
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/")
+
+    assert response.status_code == 200
+    assert response.headers["X-RateLimit-Limit"] == "1"
+    assert response.headers["X-RateLimit-Remaining"] == "0"
 
 
 @pytest.mark.asyncio
