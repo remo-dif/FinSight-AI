@@ -17,11 +17,11 @@ test("an undecided case can progress without returning to new or resolving direc
   const selected = await openLiveCase(page);
   const status = selected.getByLabel("Status");
   await expect(status).toHaveValue("needs_evidence");
-  await expect(status.getByRole("option", { name: "New", exact: true })).toBeDisabled();
-  await expect(status.getByRole("option", { name: "Resolved", exact: true })).toBeDisabled();
+  await expect(status.getByRole("option", { name: "New", exact: true })).toHaveJSProperty("disabled", true);
+  await expect(status.getByRole("option", { name: "Resolved", exact: true })).toHaveJSProperty("disabled", true);
   await status.selectOption("escalated");
   await expect(status).toHaveValue("escalated");
-  await expect(status.getByRole("option", { name: "New", exact: true })).toBeDisabled();
+  await expect(status.getByRole("option", { name: "New", exact: true })).toHaveJSProperty("disabled", true);
   await status.selectOption("needs_evidence");
   await expect(status).toHaveValue("needs_evidence");
 });

@@ -160,11 +160,11 @@ function CaseStateControls({
           id="case-status"
           className="mt-1 h-10 w-full rounded-md border border-border bg-white px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
           value={caseRecord.status}
-          disabled={!canMutate || updatePending}
+          disabled={!canMutate || updatePending || Boolean(caseRecord.decision) || caseRecord.status === "resolved"}
           onChange={(event) => onUpdate({ status: event.target.value as CaseStatus })}
         >
           {Object.entries(statusLabels).map(([value, label]) => (
-            <option key={value} value={value} disabled={value === "resolved" && !caseRecord.decision}>{label}</option>
+            <option key={value} value={value} disabled={value === "resolved" || (value === "new" && caseRecord.status !== "new")}>{label}</option>
           ))}
         </select>
       </label>
@@ -210,6 +210,8 @@ function CaseDecisionSection({
           <p className="text-sm font-semibold">{decisionLabels[caseRecord.decision]}</p>
           <p className="mt-1 text-sm leading-5 text-muted">{caseRecord.decision_reason}</p>
         </div>
+      ) : caseRecord.status === "resolved" ? (
+        <p className="mt-3 text-sm text-muted">This case is resolved. Further status changes and decisions are unavailable.</p>
       ) : (
         <form className="mt-3 space-y-3" onSubmit={onSubmit}>
           <label className="block text-sm font-medium" htmlFor="case-decision">
