@@ -23,6 +23,7 @@ export type CaseStatus = "new" | "needs_evidence" | "escalated" | "resolved";
 export type CaseDecision = "escalate" | "request_verification" | "false_positive";
 
 export type InvestigationCase = Transaction & {
+  revision?: number;
   status: CaseStatus;
   assignee_name: string | null;
   assigned_to_me: boolean;
@@ -38,7 +39,18 @@ export type CaseNote = {
   created_at: string;
 };
 
-export type CaseDetail = InvestigationCase & { notes: CaseNote[] };
+export type CaseFollowUp = {
+  id: string;
+  case_id: string;
+  actor_id: string;
+  action: "escalation_outcome" | "verification_outcome" | "close";
+  reason: string;
+  previous_status: CaseStatus;
+  resulting_status: CaseStatus;
+  revision: number;
+  created_at: string;
+};
+export type CaseDetail = InvestigationCase & { notes: CaseNote[]; follow_ups?: CaseFollowUp[] };
 
 export type CaseUpdate = {
   status?: CaseStatus;
@@ -452,3 +464,12 @@ export const demoTransactions: InvestigationCase[] = [
     updated_at: null
   }
 ];
+
+
+export function recordCaseFollowUp(caseId: string, payload: { action: "escalation_outcome" | "verification_outcome"; reason: string; expected_revision: number }): Promise<CaseFollowUp> {
+  return apiFetch<CaseFollowUp>(`/api/cases/${caseId}/follow-ups`, { method: "POST", body: JSON.stringify(payload), requireAuth: true });
+}
+
+export function closeCase(caseId: string, payload: { reason: string; expected_revision: number }): Promise<InvestigationCase> {
+  return apiFetch<InvestigationCase>(`/api/cases/${caseId}/close`, { method: "POST", body: JSON.stringify(payload), requireAuth: true });
+}

@@ -89,7 +89,7 @@ evidence that a provider integration was validated.
 | --- | --- |
 | Authentication | JSON register/login, refresh/logout and `/api/auth/me`; protected APIs use `Authorization: Bearer <access_token>`. Obtain a token through JSON login before using Swagger's Bearer authorization. |
 | Passwords | Registration requires at least 10 characters; registration/login accept at most 72 UTF-8 bytes. No truncation or normalization. Shorter legacy login passwords remain accepted. No public password-change/reset endpoint exists. |
-| Cases | List/detail, audited state/assignment/decision updates and append-only notes. Decisions pin status; generic reopening/resolution after a decision is intentionally restricted. |
+| Cases | List/detail, audited state/assignment/decision updates and notes. Initial decisions are immutable; escalation and verification support a separate outcome followed by explicit, reasoned closure. V2 closures reject further writes. See [Case Workflow V2](docs/29-case-workflow-v2.md). |
 | Transactions | User-scoped list/create, monthly summaries and spending comparisons; currencies remain isolated. |
 | Uploads | CSV transactions; embedded PDF text extraction and chunk indexing. Images currently produce metadata placeholders, not extracted OCR text. |
 | Chat | Six keyword-routed financial intents, canonical transaction evidence and deterministic review/fallback. Responses expose transaction references in tool results. |

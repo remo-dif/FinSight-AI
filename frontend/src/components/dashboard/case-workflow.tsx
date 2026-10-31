@@ -4,6 +4,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { FormEvent, useState } from "react";
 import {
   addCaseNote,
+  recordCaseFollowUp,
+  closeCase,
   CaseDecision,
   CaseDetail,
   CaseStatus,
@@ -47,6 +49,7 @@ export function CaseWorkflow({
   const [decision, setDecision] = useState<CaseDecision | "">("");
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
+  const closed = caseRecord.status === "resolved" && (caseRecord.decision === "escalate" || caseRecord.decision === "request_verification");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const updateMutation = useMutation({
@@ -104,14 +107,14 @@ export function CaseWorkflow({
     <div className="space-y-5">
       <CaseStateControls
         caseRecord={caseRecord}
-        canMutate={canMutate}
+        canMutate={canMutate && !closed}
         updatePending={updatePending}
         onUpdate={(update) => updateMutation.mutate(update)}
       />
 
       <CaseDecisionSection
         caseRecord={caseRecord}
-        canMutate={canMutate}
+        canMutate={canMutate && !closed}
         updatePending={updatePending}
         decision={decision}
         reason={reason}
@@ -120,9 +123,12 @@ export function CaseWorkflow({
         onSubmit={recordDecision}
       />
 
+      <CaseFollowUpSection key={caseRecord.id} caseRecord={caseRecord} detail={detail} canMutate={canMutate} blocked={updatePending || noteMutation.isPending || isDetailLoading || isDetailError} />
+
       <CaseNotesSection
+        isClosed={closed}
         detail={detail}
-        canMutate={canMutate}
+        canMutate={canMutate && !closed}
         isDetailLoading={isDetailLoading}
         isDetailError={isDetailError}
         onRetryDetail={onRetryDetail}
@@ -257,6 +263,7 @@ function CaseDecisionSection({
 }
 
 function CaseNotesSection({
+  isClosed = false,
   detail,
   canMutate,
   isDetailLoading,
@@ -276,6 +283,7 @@ function CaseNotesSection({
   notePending: boolean;
   onNoteChange: (note: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  isClosed?: boolean;
 }) {
   return (
     <section aria-labelledby="case-notes-heading">
@@ -289,7 +297,7 @@ function CaseNotesSection({
           </button>
         </div>
       ) : null}
-      {!canMutate ? <p className="mt-2 text-sm text-muted">Sign in to add notes or record case actions.</p> : null}
+      {!canMutate ? <p className="mt-2 text-sm text-muted">{isClosed ? "Notes are read-only after closure." : "Sign in to add notes or record case actions."}</p> : null}
       {detail?.notes.length ? (
         <ol className="mt-3 space-y-2">
           {detail.notes.map((item) => (
@@ -324,6 +332,71 @@ function CaseNotesSection({
           </button>
         </form>
       ) : null}
+    </section>
+  );
+}
+
+
+function CaseFollowUpSection({ caseRecord, detail, canMutate, blocked }: {
+  caseRecord: InvestigationCase;
+  detail?: CaseDetail;
+  canMutate: boolean;
+  blocked: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const closed = caseRecord.status === "resolved";
+  const hasOutcome = Boolean(detail?.follow_ups?.length);
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (!detail || detail.id !== caseRecord.id || detail.revision === undefined) throw new Error("Refresh the case before recording an outcome.");
+      const payload = { reason: reason.trim(), expected_revision: detail.revision };
+      if (hasOutcome) return closeCase(caseRecord.id, payload);
+      const action = caseRecord.decision === "escalate" ? "escalation_outcome" : "verification_outcome";
+      return recordCaseFollowUp(caseRecord.id, { ...payload, action });
+    },
+    onMutate: () => setError(null),
+    onSuccess: () => setReason(""),
+    onError: (failure) => setError(failure instanceof Error ? failure.message : "The case action was not saved."),
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: caseListQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: caseDetailQueryKey(caseRecord.id) })
+      ]);
+    }
+  });
+  if (caseRecord.decision !== "escalate" && caseRecord.decision !== "request_verification") return null;
+  const disabled = !canMutate || blocked || mutation.isPending || detail?.id !== caseRecord.id || detail?.revision === undefined;
+  return (
+    <section aria-labelledby="case-follow-up-heading" className="space-y-3">
+      <h3 id="case-follow-up-heading" className="text-sm font-semibold">Follow-up investigation</h3>
+      {detail?.follow_ups?.length ? (
+        <ol className="space-y-2">
+          {detail.follow_ups.map((item) => (
+            <li key={item.id} className="rounded-md border border-border p-3">
+              <p className="text-sm font-semibold">{item.action === "close" ? "Case closed" : "Investigation outcome recorded"}</p>
+              <p className="whitespace-pre-wrap text-sm">{item.reason}</p>
+              <p className="text-xs text-muted">{item.previous_status}{" to "}{item.resulting_status}{" - "}<time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time></p>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+      {closed ? <p className="text-sm text-muted">This case is closed. Its decision and history are preserved.</p> : (
+        <form className="space-y-2" onSubmit={(event) => {
+          event.preventDefault();
+          if (reason.trim() && !disabled) mutation.mutate();
+        }}>
+          <label className="block text-sm" htmlFor="case-follow-up-reason">
+            {hasOutcome ? "Closure reason" : caseRecord.decision === "request_verification" ? "Verification result and outcome" : "Escalation investigation outcome"}
+          </label>
+          <textarea id="case-follow-up-reason" className="w-full rounded-md border border-border p-2" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={4000} required disabled={disabled} />
+          <button type="submit" className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white disabled:opacity-60" disabled={disabled || !reason.trim()}>
+            {hasOutcome ? "Close investigation" : "Record follow-up outcome"}
+          </button>
+        </form>
+      )}
+      {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
     </section>
   );
 }
