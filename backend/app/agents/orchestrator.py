@@ -1,4 +1,5 @@
 import json
+import re
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -77,7 +78,7 @@ class OrchestratorAgent:
             return "recurring"
         if "budget" in lower:
             return "budget"
-        if "merchant" in lower or "top" in lower:
+        if "merchant" in lower or re.search(r"\btop\b", lower):
             return "merchant"
         if "compar" in lower or "increas" in lower or "decreas" in lower:
             return "summary"
