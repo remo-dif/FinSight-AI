@@ -97,6 +97,12 @@ not replace infrastructure provisioning, drift detection, or incident-response t
 
 ## GHCR Images
 
+The `ci` workflow runs on pushes to `main`/`master` and pull-request events. The
+temporary `fix/ci-playwright-runner` push exception has been removed. A feature/fix/chore
+branch push alone does not start CI. PR runs preserve backend, frontend, dependency
+review and container build/scan checks; dependency review is PR-only. `main` pushes
+run checks but do not publish images or trigger the master deployment condition.
+
 After backend tests, frontend tests, Docker builds, and Trivy scans pass on `master`, CI publishes:
 
 - `ghcr.io/remo-dif/finsight-ai-backend:<commit-sha>`
@@ -218,13 +224,15 @@ REDIS_URL=<ElastiCache endpoint>
 Its task role needs least-privilege `s3:PutObject` access to the configured upload prefix and
 `s3:ListBucket` for readiness checks. Add KMS encrypt permissions when `S3_KMS_KEY_ID` is set.
 
-The backend task definition currently references these AWS Secrets Manager values:
+The backend task definition must provide these values; verify the actual protected
+task configuration rather than inferring live settings from this document:
 
 ```text
 DATABASE_URL
 OPENAI_API_KEY
 JWT_SECRET_KEY
 JWT_REFRESH_SECRET_KEY
+REDIS_URL (when it contains credentials)
 ```
 
 When a Secrets Manager secret is stored as key/value JSON, ECS `valueFrom` must include the JSON
@@ -272,6 +280,11 @@ eu-north-1
 
 ## Database Migrations
 
-Before scaling beyond one backend task, move `alembic upgrade head` out of the backend container
-startup command. Run migrations as a dedicated one-off ECS task before updating the backend service
-so multiple replicas cannot race to apply the same migration.
+The backend image starts Uvicorn only; it does not run Alembic. The existing deploy
+workflow calls `run_backend_migrations` as a one-off ECS task and checks its exit
+before updating the backend service. Local Compose users must run the README's
+explicit migration command. Do not move migrations into every replica's startup.
+
+Live AWS proxy/header/ingress verification remains separate and deferred. A green CI
+or an enabled workflow is not evidence that trusted CIDRs or origin access controls
+are correct; see documents 23–25 for the current verification boundaries.
