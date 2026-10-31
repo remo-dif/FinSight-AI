@@ -94,13 +94,25 @@ class RagService:
     def retrieve(self, user_id: UUID, query: str, limit: int = 5) -> list[str]:
         return [row.text for row in self.retrieve_chunks(user_id, query, limit)]
 
-    def retrieve_chunks(self, user_id: UUID, query: str, limit: int = 5) -> list[RagChunkResult]:
+    def retrieve_chunks(
+        self,
+        user_id: UUID,
+        query: str,
+        limit: int = 5,
+        document_ids: list[UUID] | None = None,
+    ) -> list[RagChunkResult]:
         with ai_operation("rag.retrieve") as fields:
-            rows = self._retrieve_chunks(user_id, query, limit)
+            rows = self._retrieve_chunks(user_id, query, limit, document_ids=document_ids)
             fields["retrieved_count"] = len(rows)
             return rows
 
-    def _retrieve_chunks(self, user_id: UUID, query: str, limit: int) -> list[RagChunkResult]:
+    def _retrieve_chunks(
+        self,
+        user_id: UUID,
+        query: str,
+        limit: int,
+        document_ids: list[UUID] | None = None,
+    ) -> list[RagChunkResult]:
         if limit <= 0 or not query.strip():
             return []
 
@@ -113,7 +125,20 @@ class RagService:
             )
             return []
         bind = self.db.get_bind()
-        if bind.dialect.name == "postgresql":
+        base_query = self.db.query(Embedding).filter(
+            Embedding.user_id == user_id,
+            Embedding.embedding_model == self.embedding_model,
+            Embedding.embedding_dimensions == EMBEDDING_DIMENSIONS,
+        )
+        if document_ids is not None:
+            document_ids = [doc_id for doc_id in document_ids if doc_id is not None]
+            if not document_ids:
+                return []
+            base_query = base_query.filter(
+                Embedding.source_type == "upload",
+                Embedding.source_id.in_(document_ids),
+            )
+        if bind.dialect.name == "postgresql" and document_ids is None:
             rows = self.db.execute(
                 text(
                     """
@@ -142,15 +167,7 @@ class RagService:
                 for row in rows
             ]
 
-        rows = (
-            self.db.query(Embedding)
-            .filter(
-                Embedding.user_id == user_id,
-                Embedding.embedding_model == self.embedding_model,
-                Embedding.embedding_dimensions == EMBEDDING_DIMENSIONS,
-            )
-            .all()
-        )
+        rows = base_query.all()
         ranked = sorted(
             (
                 RagChunkResult(

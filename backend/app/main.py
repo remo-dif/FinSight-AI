@@ -46,7 +46,9 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         if scheme is not None:
             request.scope["scheme"] = scheme
         with request_correlation(request.headers.get("x-request-id")) as request_id:
-            if request.url.path in {"/api/chat", "/api/uploads"}:
+            if request.url.path in {"/api/chat", "/api/uploads"} or request.url.path.startswith(
+                "/api/document"
+            ):
                 with ai_operation("http.ai_request") as fields:
                     response = await call_next(request)
                     fields["status_code"] = response.status_code

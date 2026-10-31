@@ -51,10 +51,51 @@ export const caseListQueryKey = (limit = 50) => ["cases", limit] as const;
 export const caseDetailQueryKey = (caseId: string) => ["case", caseId] as const;
 
 export type ChatResponse = {
-  session_id: string;
+  session_id: string | null;
   answer: string;
   review: string;
   tool_results: Record<string, unknown>;
+  citations?: Array<{
+    id: string;
+    document_id: string;
+    document_name: string;
+    chunk_id: string;
+    chunk_index?: number | null;
+    page?: number | null;
+    excerpt: string;
+    score?: number | null;
+    reference: string;
+  }>;
+  grounded?: boolean;
+  abstained?: boolean;
+  status?: "ok" | "abstained";
+};
+
+export type DocumentQuestionRequest = {
+  question?: string;
+  document_ids?: string[] | null;
+  document_scope?: string[] | null;
+  limit?: number;
+  min_score?: number | null;
+};
+
+export type DocumentQuestionResponse = {
+  answer: string;
+  citations: Array<{
+    id: string;
+    document_id: string;
+    document_name: string;
+    chunk_id: string;
+    chunk_index?: number | null;
+    page?: number | null;
+    excerpt: string;
+    score?: number | null;
+    reference: string;
+  }>;
+  grounded: boolean;
+  abstained: boolean;
+  document_ids: string[];
+  status: "ok" | "abstained";
 };
 
 export type TokenResponse = {
@@ -232,6 +273,23 @@ export function sendChatMessage({ message, sessionId }: ChatRequest): Promise<Ch
     body: JSON.stringify({
       message,
       session_id: sessionId ?? null
+    }),
+    requireAuth: true
+  });
+}
+
+export function askDocumentQuestion(
+  question: string,
+  documentIds?: string[] | null,
+  options?: { limit?: number; minScore?: number | null }
+): Promise<DocumentQuestionResponse> {
+  return apiFetch<DocumentQuestionResponse>("/api/documents/ask", {
+    method: "POST",
+    body: JSON.stringify({
+      question,
+      document_ids: documentIds ?? null,
+      limit: options?.limit ?? 5,
+      min_score: options?.minScore ?? null
     }),
     requireAuth: true
   });

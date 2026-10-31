@@ -14,6 +14,7 @@ from app.repositories.transactions import TransactionRepository
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.analytics import FinanceAnalyticsService
 from app.services.audit import AuditService
+from app.services.document_qa import DocumentQAService
 from app.services.llm import LLMService
 from app.services.rag import RagService
 
@@ -27,6 +28,32 @@ def chat(
     db: Annotated[Session, Depends(get_db)],
 ):
     user_id = user.id
+    document_ids = payload.document_ids or payload.document_scope
+    if payload.mode == "document_qa" or document_ids:
+        qa_result = DocumentQAService(db, user_id).answer(
+            payload.message,
+            document_ids=document_ids,
+            limit=payload.limit,
+            min_score=payload.min_score,
+        )
+        return ChatResponse(
+            session_id=payload.session_id,
+            answer=qa_result["answer"],
+            review="Document-grounded answer generated from authorized excerpts.",
+            tool_results={
+                "_evidence": {
+                    "document_ids": qa_result["document_ids"],
+                    "citations": qa_result["citations"],
+                    "grounded": qa_result["grounded"],
+                    "abstained": qa_result["abstained"],
+                }
+            },
+            citations=qa_result["citations"],
+            grounded=qa_result["grounded"],
+            abstained=qa_result["abstained"],
+            status="abstained" if qa_result["abstained"] else "ok",
+        )
+
     session = None
     if payload.session_id:
         session = db.scalar(
