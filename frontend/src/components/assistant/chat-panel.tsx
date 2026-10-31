@@ -20,12 +20,12 @@ export function ChatPanel() {
   const statusId = useId();
   const chatSessionId = useSessionStore((state) => state.chatSessionId);
   const setChatSessionId = useSessionStore((state) => state.setChatSessionId);
-  const [input, setInput] = useState("Summarize the evidence for the highest-risk alert");
+  const [input, setInput] = useState("Show my monthly summary");
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
       content:
-        "Ask for alert summaries, suspicious transaction patterns, entity history, or evidence from uploaded documents. Answers are grounded through approved tools."
+        "Ask about monthly cash flow, category spending, top merchants, unusual transactions, recurring charges, or estimated budgets. Answers are checked against your transaction data."
     }
   ]);
 
@@ -118,7 +118,7 @@ export function ChatPanel() {
           aria-label="Ask the finance assistant"
           aria-describedby={statusId}
           className="min-w-0 flex-1 rounded-md border border-border bg-white px-3 text-sm outline-none transition placeholder:text-muted/70 hover:border-accent/70 focus:border-accent focus:ring-2 focus:ring-accent/30"
-          placeholder="Ask about a case, entity, or signal"
+          placeholder="Ask about cash flow, merchants, or spending"
           value={input}
           onChange={(event) => setInput(event.target.value)}
         />

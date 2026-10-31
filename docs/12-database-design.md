@@ -8,12 +8,15 @@
 - `chat_sessions`: user conversation containers.
 - `chat_messages`: persisted chat messages.
 - `budgets`: monthly budget limits by category.
-- `embeddings`: personal knowledge-base chunks and vector placeholder.
+- `embeddings`: user-scoped text chunks, source metadata, embedding model/dimensions and vectors.
 - `audit_logs`: security and AI-tool audit trail.
+- `investigation_cases`, `case_notes`: transaction-keyed investigation state and append-only notes; a separate case-ID migration remains deferred.
 
 ## pgvector
 
-The Docker database enables `vector`. The current ORM stores embedding payloads behind a service boundary so the column can be migrated to a native vector type when production migrations are introduced.
+The Docker database enables `vector`. `EmbeddingVector` uses native `vector(1536)` on PostgreSQL and JSON on SQLite. Migration `20260530_0004_pgvector_embeddings` already introduces the native column, chunk metadata and an HNSW cosine index; this is not a future vector migration.
+
+Retrieval filters by user, embedding model and dimensions, then ranks by cosine distance. It returns top-K results without a minimum relevance threshold. The vectors and source metadata support internal retrieval; their presence does not establish document-Q&A or public citation support.
 
 ## Indexing
 

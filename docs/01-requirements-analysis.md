@@ -2,19 +2,19 @@
 
 ## Product Goal
 
-Personal Finance AI Assistant is a SaaS platform that helps users understand cash flow, detect anomalies, identify recurring payments, analyze uploaded financial documents, ask conversational questions, and generate reports.
+FinSight-AI is a portfolio application for transaction analysis and investigation-case review. Its current chat answers financial queries using transaction tools. General document question answering, document citations and OCR are not implemented public capabilities.
 
 ## Functional Requirements
 
-- User authentication with JWT, refresh tokens, bcrypt password hashing, and RBAC.
-- Transaction ingestion from CSV and financial documents.
-- Multimodal document handling for PDF, PNG, JPG, and JPEG.
+- User authentication with JWT, persisted refresh-token rotation and bcrypt password hashing. Role-check helpers exist; uploads enforce USER/ADMIN roles, while case, transaction and chat routes use active-user authentication and user ownership rather than a separate analyst-role policy.
+- Explicit-currency transaction ingestion from CSV; PDF text extraction and embedding storage do not create transaction rows.
+- PDF, PNG, JPG and JPEG upload validation. Text-based PDFs can be indexed; images currently produce a dimensions/metadata placeholder, not OCR text.
 - Transaction normalization, categorization, and storage.
 - Financial analytics tools exposed only through controlled backend functions.
-- Conversational AI with strict tool calling. The model never receives database credentials or direct SQL access.
-- Personal RAG knowledge base over receipts, PDFs, and notes.
-- Budget generation, anomaly detection, recurring payment detection, and report generation.
-- Responsive dashboard, chat, upload, and report experiences.
+- Financial chat with application-controlled keyword routing and tool execution. The model selects permitted financial claim IDs; it does not choose or execute database tools through function calling.
+- Internal user-scoped RAG indexing/retrieval for uploaded text. Retrieval uses top-K similarity ranking without a minimum relevance threshold. General document answers, document citations and automatic indexing of case notes remain planned.
+- Deterministic monthly summaries/comparisons, category/merchant spending, anomaly heuristics, repeated-charge estimates and budget estimates.
+- Responsive investigation workspace, case controls, chat and upload experiences. Downloadable report generation is not a public endpoint.
 
 ## Non-Functional Requirements
 
@@ -29,7 +29,8 @@ Personal Finance AI Assistant is a SaaS platform that helps users understand cas
 - The repository starts as a portfolio-grade foundation, not a fully regulated banking product.
 - Plaid/Open Banking integrations are deferred so the first version can focus on ingestion, analytics, and AI architecture.
 - LangGraph is isolated behind an orchestration adapter so the graph can run with mocked LLMs in tests and real OpenAI calls in production.
-- OCR support is implemented as a service boundary with pdfplumber, Pillow, and pytesseract dependencies, but deep bank-statement layout extraction should be extended per institution.
+- Text PDFs use pdfplumber and image validation uses Pillow. The container installs Tesseract, but no OCR call is wired into ingestion and pytesseract is not a declared application dependency. Scanned-PDF OCR and institution-specific statement extraction remain planned.
+- Upload extraction and embedding calls run within the request lifecycle, outside database persistence transactions; a background worker queue is not implemented.
 
 ## Risks
 

@@ -2,21 +2,20 @@
 
 ## Supervisor Pattern
 
-The application uses a hierarchical agent architecture. The Orchestrator Agent is the only component allowed to route work. Agents do not call each other directly.
+The implemented LangGraph flow is supervisor -> one financial specialist -> reviewer. Application keyword rules choose the specialist; the LLM does not select tools or route work. This is a bounded graph, not a set of independently acting agents.
 
 ## Agents
 
-- Orchestrator Agent: routes user intent and merges outputs.
-- Transaction Agent: answers transaction lookup and merchant questions.
-- Document Agent: extracts and summarizes uploaded files.
-- Categorization Agent: assigns and improves transaction categories.
-- Financial Analyst Agent: performs spending and cash-flow analysis.
-- Budget Planner Agent: generates budget recommendations.
-- Anomaly Detection Agent: identifies unusual transactions.
-- Recurring Payment Agent: detects subscriptions and repeating payments.
-- RAG Agent: retrieves personal document context from pgvector.
-- Report Agent: creates user-ready summaries.
-- Reviewer Agent: checks financial reasoning, missing context, safety, and unsupported claims.
+- Orchestrator/supervisor: resolves intent, currency and supported reporting periods.
+- Summary specialist: monthly transaction summaries and two-month comparisons.
+- Category specialist: category spending.
+- Merchant specialist: top-merchant spending.
+- Budget specialist: all-history spending-based estimates.
+- Anomaly specialist: unusual-amount heuristics.
+- Recurring specialist: repeated-charge estimates; verified subscription cadence is not guaranteed.
+- Reviewer: validates the canonical financial evidence and renders permitted facts deterministically.
+
+RAG retrieval is a service call before graph execution, not a separate graph agent. Although retrieved chunks enter `AgentState`, the financial `_evidence` generation path sends claim IDs rather than document excerpts to the LLM. Document question answering, document citations and dedicated document/report agents remain planned. Categorization currently belongs to an ingestion service, not an independent agent.
 
 ## Routing Contract
 
@@ -32,9 +31,10 @@ All agent communication passes through `AgentState`:
 
 ## Reviewer Gate
 
-No AI response is returned until the Reviewer Agent validates:
+Every public financial chat response passes the reviewer. It checks:
 
-- The answer is based on tool output or retrieved context.
-- No hidden SQL/database access was requested.
-- Financial advice is framed as analysis, not certified professional advice.
-- Sensitive data is not unnecessarily echoed.
+- Tool results match the canonical calculation snapshot.
+- Currency, reporting period, amounts, totals and transaction references are consistent.
+- Selected claim IDs are complete and supported; invalid selections use a deterministic explanation, while invalid evidence is rejected.
+
+This gate does not validate arbitrary document claims, document citations, general professional advice or every possible sensitive-data disclosure. The model has no direct SQL/database tool. User isolation is enforced by authenticated, user-scoped application queries rather than by a reviewer promise.
