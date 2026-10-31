@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, select, update
 from sqlalchemy.orm import Session
 
 from app.models.case import CaseNote, InvestigationCase
@@ -36,7 +36,28 @@ class CaseRepository:
                 Transaction.user_id == user_id,
             )
         )
-        return self.db.execute(query).tuples().one_or_none()
+        return (
+            self.db.execute(query.execution_options(populate_existing=True)).tuples().one_or_none()
+        )
+
+    def update_if_unchanged(self, case: InvestigationCase, user_id: UUID, changes: dict) -> bool:
+        """Compare-and-set the observed state without an ORM lost-update window."""
+        statement = (
+            update(InvestigationCase)
+            .where(
+                InvestigationCase.transaction_id == case.transaction_id,
+                InvestigationCase.transaction_id.in_(
+                    select(Transaction.id).where(Transaction.user_id == user_id)
+                ),
+                InvestigationCase.status == case.status,
+                InvestigationCase.decision == case.decision,
+                InvestigationCase.decision_reason == case.decision_reason,
+                InvestigationCase.assignee_user_id == case.assignee_user_id,
+            )
+            .values(**changes)
+            .execution_options(synchronize_session=False)
+        )
+        return self.db.execute(statement).rowcount == 1
 
     def notes_for_user(self, case_id: UUID, user_id: UUID) -> list[tuple[CaseNote, User | None]]:
         query = (

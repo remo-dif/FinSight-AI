@@ -19,6 +19,7 @@ from app.schemas.cases import (
     CaseUpdate,
 )
 from app.services.audit import AuditService
+from app.services.case_workflow import DECISION_STATUSES, validate_case_update
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 
@@ -57,7 +58,10 @@ def list_cases(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[CaseResponse]:
-    return [_case_response(record, user) for record in CaseRepository(db).list_for_user(user.id, limit, offset)]
+    return [
+        _case_response(record, user)
+        for record in CaseRepository(db).list_for_user(user.id, limit, offset)
+    ]
 
 
 @router.get("/{case_id}", response_model=CaseDetailResponse)
@@ -90,68 +94,75 @@ def update_case(
     db: Annotated[Session, Depends(get_db)],
 ) -> CaseResponse:
     case, _, _ = _get_case_record(case_id, user, db)
-    if payload.status is None and payload.assignee is None and payload.decision is None:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT,
-            "At least one valid case update is required",
-        )
-    if payload.status == CaseStatus.RESOLVED and case.decision is None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Record an investigation decision before resolving the case")
-
-    audit = AuditService(db)
+    validate_case_update(case, payload)
+    changes = {}
+    events = []
     if payload.assignee is not None:
         assignee_id = user.id if payload.assignee == "me" else None
         if case.assignee_user_id != assignee_id:
             previous_assignee_id = case.assignee_user_id
-            case.assignee_user_id = assignee_id
-            audit.record(
-                "case.assigned",
-                user.id,
-                {
-                    "case_id": str(case_id),
-                    "previous_assignee_id": str(previous_assignee_id) if previous_assignee_id else None,
-                    "assignee_id": str(assignee_id) if assignee_id else None,
-                },
+            changes["assignee_user_id"] = assignee_id
+            events.append(
+                (
+                    "case.assigned",
+                    {
+                        "case_id": str(case_id),
+                        "previous_assignee_id": str(previous_assignee_id)
+                        if previous_assignee_id
+                        else None,
+                        "assignee_id": str(assignee_id) if assignee_id else None,
+                    },
+                )
             )
 
     if payload.status is not None and case.status != payload.status.value:
         previous_status = case.status
-        case.status = payload.status.value
-        audit.record(
-            "case.status_changed",
-            user.id,
-            {"case_id": str(case_id), "from": previous_status, "to": case.status},
+        changes["status"] = payload.status.value
+        events.append(
+            (
+                "case.status_changed",
+                {"case_id": str(case_id), "from": previous_status, "to": payload.status.value},
+            )
         )
 
     if payload.decision is not None:
-        if case.decision is not None:
-            raise HTTPException(status.HTTP_409_CONFLICT, "A decision has already been recorded for this case")
         previous_status = case.status
-        next_status = {
-            CaseDecision.ESCALATE: CaseStatus.ESCALATED,
-            CaseDecision.REQUEST_VERIFICATION: CaseStatus.NEEDS_EVIDENCE,
-            CaseDecision.FALSE_POSITIVE: CaseStatus.RESOLVED,
-        }[payload.decision]
-        case.decision = payload.decision.value
-        case.decision_reason = payload.reason
-        case.status = next_status.value
-        audit.record(
-            "case.decision_recorded",
-            user.id,
-            {
-                "case_id": str(case_id),
-                "decision": case.decision,
-                "from_status": previous_status,
-                "to_status": case.status,
-            },
+        next_status = DECISION_STATUSES[payload.decision]
+        changes.update(
+            decision=payload.decision.value,
+            decision_reason=payload.reason,
+            status=next_status.value,
+        )
+        events.append(
+            (
+                "case.decision_recorded",
+                {
+                    "case_id": str(case_id),
+                    "decision": payload.decision.value,
+                    "from_status": previous_status,
+                    "to_status": next_status.value,
+                },
+            )
         )
 
-    db.commit()
+    try:
+        if changes and not CaseRepository(db).update_if_unchanged(case, user.id, changes):
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, "Case changed while saving. Refresh the case and retry"
+            )
+        for action, metadata in events:
+            AuditService(db).record(action, user.id, metadata)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     updated = _get_case_record(case_id, user, db)
     return _case_response(updated, user)
 
 
-@router.post("/{case_id}/notes", response_model=CaseNoteResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{case_id}/notes", response_model=CaseNoteResponse, status_code=status.HTTP_201_CREATED
+)
 def add_case_note(
     case_id: UUID,
     payload: CaseNoteCreate,
