@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
@@ -26,6 +26,8 @@ class DocumentQuestionRequest(BaseModel):
 
     @model_validator(mode="after")
     def ensure_question(self) -> "DocumentQuestionRequest":
+        if self.question and self.message and self.question.strip() != self.message.strip():
+            raise ValueError("Provide only one of question or message, not both")
         if not self.question and not self.message:
             raise ValueError("question or message is required")
         if not self.question:
@@ -39,12 +41,13 @@ class DocumentQuestionResponse(BaseModel):
     grounded: bool = False
     abstained: bool = False
     document_ids: list[str] = Field(default_factory=list)
-    status: Literal["ok", "abstained"] = "ok"
+    status: Literal["ok", "abstained", "provider_error", "insufficient_evidence", "extractive_preview"] = "ok"
 
     @model_validator(mode="after")
     def sync_status(self) -> "DocumentQuestionResponse":
-        if self.abstained:
-            self.status = "abstained"
-        else:
-            self.status = "ok"
+        if self.status in {"ok", "abstained"}:
+            if self.abstained:
+                self.status = "abstained"
+            else:
+                self.status = "ok"
         return self

@@ -24,6 +24,7 @@ from app.core.openai_resilience import (
 from app.models.embedding import EMBEDDING_DIMENSIONS, Embedding
 
 LOCAL_EMBEDDING_MODEL = "deterministic-local-hash-v2"
+DEFAULT_MIN_SCORE = 0.05
 logger = logging.getLogger(__name__)
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9._%+-]*")
@@ -94,15 +95,37 @@ class RagService:
     def retrieve(self, user_id: UUID, query: str, limit: int = 5) -> list[str]:
         return [row.text for row in self.retrieve_chunks(user_id, query, limit)]
 
+    @staticmethod
+    def normalize_min_score(min_score: float | None) -> float:
+        if min_score is None:
+            return DEFAULT_MIN_SCORE
+        if min_score < -1.0 or min_score > 1.0:
+            raise ValueError("min_score must be between -1.0 and 1.0")
+        return max(DEFAULT_MIN_SCORE, float(min_score))
+
+    @staticmethod
+    def score_is_relevant(score: float | None, min_score: float | None) -> bool:
+        threshold = RagService.normalize_min_score(min_score)
+        if score is None:
+            return True
+        return float(score) >= threshold
+
     def retrieve_chunks(
         self,
         user_id: UUID,
         query: str,
         limit: int = 5,
         document_ids: list[UUID] | None = None,
+        min_score: float | None = None,
     ) -> list[RagChunkResult]:
         with ai_operation("rag.retrieve") as fields:
-            rows = self._retrieve_chunks(user_id, query, limit, document_ids=document_ids)
+            rows = self._retrieve_chunks(
+                user_id,
+                query,
+                limit,
+                document_ids=document_ids,
+                min_score=min_score,
+            )
             fields["retrieved_count"] = len(rows)
             return rows
 
@@ -112,10 +135,12 @@ class RagService:
         query: str,
         limit: int,
         document_ids: list[UUID] | None = None,
+        min_score: float | None = None,
     ) -> list[RagChunkResult]:
         if limit <= 0 or not query.strip():
             return []
 
+        threshold = self.normalize_min_score(min_score)
         try:
             query_embedding = self.embed_text(query)
         except (OpenAIError, CircuitOpenError):
@@ -158,7 +183,7 @@ class RagService:
                     "dimensions": EMBEDDING_DIMENSIONS,
                 },
             ).mappings()
-            return [
+            results = [
                 RagChunkResult(
                     text=str(row["chunk_text"]),
                     metadata=dict(row["metadata_json"] or {}),
@@ -166,6 +191,7 @@ class RagService:
                 )
                 for row in rows
             ]
+            return [row for row in results if self.score_is_relevant(row.score, threshold)][:limit]
 
         rows = base_query.all()
         ranked = sorted(
@@ -180,7 +206,8 @@ class RagService:
             key=lambda item: item.score if item.score is not None else -1.0,
             reverse=True,
         )
-        return ranked[:limit]
+        filtered = [row for row in ranked if self.score_is_relevant(row.score, threshold)]
+        return filtered[:limit]
 
     @property
     def embedding_model(self) -> str:
@@ -352,7 +379,8 @@ class RagService:
     def _format_pgvector(self, value: list[float]) -> str:
         return "[" + ",".join(f"{item:.8g}" for item in value) + "]"
 
-    def _cosine_similarity(self, left: list[float], right: list[float]) -> float:
+    @staticmethod
+    def _cosine_similarity(left: list[float], right: list[float]) -> float:
         if not left or not right or len(left) != len(right):
             return -1.0
         numerator = sum(a * b for a, b in zip(left, right, strict=True))

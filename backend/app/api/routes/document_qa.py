@@ -30,6 +30,11 @@ def ask_document_question(
     question = payload.question or payload.message
     if not question or not question.strip():
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Question is required")
+    if payload.document_ids and payload.document_scope and set(payload.document_ids) != set(payload.document_scope):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "document_ids and document_scope must match when both are provided",
+        )
     service = DocumentQAService(db, user.id)
     result = service.answer(
         question,

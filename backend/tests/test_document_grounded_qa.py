@@ -1,9 +1,16 @@
+import os
 from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+
+os.environ.setdefault("DATABASE_URL", "sqlite://")
+os.environ.setdefault("JWT_SECRET_KEY", "abcdefghijklmnopqrstuvwxyz1234567890")
+os.environ.setdefault("JWT_REFRESH_SECRET_KEY", "zyxwvutsrqponmlkjihgfedcba123456")
+os.environ.setdefault("OPENAI_API_KEY", "sk-test-1234567890")
+os.environ.setdefault("EMBEDDING_BACKEND", "local")
 
 from app.core.database import Base
 from app.models.embedding import Embedding
@@ -86,11 +93,27 @@ def test_authorized_document_qa_uses_only_user_documents(monkeypatch, qa_db):
 
     service = DocumentQAService(qa_db, user_a.id)
     result = service.answer("What does the statement say about operating expenses?", document_ids=[file_a.id])
-    assert result["grounded"] is True
+    assert result["grounded"] is False
+    assert result["status"] == "provider_error"
     assert result["citations"]
     assert str(result["citations"][0]["document_id"]) == str(file_a.id)
-    assert "42.50" in result["answer"]
+    assert "Extractive preview" in result["answer"]
 
     with pytest.raises(HTTPException) as exc:
         service.answer("What does the statement say about operating expenses?", document_ids=[file_b.id])
     assert exc.value.status_code == 404
+
+
+def test_document_qa_uses_conservative_min_score_floor_and_relevance_policy():
+    assert DocumentQAService._normalize_threshold(0.0) == 0.05
+    assert DocumentQAService._normalize_threshold(0.25) == 0.25
+    with pytest.raises(HTTPException):
+        DocumentQAService._normalize_threshold(2.0)
+
+    score = RagService._cosine_similarity(
+        RagService._local_embedding("quarterly operating expenses"),
+        RagService._local_embedding("quarterly operating expenses"),
+    )
+    assert score > 0.9
+    assert RagService.score_is_relevant(score, 0.05) is True
+    assert RagService.score_is_relevant(0.04, 0.05) is False

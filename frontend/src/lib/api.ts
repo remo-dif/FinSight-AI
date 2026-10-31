@@ -68,7 +68,7 @@ export type ChatResponse = {
   }>;
   grounded?: boolean;
   abstained?: boolean;
-  status?: "ok" | "abstained";
+  status?: "ok" | "abstained" | "provider_error" | "insufficient_evidence" | "extractive_preview";
 };
 
 export type DocumentQuestionRequest = {
@@ -95,7 +95,7 @@ export type DocumentQuestionResponse = {
   grounded: boolean;
   abstained: boolean;
   document_ids: string[];
-  status: "ok" | "abstained";
+  status: "ok" | "abstained" | "provider_error" | "insufficient_evidence" | "extractive_preview";
 };
 
 export type TokenResponse = {

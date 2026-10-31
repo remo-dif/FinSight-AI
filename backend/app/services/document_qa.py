@@ -7,9 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.finance import UploadedFile
 from app.services.llm import LLMService
-from app.services.rag import RagService
-
-DEFAULT_MIN_SCORE = 0.05
+from app.services.rag import DEFAULT_MIN_SCORE, RagService
 
 
 class DocumentQAService:
@@ -34,30 +32,45 @@ class DocumentQAService:
 
         authorized = self._load_authorized_documents(document_ids)
         requested_ids = [UUID(doc_id) for doc_id in authorized]
+        threshold = self._normalize_threshold(min_score)
         retrieval = self.rag_service.retrieve_chunks(
             self.user_id,
             question,
             limit=limit,
             document_ids=requested_ids if requested_ids else None,
+            min_score=threshold,
         )
-        threshold = self._normalize_threshold(min_score)
-        relevant = [row for row in retrieval if row.score is None or row.score >= threshold]
-        if not relevant:
+        if not retrieval:
             return {
                 "answer": "I could not find enough relevant evidence in the authorized documents to answer that confidently.",
                 "citations": [],
                 "grounded": False,
                 "abstained": True,
+                "status": "insufficient_evidence",
                 "document_ids": [str(item) for item in authorized],
             }
 
-        citations = self._build_citations(relevant, authorized)
-        answer = self.llm_service.synthesize_document_answer(question, [self._to_supported_row(row) for row in relevant])
+        citations = self._build_citations(retrieval, authorized)
+        synthesis = self.llm_service.synthesize_document_answer_result(
+            question,
+            [self._to_supported_row(row) for row in retrieval],
+        )
+        if synthesis["status"] != "ok":
+            return {
+                "answer": synthesis["answer"],
+                "citations": citations,
+                "grounded": False,
+                "abstained": True,
+                "status": synthesis["status"],
+                "document_ids": [str(item) for item in authorized],
+            }
+
         return {
-            "answer": answer,
+            "answer": synthesis["answer"],
             "citations": citations,
             "grounded": True,
             "abstained": False,
+            "status": "ok",
             "document_ids": [str(item) for item in authorized],
         }
 
@@ -91,7 +104,7 @@ class DocumentQAService:
             return DEFAULT_MIN_SCORE
         if min_score < -1.0 or min_score > 1.0:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "min_score must be between -1.0 and 1.0")
-        return float(min_score)
+        return max(DEFAULT_MIN_SCORE, float(min_score))
 
     @staticmethod
     def _to_supported_row(row: Any) -> dict[str, Any]:
@@ -105,6 +118,7 @@ class DocumentQAService:
         relevant_rows: list[Any], authorized_documents: dict[str, UploadedFile]
     ) -> list[dict[str, Any]]:
         citations: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
         for row in relevant_rows:
             metadata = getattr(row, "metadata", {}) or {}
             source = metadata.get("source", {}) if isinstance(metadata, dict) else {}
@@ -117,6 +131,9 @@ class DocumentQAService:
             chunk = metadata.get("chunk", {}) if isinstance(metadata, dict) else {}
             chunk_index = chunk.get("index") if isinstance(chunk, dict) else None
             chunk_id = f"{source_id}:{chunk_index if chunk_index is not None else 'chunk'}"
+            if chunk_id in seen_ids:
+                continue
+            seen_ids.add(chunk_id)
             snippet = str(getattr(row, "text", "") or "")
             citations.append(
                 {

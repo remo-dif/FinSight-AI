@@ -17,6 +17,8 @@ class ChatRequest(BaseModel):
 
     @model_validator(mode="after")
     def normalize_message(self) -> "ChatRequest":
+        if self.message and self.question and self.message.strip() != self.question.strip():
+            raise ValueError("Provide only one of message or question, not both")
         if not self.message and not self.question:
             raise ValueError("message or question is required")
         if not self.message:
@@ -32,4 +34,4 @@ class ChatResponse(BaseModel):
     citations: list[dict] = Field(default_factory=list)
     grounded: bool = False
     abstained: bool = False
-    status: str = "ok"
+    status: Literal["ok", "abstained", "provider_error", "insufficient_evidence", "extractive_preview"] = "ok"

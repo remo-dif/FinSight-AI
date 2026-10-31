@@ -66,16 +66,24 @@ class LLMService:
         user_message: str,
         rag_chunks: list[dict[str, Any]] | list[Any],
     ) -> str:
-        if not rag_chunks:
-            return "I couldn't find enough relevant evidence in the authorized documents to answer that confidently."
-        normalized = []
-        for chunk in rag_chunks:
-            if hasattr(chunk, "text"):
-                normalized.append({"text": getattr(chunk, "text"), "metadata": getattr(chunk, "metadata", {}), "score": getattr(chunk, "score", None)})
-            elif isinstance(chunk, dict):
-                normalized.append(chunk)
+        return self.synthesize_document_answer_result(user_message, rag_chunks)["answer"]
+
+    def synthesize_document_answer_result(
+        self,
+        user_message: str,
+        rag_chunks: list[dict[str, Any]] | list[Any],
+    ) -> dict[str, Any]:
+        normalized = self._normalize_document_chunks(rag_chunks)
+        if not normalized:
+            return {
+                "answer": "I couldn't find enough relevant evidence in the authorized documents to answer that confidently.",
+                "status": "insufficient_evidence",
+            }
         if self._client is None:
-            return self._fallback_document_answer(user_message, normalized)
+            return {
+                "answer": self._fallback_document_answer(user_message, normalized),
+                "status": "provider_error",
+            }
 
         prompt = self._build_document_prompt(user_message, normalized)
         try:
@@ -100,10 +108,34 @@ class LLMService:
                 openai_circuit.record_failure()
             except Exception:
                 pass
-            return self._fallback_document_answer(user_message, normalized)
+            return {
+                "answer": self._fallback_document_answer(user_message, normalized),
+                "status": "provider_error",
+            }
         openai_circuit.record_success()
         answer = self._extract_text(response).strip()
-        return answer or self._fallback_document_answer(user_message, normalized)
+        if not answer:
+            return {
+                "answer": self._fallback_document_answer(user_message, normalized),
+                "status": "provider_error",
+            }
+        return {"answer": answer, "status": "ok"}
+
+    @staticmethod
+    def _normalize_document_chunks(rag_chunks: list[dict[str, Any]] | list[Any]) -> list[dict[str, Any]]:
+        normalized: list[dict[str, Any]] = []
+        for chunk in rag_chunks:
+            if hasattr(chunk, "text"):
+                normalized.append(
+                    {
+                        "text": getattr(chunk, "text"),
+                        "metadata": getattr(chunk, "metadata", {}),
+                        "score": getattr(chunk, "score", None),
+                    }
+                )
+            elif isinstance(chunk, dict):
+                normalized.append(chunk)
+        return normalized
 
     def _build_document_prompt(self, user_message: str, rag_chunks: list[dict[str, Any]]) -> str:
         chunk_json = json.dumps(
@@ -129,8 +161,8 @@ class LLMService:
             return "I could not find enough relevant evidence in the authorized documents to answer that confidently."
         evidence = " ".join(snippets)
         return (
-            f"Based on the authorized document excerpts, the answer is limited to the available evidence: {evidence[:500]}. "
-            "I cannot go beyond the retrieved text for this question."
+            "Extractive preview: "
+            f"{evidence[:500]}. This answer is not verified to be grounded and should not be treated as a generated answer."
         )
 
     def _select_financial_claims(self, tool_results: dict) -> str:

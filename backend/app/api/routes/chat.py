@@ -30,6 +30,8 @@ def chat(
     user_id = user.id
     document_ids = payload.document_ids or payload.document_scope
     if payload.mode == "document_qa" or document_ids:
+        if payload.document_ids and payload.document_scope and set(payload.document_ids) != set(payload.document_scope):
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "document_ids and document_scope must match when both are provided")
         qa_result = DocumentQAService(db, user_id).answer(
             payload.message,
             document_ids=document_ids,
@@ -46,12 +48,13 @@ def chat(
                     "citations": qa_result["citations"],
                     "grounded": qa_result["grounded"],
                     "abstained": qa_result["abstained"],
+                    "status": qa_result.get("status", "ok"),
                 }
             },
             citations=qa_result["citations"],
             grounded=qa_result["grounded"],
             abstained=qa_result["abstained"],
-            status="abstained" if qa_result["abstained"] else "ok",
+            status=qa_result.get("status", "abstained" if qa_result["abstained"] else "ok"),
         )
 
     session = None
