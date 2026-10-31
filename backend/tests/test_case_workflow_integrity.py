@@ -219,3 +219,38 @@ async def test_http_rejected_update_is_atomic_and_owner_boundary_precedes_transi
         assert audit_count(db) == 1
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("decision", ["escalate", "request_verification", "false_positive"])
+def test_legacy_resolved_cannot_record_a_new_decision(db, decision):
+    user = create_user(db)
+    _, case = create_case(db, user)
+    case.status = "resolved"
+    db.commit()
+    with pytest.raises(HTTPException) as exc:
+        update_case(case.transaction_id, CaseUpdate(decision=decision, reason="Late."), user, db)
+    assert exc.value.status_code == 409
+    assert not db.dirty and not db.new
+    assert audit_count(db) == 0
+
+
+def test_audit_failure_rolls_back_status_and_assignment(db, monkeypatch):
+    from app.services.audit import AuditService
+
+    user = create_user(db)
+    _, case = create_case(db, user)
+    case_id = case.transaction_id
+
+    def fail_audit(*args, **kwargs):
+        raise RuntimeError("synthetic audit storage failure")
+
+    monkeypatch.setattr(AuditService, "record", fail_audit)
+    with pytest.raises(RuntimeError, match="synthetic audit"):
+        update_case(case_id, CaseUpdate(status="escalated", assignee="me"), user, db)
+    assert not db.dirty and not db.new
+    db.commit()
+    db.expire_all()
+    persisted = db.get(InvestigationCase, case_id)
+    assert persisted.status == "new"
+    assert persisted.assignee_user_id is None
+    assert audit_count(db) == 0
