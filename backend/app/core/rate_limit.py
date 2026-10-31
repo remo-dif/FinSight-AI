@@ -95,7 +95,7 @@ class InMemoryRateLimitMiddleware(BaseHTTPMiddleware):
             budgets.append((f"login:{client}", self.login_requests_per_minute))
         for key, limit in budgets:
             bucket = self.requests[key]
-            while bucket and now - bucket[0] > 60:
+            while bucket and now - bucket[0] >= 60:
                 bucket.popleft()
             if len(bucket) >= limit:
                 return _limit_response()
