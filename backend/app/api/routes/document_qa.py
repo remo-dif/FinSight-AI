@@ -1,5 +1,4 @@
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -30,15 +29,12 @@ def ask_document_question(
     question = payload.question or payload.message
     if not question or not question.strip():
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Question is required")
-    if payload.document_ids and payload.document_scope and set(payload.document_ids) != set(payload.document_scope):
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "document_ids and document_scope must match when both are provided",
-        )
     service = DocumentQAService(db, user.id)
     result = service.answer(
         question,
-        document_ids=payload.document_ids or payload.document_scope,
+        document_ids=(
+            payload.document_ids if payload.document_ids is not None else payload.document_scope
+        ),
         limit=payload.limit,
         min_score=payload.min_score,
     )

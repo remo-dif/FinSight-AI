@@ -28,10 +28,14 @@ def chat(
     db: Annotated[Session, Depends(get_db)],
 ):
     user_id = user.id
-    document_ids = payload.document_ids or payload.document_scope
-    if payload.mode == "document_qa" or document_ids:
-        if payload.document_ids and payload.document_scope and set(payload.document_ids) != set(payload.document_scope):
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "document_ids and document_scope must match when both are provided")
+    document_ids = (
+        payload.document_ids if payload.document_ids is not None else payload.document_scope
+    )
+    if (
+        payload.mode == "document_qa"
+        or payload.document_ids is not None
+        or payload.document_scope is not None
+    ):
         qa_result = DocumentQAService(db, user_id).answer(
             payload.message,
             document_ids=document_ids,
@@ -41,20 +45,23 @@ def chat(
         return ChatResponse(
             session_id=payload.session_id,
             answer=qa_result["answer"],
-            review="Document-grounded answer generated from authorized excerpts.",
+            review=qa_result["grounding_note"],
             tool_results={
                 "_evidence": {
                     "document_ids": qa_result["document_ids"],
                     "citations": qa_result["citations"],
+                    "sources": qa_result["sources"],
                     "grounded": qa_result["grounded"],
                     "abstained": qa_result["abstained"],
-                    "status": qa_result.get("status", "ok"),
+                    "status": qa_result["status"],
                 }
             },
             citations=qa_result["citations"],
+            sources=qa_result["sources"],
             grounded=qa_result["grounded"],
             abstained=qa_result["abstained"],
-            status=qa_result.get("status", "abstained" if qa_result["abstained"] else "ok"),
+            status=qa_result["status"],
+            grounding_note=qa_result["grounding_note"],
         )
 
     session = None

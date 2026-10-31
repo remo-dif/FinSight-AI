@@ -66,10 +66,24 @@ export type ChatResponse = {
     score?: number | null;
     reference: string;
   }>;
+  sources?: Array<{
+    id: string;
+    document_id: string;
+    document_name: string;
+    chunk_id: string;
+    chunk_index?: number | null;
+    page?: number | null;
+    excerpt: string;
+    score?: number | null;
+    reference: string;
+  }>;
   grounded?: boolean;
   abstained?: boolean;
   status?: "ok" | "abstained" | "provider_error" | "insufficient_evidence" | "extractive_preview";
+  grounding_note?: string | null;
 };
+
+export type DocumentCitation = NonNullable<ChatResponse["citations"]>[number];
 
 export type DocumentQuestionRequest = {
   question?: string;
@@ -81,22 +95,23 @@ export type DocumentQuestionRequest = {
 
 export type DocumentQuestionResponse = {
   answer: string;
-  citations: Array<{
-    id: string;
-    document_id: string;
-    document_name: string;
-    chunk_id: string;
-    chunk_index?: number | null;
-    page?: number | null;
-    excerpt: string;
-    score?: number | null;
-    reference: string;
-  }>;
+  citations: DocumentCitation[];
+  sources: DocumentCitation[];
   grounded: boolean;
   abstained: boolean;
   document_ids: string[];
   status: "ok" | "abstained" | "provider_error" | "insufficient_evidence" | "extractive_preview";
+  grounding_note: string;
 };
+
+export type UploadedDocument = {
+  id: string;
+  filename: string;
+  status: string;
+  created_at: string;
+};
+
+export const uploadedDocumentsQueryKey = ["uploaded-documents"] as const;
 
 export type TokenResponse = {
   access_token: string;
@@ -265,17 +280,31 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
 export type ChatRequest = {
   message: string;
   sessionId?: string | null;
+  mode?: "finance" | "document_qa";
+  documentIds?: string[];
 };
 
-export function sendChatMessage({ message, sessionId }: ChatRequest): Promise<ChatResponse> {
+export function sendChatMessage({
+  message,
+  sessionId,
+  mode = "finance",
+  documentIds
+}: ChatRequest): Promise<ChatResponse> {
   return apiFetch<ChatResponse>("/api/chat", {
     method: "POST",
     body: JSON.stringify({
       message,
-      session_id: sessionId ?? null
+      session_id: sessionId ?? null,
+      mode,
+      ...(mode === "document_qa" ? { document_ids: documentIds ?? null } : {})
     }),
     requireAuth: true
   });
+}
+
+export function fetchUploadedDocuments(offset = 0, limit = 100): Promise<UploadedDocument[]> {
+  const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  return apiFetch<UploadedDocument[]>(`/api/uploads?${query}`, { requireAuth: true });
 }
 
 export function askDocumentQuestion(

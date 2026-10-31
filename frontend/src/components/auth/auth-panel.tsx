@@ -6,7 +6,7 @@ import { LogIn, LogOut, UserPlus } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
-import { login, logout, register } from "@/lib/api";
+import { login, logout, register, uploadedDocumentsQueryKey } from "@/lib/api";
 import { useSessionStore } from "@/store/session";
 
 export function AuthPanel() {
@@ -25,6 +25,7 @@ export function AuthPanel() {
     onSuccess: (data) => {
       queryClient.removeQueries({ queryKey: ["cases"] });
       queryClient.removeQueries({ queryKey: ["case"] });
+      queryClient.removeQueries({ queryKey: uploadedDocumentsQueryKey });
       setAccessToken(data.access_token);
       setMessage("Signed in. Live finance tools are enabled.");
     },
@@ -45,6 +46,7 @@ export function AuthPanel() {
     onSettled: () => {
       queryClient.removeQueries({ queryKey: ["cases"] });
       queryClient.removeQueries({ queryKey: ["case"] });
+      queryClient.removeQueries({ queryKey: uploadedDocumentsQueryKey });
       clearSession();
       setMessage("Signed out. Demo alerts are visible.");
     }

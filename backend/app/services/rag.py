@@ -2,6 +2,7 @@ import hashlib
 import logging
 import math
 import re
+from bisect import insort
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -10,7 +11,8 @@ from typing import Any
 from uuid import UUID
 
 from openai import OpenAIError
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
 from sqlalchemy.orm import Session
 
 from app.core.ai_observability import ai_operation, capture_usage
@@ -43,6 +45,14 @@ class RagChunkResult:
     text: str
     metadata: dict[str, Any]
     score: float | None = None
+    source_type: str | None = None
+    source_id: UUID | None = None
+    chunk_index: int | None = None
+    embedding_id: UUID | None = None
+
+
+class RetrievalProviderError(RuntimeError):
+    """Raised when an embedding provider cannot produce a query vector."""
 
 
 class RagService:
@@ -105,9 +115,11 @@ class RagService:
 
     @staticmethod
     def score_is_relevant(score: float | None, min_score: float | None) -> bool:
+        if min_score is None:
+            return True
         threshold = RagService.normalize_min_score(min_score)
         if score is None:
-            return True
+            return False
         return float(score) >= threshold
 
     def retrieve_chunks(
@@ -117,6 +129,7 @@ class RagService:
         limit: int = 5,
         document_ids: list[UUID] | None = None,
         min_score: float | None = None,
+        raise_provider_errors: bool = False,
     ) -> list[RagChunkResult]:
         with ai_operation("rag.retrieve") as fields:
             rows = self._retrieve_chunks(
@@ -125,6 +138,7 @@ class RagService:
                 limit,
                 document_ids=document_ids,
                 min_score=min_score,
+                raise_provider_errors=raise_provider_errors,
             )
             fields["retrieved_count"] = len(rows)
             return rows
@@ -136,18 +150,27 @@ class RagService:
         limit: int,
         document_ids: list[UUID] | None = None,
         min_score: float | None = None,
+        raise_provider_errors: bool = False,
     ) -> list[RagChunkResult]:
         if limit <= 0 or not query.strip():
             return []
 
-        threshold = self.normalize_min_score(min_score)
+        threshold = self.normalize_min_score(min_score) if min_score is not None else None
+        if document_ids is not None:
+            document_ids = list(
+                dict.fromkeys(doc_id for doc_id in document_ids if doc_id is not None)
+            )
+            if not document_ids:
+                return []
         try:
             query_embedding = self.embed_text(query)
-        except (OpenAIError, CircuitOpenError):
+        except (OpenAIError, CircuitOpenError) as exc:
             logger.warning(
                 "RAG retrieval skipped because the embedding provider is unavailable",
                 extra={"event": "rag.embedding_provider_unavailable"},
             )
+            if raise_provider_errors:
+                raise RetrievalProviderError("Embedding provider unavailable") from exc
             return []
         bind = self.db.get_bind()
         base_query = self.db.query(Embedding).filter(
@@ -156,58 +179,91 @@ class RagService:
             Embedding.embedding_dimensions == EMBEDDING_DIMENSIONS,
         )
         if document_ids is not None:
-            document_ids = [doc_id for doc_id in document_ids if doc_id is not None]
-            if not document_ids:
-                return []
             base_query = base_query.filter(
                 Embedding.source_type == "upload",
                 Embedding.source_id.in_(document_ids),
             )
-        if bind.dialect.name == "postgresql" and document_ids is None:
-            rows = self.db.execute(
-                text(
-                    """
-                    SELECT chunk_text, metadata_json, 1 - (embedding <=> CAST(:embedding AS vector)) AS score
-                    FROM embeddings
-                    WHERE user_id = :user_id
-                      AND embedding_model = :model AND embedding_dimensions = :dimensions
-                    ORDER BY embedding <=> CAST(:embedding AS vector)
-                    LIMIT :limit
-                    """
-                ),
-                {
-                    "user_id": str(user_id),
-                    "embedding": self._format_pgvector(query_embedding),
-                    "limit": limit,
-                    "model": self.embedding_model,
-                    "dimensions": EMBEDDING_DIMENSIONS,
-                },
-            ).mappings()
-            results = [
+        if bind.dialect.name == "postgresql":
+            scope_clause = ""
+            params: dict[str, Any] = {
+                "user_id": str(user_id),
+                "embedding": self._format_pgvector(query_embedding),
+                "limit": limit,
+                "model": self.embedding_model,
+                "dimensions": EMBEDDING_DIMENSIONS,
+            }
+            threshold_clause = ""
+            if threshold is not None:
+                threshold_clause = (
+                    "AND 1 - (embedding <=> CAST(:embedding AS vector)) >= :min_score"
+                )
+                params["min_score"] = threshold
+            if document_ids is not None:
+                scope_clause = "AND source_type = 'upload' AND source_id IN :document_ids"
+            statement = text(
+                f"""
+                SELECT id, chunk_text, metadata_json, source_type, source_id, chunk_index,
+                       1 - (embedding <=> CAST(:embedding AS vector)) AS score
+                FROM embeddings
+                WHERE user_id = :user_id
+                  AND embedding_model = :model
+                  AND embedding_dimensions = :dimensions
+                  {threshold_clause}
+                  {scope_clause}
+                ORDER BY embedding <=> CAST(:embedding AS vector), source_id, chunk_index, id
+                LIMIT :limit
+                """
+            )
+            statement = statement.bindparams(
+                bindparam("user_id", type_=PostgreSQLUUID(as_uuid=True)),
+            )
+            if document_ids is not None:
+                statement = statement.bindparams(
+                    bindparam("document_ids", type_=PostgreSQLUUID(as_uuid=True), expanding=True),
+                )
+                params["document_ids"] = document_ids
+            params["user_id"] = user_id
+            rows = self.db.execute(statement, params).mappings()
+            return [
                 RagChunkResult(
                     text=str(row["chunk_text"]),
                     metadata=dict(row["metadata_json"] or {}),
                     score=float(row["score"]) if row["score"] is not None else None,
+                    source_type=str(row["source_type"]),
+                    source_id=UUID(str(row["source_id"])) if row["source_id"] is not None else None,
+                    chunk_index=int(row["chunk_index"]),
+                    embedding_id=UUID(str(row["id"])),
                 )
                 for row in rows
             ]
-            return [row for row in results if self.score_is_relevant(row.score, threshold)][:limit]
 
-        rows = base_query.all()
-        ranked = sorted(
-            (
-                RagChunkResult(
-                    text=row.chunk_text,
-                    metadata=row.metadata_json or {},
-                    score=self._cosine_similarity(query_embedding, row.embedding or []),
-                )
-                for row in rows
-            ),
-            key=lambda item: item.score if item.score is not None else -1.0,
-            reverse=True,
-        )
-        filtered = [row for row in ranked if self.score_is_relevant(row.score, threshold)]
-        return filtered[:limit]
+        rows = base_query.order_by(
+            Embedding.source_id, Embedding.chunk_index, Embedding.id
+        ).yield_per(256)
+        ranked: list[tuple[tuple[float, str, int, str], RagChunkResult]] = []
+        for row in rows:
+            score = self._cosine_similarity(query_embedding, row.embedding or [])
+            if not self.score_is_relevant(score, threshold):
+                continue
+            result = RagChunkResult(
+                text=row.chunk_text,
+                metadata=row.metadata_json or {},
+                score=score,
+                source_type=row.source_type,
+                source_id=row.source_id,
+                chunk_index=row.chunk_index,
+                embedding_id=row.id,
+            )
+            order = (
+                -score,
+                str(row.source_id or ""),
+                row.chunk_index if row.chunk_index is not None else -1,
+                str(row.id or ""),
+            )
+            insort(ranked, (order, result))
+            if len(ranked) > limit:
+                ranked.pop()
+        return [result for _, result in ranked]
 
     @property
     def embedding_model(self) -> str:

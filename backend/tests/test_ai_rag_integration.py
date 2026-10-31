@@ -22,7 +22,7 @@ from app.core.security import TokenType, create_token
 from app.main import create_app
 from app.models.audit import AuditLog
 from app.models.chat import ChatMessage
-from app.models.embedding import Embedding
+from app.models.embedding import EMBEDDING_DIMENSIONS, Embedding
 from app.models.finance import Transaction, UploadedFile
 from app.models.user import User
 from app.services.rag import RagService
@@ -82,6 +82,98 @@ def test_upload_index_retrieve_chat_ownership_citations_and_telemetry(
     # this integration, without changing the application's/global loop policy.
     with asyncio.Runner(loop_factory=asyncio.SelectorEventLoop) as runner:
         runner.run(_exercise_http(isolated_pg, monkeypatch, tmp_path, caplog))
+
+
+def test_pgvector_document_qa_score_order_and_owner_isolation(isolated_pg, monkeypatch):
+    _, _, engine = isolated_pg
+    monkeypatch.setattr(settings, "embedding_backend", "local")
+    owner_a = User(
+        id=uuid4(),
+        email="pg-docqa-a@example.invalid",
+        full_name="Synthetic A",
+        password_hash="unused",
+    )
+    owner_b = User(
+        id=uuid4(),
+        email="pg-docqa-b@example.invalid",
+        full_name="Synthetic B",
+        password_hash="unused",
+    )
+    doc_a = UploadedFile(
+        id=uuid4(),
+        user_id=owner_a.id,
+        filename="owner-a.pdf",
+        content_type="application/pdf",
+        storage_path="/private/a",
+        status="indexed",
+    )
+    doc_b = UploadedFile(
+        id=uuid4(),
+        user_id=owner_b.id,
+        filename="owner-b.pdf",
+        content_type="application/pdf",
+        storage_path="/private/b",
+        status="indexed",
+    )
+    query_vector = [1.0] + [0.0] * (EMBEDDING_DIMENSIONS - 1)
+
+    def vector_at_score(score):
+        return [score, (1.0 - score * score) ** 0.5] + [0.0] * (EMBEDDING_DIMENSIONS - 2)
+
+    with Session(engine) as db:
+        db.add_all([owner_a, owner_b])
+        db.flush()
+        db.add_all([doc_a, doc_b])
+        db.flush()
+        rag = RagService(db)
+        representative_text = "Representative indexed owner A document evidence."
+        assert rag.index_text(owner_a.id, "upload", doc_a.id, representative_text) == 1
+        assert (
+            rag.index_text(owner_b.id, "upload", doc_b.id, "Private owner B document evidence.")
+            == 1
+        )
+        for index, score in enumerate((0.049, 0.05, 0.8)):
+            db.add(
+                Embedding(
+                    user_id=owner_a.id,
+                    source_type="upload",
+                    source_id=doc_a.id,
+                    chunk_index=index + 1,
+                    chunk_text=f"score {score}",
+                    chunk_hash=f"pg-score-{index}",
+                    embedding=vector_at_score(score),
+                    embedding_model=rag.embedding_model,
+                    embedding_dimensions=EMBEDDING_DIMENSIONS,
+                    metadata_json={"source": {"id": "untrusted-metadata"}},
+                )
+            )
+        db.commit()
+        monkeypatch.setattr(rag, "embed_text", lambda _: query_vector)
+
+        selected = rag.retrieve_chunks(
+            owner_a.id,
+            "synthetic query",
+            limit=1,
+            document_ids=[doc_a.id],
+            min_score=0.05,
+        )
+        assert len(selected) == 1
+        assert selected[0].text == "score 0.8"
+        assert selected[0].score == pytest.approx(0.8, abs=1e-6)
+        assert selected[0].source_id == doc_a.id
+        assert selected[0].chunk_index == 3
+
+        mixed = rag.retrieve_chunks(
+            owner_a.id,
+            "synthetic query",
+            limit=20,
+            document_ids=[doc_a.id, doc_b.id],
+        )
+        assert mixed
+        assert all(row.source_id == doc_a.id for row in mixed)
+        unscoped = rag.retrieve_chunks(owner_a.id, "synthetic query", limit=20)
+        assert unscoped
+        assert all(row.source_id != doc_b.id for row in unscoped)
 
 
 async def _exercise_http(isolated_pg, monkeypatch, tmp_path, caplog):
