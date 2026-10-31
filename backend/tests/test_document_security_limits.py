@@ -43,7 +43,10 @@ def test_pdf_extraction_stops_before_reading_later_pages(monkeypatch):
 
     class Pdf:
         def __init__(self):
-            self.pages = [SimpleNamespace(extract_text=extract), SimpleNamespace(extract_text=extract)]
+            self.pages = [
+                SimpleNamespace(extract_text=extract),
+                SimpleNamespace(extract_text=extract),
+            ]
 
         def __enter__(self):
             return self

@@ -78,10 +78,14 @@ def test_upload_metadata_rejects_extension_and_content_type_mismatches():
     uploader = SecureUploadService()
 
     with pytest.raises(HTTPException, match="Unsupported file extension"):
-        uploader.validate_metadata(SimpleNamespace(filename="statement.exe", content_type="text/csv"))
+        uploader.validate_metadata(
+            SimpleNamespace(filename="statement.exe", content_type="text/csv")
+        )
 
     with pytest.raises(HTTPException, match="Unsupported content type"):
-        uploader.validate_metadata(SimpleNamespace(filename="statement.csv", content_type="text/plain"))
+        uploader.validate_metadata(
+            SimpleNamespace(filename="statement.csv", content_type="text/plain")
+        )
 
 
 def test_upload_payload_rejects_spoofed_binary_signatures():

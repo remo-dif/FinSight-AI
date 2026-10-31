@@ -68,7 +68,9 @@ def upgrade() -> None:
     )
     op.execute(f"ALTER TABLE embeddings ADD COLUMN embedding vector({EMBEDDING_DIMENSIONS})")
     zero_vector = "[" + ",".join("0" for _ in range(EMBEDDING_DIMENSIONS)) + "]"
-    op.get_bind().execute(sa.text("UPDATE embeddings SET embedding = :embedding"), {"embedding": zero_vector})
+    op.get_bind().execute(
+        sa.text("UPDATE embeddings SET embedding = :embedding"), {"embedding": zero_vector}
+    )
     op.execute("ALTER TABLE embeddings ALTER COLUMN embedding SET NOT NULL")
 
     op.create_index(

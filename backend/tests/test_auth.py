@@ -81,7 +81,8 @@ def test_login_persists_hashed_refresh_token(db: Session):
     assert len(stored.token_hash) == 64
     assert stored.revoked_at is None
     access_cookie = next(
-        cookie for cookie in http_response.headers.getlist("set-cookie")
+        cookie
+        for cookie in http_response.headers.getlist("set-cookie")
         if cookie.startswith("finsight_access_token=")
     )
     assert "HttpOnly" in access_cookie

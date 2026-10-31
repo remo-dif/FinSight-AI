@@ -46,7 +46,9 @@ def upgrade() -> None:
             name="ck_investigation_cases_decision_known",
         ),
     )
-    op.create_index("ix_investigation_cases_assignee_user_id", "investigation_cases", ["assignee_user_id"])
+    op.create_index(
+        "ix_investigation_cases_assignee_user_id", "investigation_cases", ["assignee_user_id"]
+    )
     op.execute(
         "INSERT INTO investigation_cases (transaction_id, status) "
         "SELECT id, 'new' FROM transactions"

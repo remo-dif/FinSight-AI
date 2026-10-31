@@ -139,7 +139,9 @@ def test_notes_are_append_only_and_included_in_case_detail(db: Session):
     user = create_user(db)
     _, case = create_case(db, user)
 
-    note = add_case_note(case.transaction_id, CaseNoteCreate(content="  Reviewed source statement.  "), user, db)
+    note = add_case_note(
+        case.transaction_id, CaseNoteCreate(content="  Reviewed source statement.  "), user, db
+    )
     detail = get_case(case.transaction_id, user, db)
 
     assert note.content == "Reviewed source statement."
