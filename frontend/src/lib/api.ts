@@ -102,7 +102,16 @@ function extractErrorMessage(body: unknown, fallback: string) {
   if (body && typeof body === "object" && "detail" in body) {
     const detail = (body as { detail: unknown }).detail;
     if (typeof detail === "string") return detail;
-    if (Array.isArray(detail)) return detail.map(String).join(", ");
+    if (Array.isArray(detail)) {
+      const messages = detail.map((item: unknown) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object" && "msg" in item && typeof item.msg === "string") {
+          return item.msg;
+        }
+        return "";
+      }).filter((message) => message.trim().length > 0);
+      return messages.length ? messages.join(", ") : fallback;
+    }
   }
   return fallback;
 }

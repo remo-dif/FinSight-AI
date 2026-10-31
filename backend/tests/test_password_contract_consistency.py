@@ -67,6 +67,15 @@ def test_registration_minimum_is_characters_while_login_keeps_legacy_short_passw
     assert LoginRequest(email="synthetic@example.com", password="legacy").password == "legacy"
 
 
+@pytest.mark.parametrize("request_type", [RegisterRequest, LoginRequest])
+@pytest.mark.parametrize("container", [bytes, bytearray])
+def test_programmatic_utf8_input_coercion_cannot_bypass_the_byte_limit(request_type, container):
+    data = {"email": "synthetic@example.com", "full_name": "Synthetic"}
+    assert request_type(**data, password=container(("è" * 36).encode("utf-8"))).password == "è" * 36
+    with pytest.raises(ValidationError):
+        request_type(**data, password=container(("è" * 37).encode("utf-8")))
+
+
 @pytest.mark.parametrize("password", ["A" * 72, "è" * 36, "😀" * 18, "e\u0301" * 24])
 def test_hashing_preserves_exact_password_without_unicode_or_whitespace_normalization(password):
     hashed = hash_password(password)
