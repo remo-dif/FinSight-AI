@@ -254,3 +254,31 @@ def test_audit_failure_rolls_back_status_and_assignment(db, monkeypatch):
     assert persisted.status == "new"
     assert persisted.assignee_user_id is None
     assert audit_count(db) == 0
+
+
+@pytest.mark.parametrize(
+    ("stored_decision", "stored_reason"),
+    [("false_positive", "Legacy inconsistent status."), ("escalate", "   ")],
+)
+def test_inconsistent_legacy_decision_requires_review_without_automatic_repair(
+    db, stored_decision, stored_reason
+):
+    user = create_user(db)
+    _, case = create_case(db, user)
+    case.status = "escalated"
+    case.decision = stored_decision
+    case.decision_reason = stored_reason
+    db.commit()
+    case_id = case.transaction_id
+    with pytest.raises(HTTPException) as exc:
+        update_case(case_id, CaseUpdate(assignee="me"), user, db)
+    assert exc.value.status_code == 409
+    assert not db.new and not db.dirty
+    db.commit()
+    db.expire_all()
+    persisted = db.get(InvestigationCase, case_id)
+    assert persisted.status == "escalated"
+    assert persisted.decision == stored_decision
+    assert persisted.decision_reason == stored_reason
+    assert persisted.assignee_user_id is None
+    assert audit_count(db) == 0

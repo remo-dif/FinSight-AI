@@ -5,13 +5,16 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, local
 from uuid import uuid4
 
+import httpx
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session
 
 from app.api.routes import cases
-from app.core.database import Base
+from app.core.database import Base, get_db
+from app.core.security import TokenType, create_token
+from app.main import create_app
 from app.models.audit import AuditLog
 from app.models.case import InvestigationCase
 from app.models.user import User
@@ -137,3 +140,64 @@ def test_long_lived_identity_map_does_not_hide_a_committed_decision(case_pg):
         assert record.decision == "false_positive"
         assert record.assignee_user_id is None
         assert len(list(db.scalars(select(AuditLog)))) == 1
+
+
+@pytest.mark.asyncio
+async def test_postgres_http_workflow_keeps_rejected_changes_and_foreign_users_out(case_pg):
+    engine, (user_id, case_id) = case_pg
+    with Session(engine) as db:
+        stranger_id = create_user(db, "stranger@example.com").id
+    app = create_app()
+
+    def request_db():
+        with Session(engine, autoflush=False) as db:
+            try:
+                yield db
+            except Exception:
+                db.rollback()
+                raise
+
+    app.dependency_overrides[get_db] = request_db
+    owner_headers = {"Authorization": f"Bearer {create_token(user_id, TokenType.ACCESS)}"}
+    stranger_headers = {"Authorization": f"Bearer {create_token(stranger_id, TokenType.ACCESS)}"}
+    path = f"/api/cases/{case_id}"
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            assert (await client.get(path)).status_code == 401
+            assigned = await client.patch(
+                path, headers=owner_headers, json={"status": "escalated", "assignee": "me"}
+            )
+            assert assigned.status_code == 200
+            decided = await client.patch(
+                path,
+                headers=owner_headers,
+                json={"decision": "false_positive", "reason": "Verified through owner evidence."},
+            )
+            assert decided.status_code == 200
+            assert decided.json()["status"] == "resolved"
+            rejected = await client.patch(
+                path, headers=owner_headers, json={"status": "new", "assignee": "unassigned"}
+            )
+            assert rejected.status_code == 409
+            assert (
+                await client.patch(path, headers=owner_headers, json={"status": "invalid"})
+            ).status_code == 422
+            for method, url, payload in [
+                ("GET", path, None),
+                ("PATCH", path, {"status": "new"}),
+                ("POST", f"{path}/notes", {"content": "Forbidden evidence"}),
+            ]:
+                response = await client.request(method, url, headers=stranger_headers, json=payload)
+                assert response.status_code == 404
+                assert response.json() == {"detail": "Case not found"}
+            persisted = await client.get(path, headers=owner_headers)
+            assert persisted.status_code == 200
+            assert persisted.json()["assigned_to_me"] is True
+            assert persisted.json()["decision"] == "false_positive"
+            assert persisted.json()["notes"] == []
+        with Session(engine) as db:
+            assert len(list(db.scalars(select(AuditLog)))) == 3
+    finally:
+        app.dependency_overrides.clear()
