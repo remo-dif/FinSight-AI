@@ -5,11 +5,11 @@ Status: automated checks completed; manual screen-reader and native 200% zoom ve
 ## Baseline and tested source
 
 - Merged UX/WCAG Batch 1: PR #13, commit `3bf27dc7c098b3bda41315d529a0b3ba54c1b39a`.
-- Branch base: latest `origin/master` fetched for this work, `57defd4401ba7ace882e0da9bf5ff54e9ba54cf0`.
+- Prior branch base: `57defd4401ba7ace882e0da9bf5ff54e9ba54cf0`.
 - Branch: `fix/issue-14-accessibility-verification`.
-- Tested implementation commit: `cca64027290b4e1d64e84a6169ac899d749b1e9c`. The full matrix ran on the exact source tree recorded by this commit; no code changes followed the run.
+- Follow-up started from reported HEAD `d05acb2ea2a957620fa52175edd81cdf9576480b`. The verification below covers the follow-up test changes in this report; no production UI code changed.
 - The test data and authentication responses described below are deterministic Playwright mocks; no backend, production service, or AWS resource was accessed or changed.
-- The requested ECC-specific accessibility, frontend-a11y, browser-qa, security-review, and testing skill labels were not available in the active skill catalog for this session. No ECC installation or configuration was changed; verification used the existing Batch 1 report, repository tests, and axe-core.
+- Applied the local `browser-qa`, `security-review`, `frontend-a11y`, and `accessibility` skill instructions. Browser QA guidance was applied to the mocked local browser runs; security guidance to keep UI tests mocked and not overstate backend coverage; frontend accessibility guidance to preserve semantic labels and assert the user-visible registration state. No accessible interaction behavior changed. No ECC installation or configuration was changed.
 
 ## Findings and changes
 
@@ -30,7 +30,7 @@ axe's reported `contrastRatio: 0` is a sentinel for an unresolved sample, not a 
 
 **Conclusion:** this is a valid automated result that axe cannot conclusively classify, not a confirmed contrast violation and not a PASS. The computed style compositing is encouraging but does not replace visual inspection/pixel evidence of the rendered cells and selected-row state. Manual inspection remains required. In the final Chromium scan, the settled live-case state had 4 incomplete contrast nodes; after scrolling to the end, 10 different nodes were incomplete and the original four were no longer reported. Browser: Playwright Chromium 148.0.7778.96; Playwright 1.60.0; axe-core pinned to 4.14.0.
 
-The rerun through the repository's existing Next `next start` test-server path produced zero axe violations across the scanned workspace states. Next prints a warning because the app uses standalone output, but the server serves the built page/styles and the configured tests complete. Incomplete findings are retained and reported rather than converted to PASS. An earlier direct standalone-server attempt produced layout-dependent target-size findings and suite timeouts; it is not treated as product evidence.
+The follow-up two-worker matrix used the production standalone output from `npm run build`, with `.next\static` and `public` copied into `.next\standalone` and `node .next/standalone/server.js` serving the tests. The axe checks completed in that matrix; incomplete contrast findings remain classified as incomplete, not violations or PASS. Runs through `next start` are not used as the current production-server evidence because Next warns that this command is unsupported with standalone output.
 
 ### Manual contrast inspection — NOT VERIFIED
 
@@ -44,6 +44,14 @@ The rerun through the repository's existing Next `next start` test-server path p
 ### Confirmed defect and regression fix
 
 The drawer focus-restoration regression exposed by WebKit was fixed. The workspace now retains the actual activating element from the trigger event and restores focus to that trigger after close, rather than relying on `document.activeElement` after the drawer mounts. Automated tests cover the drawer name, focus containment, focus restoration, and visible keyboard focus.
+
+### Issue #14 follow-up — draft isolation and registration privacy
+
+The original draft-isolation setup mocked login but left `SessionBootstrap`'s initial `/api/auth/refresh` request uncontrolled. `restoreSession()` can clear the session when that refresh fails, so a late refresh could race a mocked login. The fixture now registers a 401 refresh response before navigation and waits for it to complete before logging in.
+
+That change alone was insufficient: the focused iPhone scenario still failed 2/10 runs at the controlled note-value assertion. Source inspection identified a second fixture readiness gap: the helper waited for the auth panel to report a token, not for the case-list query to finish. `DashboardWorkspace` transitions from demo cases to live cases when that query resolves, and `AlertDetailPanel` keys `CaseWorkflow` by case ID and mutation state; a transition can remount the workflow and reset its note draft. The fixture now waits for the live-queue status and the expected `CASE-9001` selection before interacting. The same iPhone scenario then passed 10/10 runs. No product input-handling defect was reproduced, and no assertion was weakened; the note value, enabled submit button, A/B case identities, and draft ownership remain asserted.
+
+The registration UI tests now use distinct valid addresses (`new.account@example.test` and `existing.account@example.test`) and assert the complete registration request body. They keep `/api/auth/register` mocked with the same HTTP 202 response, assert the generic next step, and assert that registration neither sends a login request nor enables the live session UI. These UI tests do **not** establish whether an account exists in the backend. Existing backend coverage is present in `backend/tests/test_auth_security_v2.py::test_registration_has_same_public_contract_for_existing_and_new_accounts`, which exercises the FastAPI registration endpoint with a database fixture and verifies identical public responses. No additional backend test was needed for this narrow correction.
 
 ### Mobile authentication coverage
 
@@ -82,25 +90,30 @@ All commands ran from `frontend/` on Windows 11 Pro (build 26300). The Playwrigh
 | `npm run build` | PASS |
 | `npm run test:e2e -- tests/e2e/auth --project=chromium --project=firefox --project=webkit --project=mobile --project=iphone --project=tablet --workers=2 --reporter=list` | 78 PASS, 30 SKIP, 0 FAIL (108 total) |
 | `npm run test:e2e -- tests/e2e/accessibility/axe.spec.ts --project=chromium --reporter=list --global-timeout=240000` | 1 PASS; zero axe violations; live-case contrast remains incomplete as described above |
-| `npm run test:e2e -- tests/e2e/investigations/draft-isolation.spec.ts --project=webkit --grep 'a delayed successful note stays on A' --repeat-each=3 --workers=1 --reporter=list` | 3 PASS |
+| `npm run test:e2e -- tests/e2e/investigations/draft-isolation.spec.ts --project=iphone --grep 'a delayed successful note stays on A' --repeat-each=10 --workers=1 --reporter=list` | 10 PASS after the fixture readiness correction |
 | `npm run test:e2e -- tests/e2e/auth/session.spec.ts --project=firefox --project=webkit --grep 'logout timeout is reported as an unknown server outcome' --repeat-each=3 --workers=2 --reporter=list` | 6 PASS (three each on Firefox and WebKit) |
-| Focused cross-browser matrix (Batch 1, axe, financial display/spacing, workspace, draft isolation, and auth; Chromium/Firefox/WebKit/Pixel/iPhone/iPad) | 213 PASS, 33 SKIP, 0 FAIL (246 total; 5.6 minutes) |
+| Focused cross-browser matrix (Batch 1, axe, financial display/spacing, workspace, draft isolation, and auth; Chromium/Firefox/WebKit/Pixel/iPhone/iPad; `--workers=2`) | 213 PASS, 33 SKIP, 0 FAIL (246 total; 2.9 minutes) |
 | `git diff --check` | PASS |
 
 The focused matrix covers case A/B draft isolation, accessible authentication validation, autocomplete, placeholder and essential-input contrast, WCAG text-spacing overrides, exact financial amounts/identifiers, drawer behavior, keyboard focus, responsive layouts, and axe scans. It runs Chromium, Firefox, WebKit, and the supported emulated mobile profiles.
 
-Two earlier two-worker matrix attempts each reported 212 PASS, 1 FAIL, and 33 SKIP; the sole failure was the same WebKit note-submit case where the “Add note” button remained disabled after filling. The test now explicitly waits for the controlled field value and enabled state; the isolated WebKit scenario passed three repetitions. The final serial full matrix passed all 213 runnable tests. A separate pre-fix serial run with `--global-timeout=600000` reported 213 PASS and 33 SKIP but also emitted suite/teardown timeout errors at the 600-second cap, so it is not counted as a clean run.
+Earlier two-worker matrix attempts reported 212 PASS, 1 FAIL, and 33 SKIP; the failure was the delayed note scenario observing an empty textarea after filling. In the follow-up, controlling the bootstrap refresh alone still produced two failures in ten iPhone repetitions. Waiting for the live case queue and exact initial case removed the fixture race: the isolated scenario passed 10/10, and the complete two-worker matrix passed 213 tests with 33 intentional skips and no failures. An earlier serial run that emitted suite/teardown timeout errors remains excluded from the current result.
 
-The test server command used for the final matrix was set in PowerShell as:
+The production build uses `output: "standalone"`. For the matrix, the standalone server was started rather than using `next start`; the generated static and public assets were copied into the standalone output before the server started. This avoids Next's warning that `next start` is unsupported for standalone output. The PowerShell setup was:
 
 ```powershell
-$env:PLAYWRIGHT_WEB_SERVER_COMMAND = 'node node_modules/next/dist/bin/next start -p 3101'
+New-Item -ItemType Directory -Path '.next\standalone\.next\static' -Force | Out-Null
+Copy-Item '.next\static\*' '.next\standalone\.next\static' -Recurse -Force
+Copy-Item 'public' '.next\standalone\public' -Recurse -Force
+$env:PLAYWRIGHT_WEB_SERVER_COMMAND = 'node .next/standalone/server.js'
+$env:PORT = '3101'
+$env:HOSTNAME = '127.0.0.1'
 ```
 
-The full matrix command was:
+After `npm run build`, copy `.next\static` to `.next\standalone\.next\static` and `public` to `.next\standalone\public`. The two-worker full matrix command was:
 
 ```powershell
-npm run test:e2e -- tests/e2e/accessibility/batch1.spec.ts tests/e2e/accessibility/axe.spec.ts tests/e2e/accessibility/financial-display.spec.ts tests/e2e/accessibility/financial-spacing.spec.ts tests/e2e/accessibility/workspace.spec.ts tests/e2e/investigations/draft-isolation.spec.ts tests/e2e/auth --project=chromium --project=firefox --project=webkit --project=mobile --project=iphone --project=tablet --workers=1 --reporter=list
+npm run test:e2e -- tests/e2e/accessibility/batch1.spec.ts tests/e2e/accessibility/axe.spec.ts tests/e2e/accessibility/financial-display.spec.ts tests/e2e/accessibility/financial-spacing.spec.ts tests/e2e/accessibility/workspace.spec.ts tests/e2e/investigations/draft-isolation.spec.ts tests/e2e/auth --project=chromium --project=firefox --project=webkit --project=mobile --project=iphone --project=tablet --workers=2 --reporter=list
 ```
 
 ## Manual screen-reader verification — NOT VERIFIED
