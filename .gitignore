@@ -57,3 +57,6 @@ pnpm-debug.log*
 Thumbs.db
 .idea/
 .vscode/
+
+# Local GitHub Copilot / ECC Agent Skills
+.github/skills/
