@@ -144,5 +144,5 @@ Required evidence is currently outstanding: actual browser zoom at 200%, screens
 - Complete actual native 200% zoom checks with browser/OS/window metadata and screenshots.
 - Manually inspect the incomplete live-case contrast nodes while each target is visible; retain visual/pixel evidence and a final reviewer conclusion. Do not reclassify axe's incomplete result as PASS.
 - Review the remaining mobile skip boundary during independent review. There are currently no non-Chromium desktop timeout exclusions.
-- A dependency install reported 13 moderate audit findings; they were not analyzed or remediated as part of this focused accessibility task.
+- An earlier dependency-install audit summary reported 13 moderate findings, and GitHub reported one moderate Dependabot vulnerability on the default branch during push. Neither was analyzed or remediated as part of this focused accessibility task.
 - Keep Issue #14 open until required manual evidence and coverage decisions are recorded. No full WCAG conformance or production-readiness claim is made.
