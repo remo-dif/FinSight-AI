@@ -262,7 +262,7 @@ export function ChatPanel() {
         <input
           aria-label={mode === "document_qa" ? "Ask about selected documents" : "Ask the finance assistant"}
           aria-describedby={statusId}
-          className="min-w-0 flex-1 rounded-md border border-border bg-white px-3 text-sm outline-none transition placeholder:text-muted/70 hover:border-accent/70 focus:border-accent focus:ring-2 focus:ring-accent/30"
+          className="min-w-0 flex-1 rounded-md border border-border bg-white px-3 text-sm outline-none transition placeholder:text-muted hover:border-accent/70 focus:border-accent focus:ring-2 focus:ring-accent/30"
           placeholder={mode === "document_qa" ? "Ask about the selected documents" : "Ask about cash flow, merchants, or spending"}
           value={input}
           onChange={(event) => setInput(event.target.value)}

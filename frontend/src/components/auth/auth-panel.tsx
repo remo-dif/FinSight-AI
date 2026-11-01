@@ -37,6 +37,32 @@ export function AuthPanel() {
   const [message, setMessage] = useState<string | null>(null);
   const [messageRole, setMessageRole] = useState<"status" | "alert">("status");
   const [logoutFailed, setLogoutFailed] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  function authenticationFailure(error: unknown, fallback: string, submittedPassword: string) {
+    const redact = (text: string) => submittedPassword ? text.split(submittedPassword).join("[redacted]") : text;
+    const errors: Record<string, string> = {};
+    if (error instanceof ApiError) {
+      for (const issue of error.validationIssues) {
+        const [scope, field] = issue.location;
+        if (scope === "body" && issue.location.length === 2 && typeof field === "string" &&
+            ["email", "password", ...(mode === "register" ? ["full_name"] : [])].includes(field)) {
+          errors[field] = [errors[field], redact(issue.message)].filter(Boolean).join(". ");
+        }
+      }
+    }
+    setFieldErrors(errors);
+    announce(redact(error instanceof Error ? error.message : fallback), "alert");
+    const first = ["full_name", "email", "password"].find(field => errors[field]);
+    if (first) document.getElementById(`auth-${first}`)?.focus();
+    setPassword("");
+  }
+
+  function switchMode(next: "login" | "register") {
+    setMode(next);
+    setFieldErrors({});
+    announce(null);
+  }
 
   function announce(nextMessage: string | null, role: "status" | "alert" = "status") {
     setMessage(nextMessage);
@@ -51,7 +77,7 @@ export function AuthPanel() {
   }
 
   const loginMutation = useMutation({
-    mutationFn: () => login(email, password),
+    mutationFn: (credentials: { email: string; password: string }) => login(credentials.email, credentials.password),
     onSuccess: (data) => {
       queryClient.removeQueries({ queryKey: ["cases"] });
       queryClient.removeQueries({ queryKey: ["case"] });
@@ -59,16 +85,18 @@ export function AuthPanel() {
       setAccessToken(data.access_token);
       announce("Signed in. Live finance tools are enabled.");
     },
-    onError: (error) => announce(error instanceof Error ? error.message : "Sign in failed.", "alert")
+    onError: (error, credentials) => authenticationFailure(error, "Sign in failed.", credentials.password)
   });
 
   const registerMutation = useMutation({
-    mutationFn: () => register(email, password, fullName),
+    mutationFn: (credentials: { email: string; password: string; fullName: string }) => register(credentials.email, credentials.password, credentials.fullName),
     onSuccess: (data) => {
       setMode("login");
+      setFieldErrors({});
+      setPassword("");
       announce(data.message);
     },
-    onError: (error) => announce(error instanceof Error ? error.message : "Registration failed.", "alert")
+    onError: (error, credentials) => authenticationFailure(error, "Registration failed.", credentials.password)
   });
 
   const logoutMutation = useMutation({
@@ -91,10 +119,11 @@ export function AuthPanel() {
   function submit(event: FormEvent) {
     event.preventDefault();
     announce(null);
+    setFieldErrors({});
     if (mode === "login") {
-      loginMutation.mutate();
+      loginMutation.mutate({ email, password });
     } else {
-      registerMutation.mutate();
+      registerMutation.mutate({ email, password, fullName });
     }
   }
 
@@ -144,7 +173,8 @@ export function AuthPanel() {
             <button
               type="button"
               className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${mode === "login" ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:text-foreground"}`}
-              onClick={() => setMode("login")}
+              disabled={loginMutation.isPending || registerMutation.isPending}
+              onClick={() => switchMode("login")}
               aria-pressed={mode === "login"}
             >
               Sign in
@@ -152,26 +182,30 @@ export function AuthPanel() {
             <button
               type="button"
               className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${mode === "register" ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:text-foreground"}`}
-              onClick={() => setMode("register")}
+              disabled={loginMutation.isPending || registerMutation.isPending}
+              onClick={() => switchMode("register")}
               aria-pressed={mode === "register"}
             >
               Register
             </button>
           </div>
-          {mode === "register" ? (
-            <label className="block text-sm font-medium">
-              Full name
-              <input className="mt-1 h-10 w-full rounded-md border border-border px-3 text-sm" value={fullName} onChange={(event) => setFullName(event.target.value)} />
-            </label>
-          ) : null}
-          <label className="block text-sm font-medium">
-            Email
-            <input className="mt-1 h-10 w-full rounded-md border border-border px-3 text-sm" type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
-          </label>
-          <label className="block text-sm font-medium">
-            Password
-            <input className="mt-1 h-10 w-full rounded-md border border-border px-3 text-sm" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
-          </label>
+          {[
+            ...(mode === "register" ? [{ field: "full_name", label: "Full name", type: "text", purpose: "name", value: fullName, change: setFullName }] : []),
+            { field: "email", label: "Email", type: "email", purpose: mode === "login" ? "username" : "email", value: email, change: setEmail },
+            { field: "password", label: "Password", type: "password", purpose: mode === "login" ? "current-password" : "new-password", value: password, change: setPassword }
+          ].map(({ field, label, type, purpose, value, change }) => (
+            <div key={field}>
+              <label className="block text-sm font-medium" htmlFor={`auth-${field}`}>{label}</label>
+              <input
+                id={`auth-${field}`} name={field} type={type} autoComplete={purpose}
+                className="mt-1 min-h-10 w-full rounded-md border border-border px-3 py-2 text-sm"
+                value={value} onChange={(event) => change(event.target.value)}
+                aria-invalid={fieldErrors[field] ? true : undefined}
+                aria-describedby={fieldErrors[field] ? `auth-${field}-error` : undefined}
+              />
+              {fieldErrors[field] ? <p id={`auth-${field}-error`} className="mt-1 text-sm text-danger">{fieldErrors[field]}</p> : null}
+            </div>
+          ))}
           <Button type="submit" disabled={loginMutation.isPending || registerMutation.isPending}>
             {mode === "login" ? <LogIn aria-hidden className="h-4 w-4" /> : <UserPlus aria-hidden className="h-4 w-4" />}
             {mode === "login" ? "Sign in" : "Create account"}

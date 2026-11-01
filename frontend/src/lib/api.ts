@@ -146,19 +146,24 @@ type ApiFetchInit = RequestInit & {
 
 export type ApiErrorKind = "http" | "network" | "timeout";
 
+export type ValidationIssue = { location: Array<string | number>; message: string };
+
 export class ApiError extends Error {
+  validationIssues: ValidationIssue[];
   status?: number;
   kind: ApiErrorKind;
 
   constructor(
     message: string,
     status?: number,
-    kind: ApiErrorKind = status === undefined ? "network" : "http"
+    kind: ApiErrorKind = status === undefined ? "network" : "http",
+    validationIssues: ValidationIssue[] = []
   ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.kind = kind;
+    this.validationIssues = validationIssues;
   }
 }
 
@@ -299,13 +304,22 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
 
   if (!response.ok || (init?.expectedStatus !== undefined && response.status !== init.expectedStatus)) {
     let detail = `API request failed: ${response.status}`;
+    let validationIssues: ValidationIssue[] = [];
     try {
       const body = await response.json();
       detail = extractErrorMessage(body, detail);
+      if (Array.isArray(body?.detail)) {
+        validationIssues = body.detail.flatMap((item: unknown) => {
+          if (!item || typeof item !== "object" || !("loc" in item) || !("msg" in item)) return [];
+          if (!Array.isArray(item.loc) || !item.loc.every((part: unknown) => typeof part === "string" || typeof part === "number") || typeof item.msg !== "string") return [];
+          // Do not retain Pydantic input/ctx: those can contain passwords.
+          return [{ location: [...item.loc], message: item.msg }];
+        });
+      }
     } catch {
       // Keep the status-only fallback when the server does not return JSON.
     }
-    throw new ApiError(formatApiError(response.status, detail, Boolean(token), Boolean(init?.requireAuth)), response.status);
+    throw new ApiError(formatApiError(response.status, detail, Boolean(token), Boolean(init?.requireAuth)), response.status, "http", validationIssues);
   }
   if (response.status === 204) {
     return undefined as T;

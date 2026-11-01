@@ -89,13 +89,13 @@ export function DashboardWorkspace({ initialQueue }: { initialQueue?: InitialCas
 
       <div className="grid gap-4 xl:grid-cols-[190px_minmax(0,1fr)_350px]">
         <QueueFilters caseCount={activeCases.length} />
-        <section aria-labelledby="alert-queue-heading" className="min-w-0">
+        <div className="min-w-0">
           <TransactionsTable
             transactions={activeCases}
             selectedId={selectedCase?.id}
             onSelect={(caseRecord) => setSelectedId(caseRecord.id)}
           />
-        </section>
+        </div>
         <AlertDetailPanel
           caseRecord={selectedCase}
           canMutate={Boolean(token)}
@@ -240,14 +240,14 @@ function AlertDetailPanel({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 id="selected-alert-heading" className="text-xs font-semibold uppercase tracking-wide text-muted">Selected alert</h2>
-            <p className="mt-1 text-xl font-semibold leading-tight">
+            <p className="mt-1 break-all text-xl font-semibold leading-tight">
               {caseRecord?.id ?? "No alert selected"}
             </p>
             <p className="mt-1 text-sm text-muted">{caseRecord?.merchant ?? "Select a row to review the case."}</p>
           </div>
         </div>
 
-        <dl className="mt-4 grid grid-cols-2 gap-2 text-sm">
+        <dl className="mt-4 grid grid-cols-1 gap-2 text-sm">
           <SummaryItem label="Exposure" value={caseRecord ? formatAmount(caseRecord) : "--"} />
           <SummaryItem label="Source" value={caseRecord?.source ?? "--"} />
           <SummaryItem label="Status" value={caseRecord ? statusLabel(caseRecord.status) : "--"} />
@@ -283,6 +283,7 @@ function AlertDetailPanel({
 
         {caseRecord ? (
           <CaseWorkflow
+            key={`${caseRecord.id}:${canMutate}`}
             caseRecord={caseRecord}
             detail={caseDetail.data}
             canMutate={canMutate}
@@ -298,9 +299,9 @@ function AlertDetailPanel({
 
 function SummaryItem({ label, value, tone }: { label: string; value: string; tone?: "danger" }) {
   return (
-    <div className="rounded-md border border-border bg-panel p-3">
+    <div className="min-w-0 rounded-md border border-border bg-panel p-3">
       <dt className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</dt>
-      <dd className={`mt-1 truncate font-semibold ${tone === "danger" ? "text-danger" : ""}`}>{value}</dd>
+      <dd className={`mt-1 break-all font-semibold ${tone === "danger" ? "text-danger" : ""}`}>{value}</dd>
     </div>
   );
 }
@@ -349,7 +350,7 @@ function ContextDrawer({ drawer, onClose }: { drawer: Exclude<ToolDrawer, null>;
 }
 
 function DrawerPanelLoading() {
-  return <div className="h-48 animate-pulse rounded-lg bg-border/50" aria-label="Loading panel" />;
+  return <div className="h-48 animate-pulse rounded-lg bg-border/50" role="status"><span className="sr-only">Loading panel</span></div>;
 }
 
 function statusLabel(status: InvestigationCase["status"]) {

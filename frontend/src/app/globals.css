@@ -45,3 +45,26 @@ a {
 ::selection {
   background: hsl(var(--accent) / 0.16);
 }
+
+/* Essential control boundaries are separate from decorative separators. */
+:root {
+  --control-border: 215 18% 45%;
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+textarea,
+select {
+  border-color: hsl(var(--control-border));
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: hsl(var(--muted));
+  opacity: 1;
+}
+
+input[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"] {
+  border-color: hsl(var(--danger));
+}
