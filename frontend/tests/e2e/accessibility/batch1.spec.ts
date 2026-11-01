@@ -51,3 +51,42 @@ test("placeholder and essential input borders meet composited contrast threshold
   expect(values.placeholder).toBeGreaterThanOrEqual(4.5);
   expect(values.border).toBeGreaterThanOrEqual(3);
 });
+
+
+test("lazy panel loading exposes a valid status instead of a labelled generic div", async ({ page }) => {
+  await page.goto("/");
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/_next/static/chunks/*.js", async route => { await gate; await route.continue(); });
+  try {
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Loading panel" })).toHaveCount(1);
+  } finally { release(); }
+  await expect(page.getByRole("region", { name: "Analyst session" })).toBeVisible();
+});
+
+
+test("validation never echoes the submitted password even if it is edited during the request", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  const auth = page.getByRole("region", { name: "Analyst session" });
+  await auth.getByRole("button", { name: "Register", exact: true }).click();
+  await auth.getByLabel("Password", { exact: true }).fill("synthetic-original-password");
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/api/auth/register", async route => {
+    await gate;
+    return json(route, 422, { detail: [{ loc: ["body", "password"], msg: "Rejected synthetic-original-password", input: "synthetic-original-password" }] });
+  });
+  try {
+    const request = page.waitForRequest("**/api/auth/register");
+    await auth.getByRole("button", { name: "Create account" }).click();
+    await request;
+    await auth.getByLabel("Password", { exact: true }).fill("synthetic-replacement-password");
+    release();
+    await expect(auth.getByRole("alert")).toContainText("[redacted]");
+    await expect(auth).not.toContainText("synthetic-original-password");
+    await expect(auth).not.toContainText("synthetic-replacement-password");
+    await expect(auth.getByLabel("Password", { exact: true })).toHaveValue("");
+  } finally { release(); }
+});

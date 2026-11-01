@@ -150,7 +150,7 @@ export function AppShell({
                   <input
                     id="workspace-search"
                     type="search"
-                    className="h-10 w-full rounded-md border border-border bg-white pl-9 pr-3 text-sm outline-none transition placeholder:text-muted/70 hover:border-accent/70 focus:border-accent focus:ring-2 focus:ring-accent/20"
+                    className="h-10 w-full rounded-md border border-border bg-white pl-9 pr-3 text-sm outline-none transition placeholder:text-muted hover:border-accent/70 focus:border-accent focus:ring-2 focus:ring-accent/20"
                     placeholder="Search cases, entities, merchants..."
                   />
                 </label>

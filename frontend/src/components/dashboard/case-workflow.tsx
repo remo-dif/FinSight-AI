@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { FormEvent, useState } from "react";
 import {
+  ApiError,
   addCaseNote,
   recordCaseFollowUp,
   closeCase,
@@ -52,53 +53,59 @@ export function CaseWorkflow({
   const closed = caseRecord.status === "resolved" && (caseRecord.decision === "escalate" || caseRecord.decision === "request_verification");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const updateMutation = useMutation({
-    mutationFn: (update: Parameters<typeof updateCase>[1]) => updateCase(caseRecord.id, update),
-    onMutate: () => setErrorMessage(null),
-    onSuccess: async (updatedCase) => {
-      queryClient.setQueryData<CaseDetail>(caseDetailQueryKey(caseRecord.id), (current) =>
-        current ? { ...current, ...updatedCase } : undefined
-      );
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: caseListQueryKey() }),
-        queryClient.invalidateQueries({ queryKey: caseDetailQueryKey(caseRecord.id) })
-      ]);
-    },
-    onError: (error) =>
-      setErrorMessage(
-        error instanceof Error ? error.message : "The case update was not saved. Refresh the case and try again."
-      )
+  // Capture identity/revision as mutation variables, never from a later selection.
+  type Snapshot = { caseId: string; revision: number | undefined };
+  const snapshot = (): Snapshot => ({
+    caseId: caseRecord.id,
+    revision: detail?.id === caseRecord.id ? detail.revision : caseRecord.revision
   });
-
-  const noteMutation = useMutation({
-    mutationFn: (content: string) => addCaseNote(caseRecord.id, content),
+  async function refreshCase(caseId: string) {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: caseListQueryKey() }),
+      queryClient.invalidateQueries({ queryKey: caseDetailQueryKey(caseId), refetchType: "all" })
+    ]);
+  }
+  const updateMutation = useMutation({
+    mutationFn: ({ caseId, update }: Snapshot & { update: CaseUpdatePayload }) => updateCase(caseId, update),
+    retry: false,
     onMutate: () => setErrorMessage(null),
-    onSuccess: async (savedNote) => {
-      queryClient.setQueryData<CaseDetail>(caseDetailQueryKey(caseRecord.id), (current) =>
-        current ? { ...current, notes: [...current.notes, savedNote] } : undefined
+    onSuccess: async (updatedCase, { caseId }) => {
+      queryClient.setQueryData<CaseDetail>(caseDetailQueryKey(caseId), current =>
+        current && updatedCase.id === caseId ? { ...current, ...updatedCase } : current
+      );
+      await refreshCase(caseId);
+    },
+    onError: async (error, { caseId }) => {
+      setErrorMessage(error instanceof Error ? error.message : "The case update was not saved. Refresh the case and try again.");
+      if (error instanceof ApiError && error.status === 409) await refreshCase(caseId);
+    }
+  });
+  const noteMutation = useMutation({
+    mutationFn: ({ caseId, content }: Snapshot & { content: string }) => addCaseNote(caseId, content),
+    retry: false,
+    onMutate: () => setErrorMessage(null),
+    onSuccess: async (savedNote, { caseId }) => {
+      queryClient.setQueryData<CaseDetail>(caseDetailQueryKey(caseId), current =>
+        current ? { ...current, notes: [...current.notes, savedNote] } : current
       );
       setNote("");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: caseListQueryKey() }),
-        queryClient.invalidateQueries({ queryKey: caseDetailQueryKey(caseRecord.id) })
-      ]);
+      await refreshCase(caseId);
     },
-    onError: (error) =>
-      setErrorMessage(
-        error instanceof Error ? error.message : "The note was not saved. Please try again."
-      )
+    onError: async (error, { caseId }) => {
+      setErrorMessage(error instanceof Error ? error.message : "The note was not saved. Please try again.");
+      if (error instanceof ApiError && error.status === 409) await refreshCase(caseId);
+    }
   });
 
   function recordDecision(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!decision || !reason.trim() || updateMutation.isPending) return;
-    updateMutation.mutate({ decision, reason: reason.trim() });
+    updateMutation.mutate({ ...snapshot(), update: { decision, reason: reason.trim() } });
   }
-
   function recordNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!note.trim() || noteMutation.isPending) return;
-    noteMutation.mutate(note.trim());
+    noteMutation.mutate({ ...snapshot(), content: note.trim() });
   }
 
   const updatePending = updateMutation.isPending;
@@ -109,7 +116,7 @@ export function CaseWorkflow({
         caseRecord={caseRecord}
         canMutate={canMutate && !closed}
         updatePending={updatePending}
-        onUpdate={(update) => updateMutation.mutate(update)}
+        onUpdate={(update) => updateMutation.mutate({ ...snapshot(), update })}
       />
 
       <CaseDecisionSection
@@ -349,20 +356,22 @@ function CaseFollowUpSection({ caseRecord, detail, canMutate, blocked }: {
   const closed = caseRecord.status === "resolved";
   const hasOutcome = Boolean(detail?.follow_ups?.length);
   const mutation = useMutation({
-    mutationFn: async () => {
-      if (!detail || detail.id !== caseRecord.id || detail.revision === undefined) throw new Error("Refresh the case before recording an outcome.");
-      const payload = { reason: reason.trim(), expected_revision: detail.revision };
-      if (hasOutcome) return closeCase(caseRecord.id, payload);
-      const action = caseRecord.decision === "escalate" ? "escalation_outcome" : "verification_outcome";
-      return recordCaseFollowUp(caseRecord.id, { ...payload, action });
+    mutationFn: async ({ caseId, revision, content, close, decision }: {
+      caseId: string; revision: number; content: string; close: boolean; decision: CaseDecision | null;
+    }) => {
+      const payload = { reason: content, expected_revision: revision };
+      if (close) return closeCase(caseId, payload);
+      const action = decision === "escalate" ? "escalation_outcome" : "verification_outcome";
+      return recordCaseFollowUp(caseId, { ...payload, action });
     },
+    retry: false,
     onMutate: () => setError(null),
     onSuccess: () => setReason(""),
     onError: (failure) => setError(failure instanceof Error ? failure.message : "The case action was not saved."),
-    onSettled: async () => {
+    onSettled: async (_data, _error, { caseId }) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: caseListQueryKey() }),
-        queryClient.invalidateQueries({ queryKey: caseDetailQueryKey(caseRecord.id) })
+        queryClient.invalidateQueries({ queryKey: caseDetailQueryKey(caseId), refetchType: "all" })
       ]);
     }
   });
@@ -385,7 +394,9 @@ function CaseFollowUpSection({ caseRecord, detail, canMutate, blocked }: {
       {closed ? <p className="text-sm text-muted">This case is closed. Its decision and history are preserved.</p> : (
         <form className="space-y-2" onSubmit={(event) => {
           event.preventDefault();
-          if (reason.trim() && !disabled) mutation.mutate();
+          if (reason.trim() && !disabled && detail?.revision !== undefined) mutation.mutate({
+            caseId: caseRecord.id, revision: detail.revision, content: reason.trim(), close: hasOutcome, decision: caseRecord.decision
+          });
         }}>
           <label className="block text-sm" htmlFor="case-follow-up-reason">
             {hasOutcome ? "Closure reason" : caseRecord.decision === "request_verification" ? "Verification result and outcome" : "Escalation investigation outcome"}

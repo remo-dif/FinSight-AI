@@ -2,8 +2,23 @@ import { demoTransactions, InvestigationCase, Transaction } from "@/lib/api";
 import { Panel } from "@/components/ui/panel";
 
 export function formatAmount(transaction: Transaction) {
-  const value = Number(transaction.amount);
-  return getCurrencyFormatter(transaction.currency || "USD").format(value);
+  // Keep decimal strings exact, including cents above Number.MAX_SAFE_INTEGER.
+  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(transaction.amount);
+  if (!match) return `${transaction.amount} ${transaction.currency}`;
+  const [, sign, integer, decimals = ""] = match;
+  const currency = transaction.currency;
+  const formatter = getCurrencyFormatter(currency);
+  const whole = BigInt(integer);
+  const signed = sign ? (whole === BigInt(0) ? -0 : -whole) : whole;
+  const parts = formatter.formatToParts(signed);
+  const fraction = decimals.padEnd(formatter.resolvedOptions().minimumFractionDigits ?? 0, "0");
+  if (!parts.some(part => part.type === "fraction") && fraction) {
+    let lastInteger = 0;
+    parts.forEach((part, index) => { if (part.type === "integer") lastInteger = index; });
+    const separator = new Intl.NumberFormat().formatToParts(1.1).find(part => part.type === "decimal")?.value ?? ".";
+    parts.splice(lastInteger + 1, 0, { type: "decimal", value: separator }, { type: "fraction", value: fraction });
+  }
+  return parts.map(part => part.type === "fraction" ? fraction : part.value).join("");
 }
 
 const currencyFormatters = new Map<string, Intl.NumberFormat>();
@@ -63,16 +78,16 @@ export function TransactionsTable({
               >
                 <span className="flex items-start justify-between gap-3">
                   <span>
-                    <span className="block font-semibold text-accent">{caseRecord.id}</span>
+                    <span className="block break-all font-semibold text-accent">{caseRecord.id}</span>
                     <span className="mt-1 block text-xs text-muted">{caseRecord.assignee_name ?? "Unassigned"}</span>
                   </span>
                 </span>
-                <span className="flex items-start justify-between gap-4">
+                <span className="flex min-w-0 flex-wrap items-start justify-between gap-4">
                   <span className="min-w-0">
                     <span className="block font-semibold">{caseRecord.merchant}</span>
                     <span className="mt-1 block text-xs text-muted">{caseRecord.category || caseRecord.description}</span>
                   </span>
-                  <span className="shrink-0 text-right">
+                  <span className="min-w-0 max-w-full break-all text-right">
                     <span className="block font-semibold">{formatAmount(caseRecord)}</span>
                     <span className="mt-1 block text-xs text-muted">{statusFor(caseRecord.status)}</span>
                   </span>
@@ -82,8 +97,8 @@ export function TransactionsTable({
           );
         })}
       </ul>
-      <div className="hidden overflow-hidden md:block">
-        <table className="w-full table-fixed border-collapse text-sm">
+      <div className="hidden overflow-x-auto md:block" tabIndex={0} role="region" aria-label="Scrollable alert queue">
+        <table className="w-full min-w-[720px] table-fixed border-collapse text-sm">
           <caption className="sr-only">Fraud cases with case, assignee, merchant, signal, amount, and status</caption>
           <thead>
             <tr className="border-y border-border bg-background text-left text-xs uppercase tracking-wide text-muted">
@@ -114,7 +129,7 @@ export function TransactionsTable({
                   <td className="px-4 py-3">
                     <button
                       type="button"
-                      className="text-left font-semibold text-accent underline-offset-4 hover:underline"
+                      className="break-all text-left font-semibold text-accent underline-offset-4 hover:underline"
                       onClick={(event) => {
                         event.stopPropagation();
                         onSelect?.(caseRecord);
@@ -129,8 +144,8 @@ export function TransactionsTable({
                     <span className="text-xs font-normal text-muted">{caseRecord.source} source - {caseRecord.posted_at}</span>
                   </th>
                   <td className="px-3 py-3 text-muted">{caseRecord.category || caseRecord.description}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-right font-semibold">{formatAmount(caseRecord)}</td>
-                  <td className="whitespace-nowrap px-3 py-3">{statusFor(caseRecord.status)}</td>
+                  <td className="break-all px-3 py-3 text-right font-semibold">{formatAmount(caseRecord)}</td>
+                  <td className="break-words px-3 py-3">{statusFor(caseRecord.status)}</td>
                 </tr>
               );
             })}
