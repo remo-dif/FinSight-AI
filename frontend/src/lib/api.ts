@@ -140,15 +140,25 @@ export type UserResponse = {
 
 type ApiFetchInit = RequestInit & {
   requireAuth?: boolean;
+  refreshOnUnauthorized?: boolean;
+  expectedStatus?: number;
 };
+
+export type ApiErrorKind = "http" | "network" | "timeout";
 
 export class ApiError extends Error {
   status?: number;
+  kind: ApiErrorKind;
 
-  constructor(message: string, status?: number) {
+  constructor(
+    message: string,
+    status?: number,
+    kind: ApiErrorKind = status === undefined ? "network" : "http"
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.kind = kind;
   }
 }
 
@@ -192,6 +202,11 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
   init.signal?.addEventListener("abort", abortRequest, { once: true });
   try {
     return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted && !init.signal?.aborted) {
+      throw new ApiError("The request timed out. The server may have completed it.", undefined, "timeout");
+    }
+    throw error;
   } finally {
     clearTimeout(timeout);
     init.signal?.removeEventListener("abort", abortRequest);
@@ -236,6 +251,8 @@ export async function restoreSession(): Promise<boolean> {
 async function requestWithToken(path: string, init: ApiFetchInit | undefined, token: string | null) {
   const requestInit = { ...(init ?? {}) };
   delete requestInit.requireAuth;
+  delete requestInit.refreshOnUnauthorized;
+  delete requestInit.expectedStatus;
   const isFormData = requestInit.body instanceof FormData;
   return fetchWithTimeout(`${API_URL}${path}`, {
     ...requestInit,
@@ -263,17 +280,24 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
   let response: Response;
   try {
     response = await requestWithToken(path, init, token);
-    if (response.status === 401 && token) {
+    if (response.status === 401 && token && init?.refreshOnUnauthorized !== false) {
       const refreshedToken = await refreshAccessToken();
       if (refreshedToken) {
         response = await requestWithToken(path, init, refreshedToken);
       }
     }
-  } catch {
-    throw new ApiError("Unable to reach the finance API. Check that the backend is running, then try again.");
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(
+      "Unable to reach the finance API. Check that the backend is running, then try again.",
+      undefined,
+      "network"
+    );
   }
 
-  if (!response.ok) {
+  if (!response.ok || (init?.expectedStatus !== undefined && response.status !== init.expectedStatus)) {
     let detail = `API request failed: ${response.status}`;
     try {
       const body = await response.json();
@@ -360,7 +384,9 @@ export function refreshSession(refreshToken: string): Promise<TokenResponse> {
 export async function logout(): Promise<void> {
   await apiFetch<void>("/api/auth/logout", {
     method: "POST",
-    body: JSON.stringify({})
+    body: JSON.stringify({}),
+    refreshOnUnauthorized: false,
+    expectedStatus: 204
   });
 }
 

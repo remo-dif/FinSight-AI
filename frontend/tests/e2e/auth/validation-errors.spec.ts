@@ -36,7 +36,7 @@ for (const scenario of validationCases) {
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     const session = page.getByRole("region", { name: "Analyst session" });
     await session.locator("form button[type='submit']").click();
-    await expect(session.getByRole("status")).toHaveText(scenario.expected);
+    await expect(session.getByRole("alert")).toHaveText(scenario.expected);
     await expect(session).not.toContainText("[object Object]");
     await expect(session).not.toContainText(secretInput);
     await expect(page.getByText("Live investigation data is active.")).toBeHidden();
@@ -54,6 +54,6 @@ test("registration displays structured validation messages", async ({ page, isMo
   const session = page.getByRole("region", { name: "Analyst session" });
   await session.getByRole("button", { name: "Register", exact: true }).click();
   await session.getByRole("button", { name: "Create account", exact: true }).click();
-  await expect(session.getByRole("status")).toHaveText(passwordMessage);
+  await expect(session.getByRole("alert")).toHaveText(passwordMessage);
   await expect(session).not.toContainText(secretInput);
 });
