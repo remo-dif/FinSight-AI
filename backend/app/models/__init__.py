@@ -3,7 +3,7 @@ from app.models.case import CaseFollowUp, CaseNote, InvestigationCase
 from app.models.chat import ChatMessage, ChatSession
 from app.models.embedding import Embedding
 from app.models.finance import Budget, Transaction, UploadedFile
-from app.models.user import RefreshToken, User, UserRole
+from app.models.user import RefreshToken, RefreshTokenFamily, User, UserRole
 
 __all__ = [
     "AuditLog",
@@ -15,6 +15,7 @@ __all__ = [
     "Embedding",
     "InvestigationCase",
     "RefreshToken",
+    "RefreshTokenFamily",
     "Transaction",
     "UploadedFile",
     "User",

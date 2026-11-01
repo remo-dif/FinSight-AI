@@ -1,11 +1,17 @@
-# AWS CI/CD Setup
+# Historical AWS CI/CD Design and Future Runbook
 
-## Deployment Target
+## Current operational status
 
-FinSight-AI targets Amazon ECS on AWS Fargate. The expected production architecture is:
+The previous AWS account is closed. No AWS infrastructure is currently claimed active or verified. This document preserves historical architecture and the repository-supported deployment design for portfolio/reference purposes. The instructions below are a future operator runbook, not authorization to authenticate, recover an account, provision resources, deploy or incur costs. Future hosting and its strict cost budget require a separate decision. Infrastructure checks are blocked and must be repeated before any future deployment.
+
+The deploy workflow is manual-only, additionally requires `AWS_DEPLOY_ENABLED=true`, and targets `production`. Normal CI completion and ordinary merges cannot trigger deployment. No GitHub secrets, variables or environment protections were changed or assumed verified.
+
+## Historical / repository-supported deployment target
+
+The retained AWS design targets ECS on Fargate. Its intended architecture is:
 
 - Two ECS services for the frontend and backend containers.
-- A separate ECS worker service when ARQ background jobs are enabled.
+- A separate worker service is a future option; no ARQ upload worker is currently implemented.
 - An Application Load Balancer for public traffic.
 - Amazon RDS for PostgreSQL with the `vector` extension.
 - Amazon ElastiCache for Redis.
@@ -43,7 +49,7 @@ Keep ECS service subnets aligned with the ALB-enabled subnets. If a Fargate task
 an Availability Zone not enabled on the ALB, target health reports `Target.NotInUse` and
 deployments can wait indefinitely for stability.
 
-Current listener routing:
+Historical/intended listener routing (not live-verified):
 
 | Path | Target group |
 | --- | --- |
@@ -107,7 +113,7 @@ After backend tests, frontend tests, Docker builds, and Trivy scans pass on `mas
 
 - `ghcr.io/remo-dif/finsight-ai-backend:<commit-sha>`
 - `ghcr.io/remo-dif/finsight-ai-frontend:<commit-sha>`
-Only immutable commit SHA tags are published and deployed. CI does not publish `latest`.
+CI publishes immutable commit SHA tags; the retained manual deployment design consumes those tags. CI does not publish `latest`.
 
 If the GHCR packages are private, create an AWS Secrets Manager secret containing:
 
@@ -259,9 +265,9 @@ The ALB forwards `/api/*` to the backend target group. Avoid baking
 browsers call their own local machine instead of AWS.
 
 If an explicit public API origin is needed later, set `NEXT_PUBLIC_API_URL` at build time to that
-origin. For the current single-ALB setup, leave it unset for production images.
+origin. For the retained single-ALB design, leave it unset for production images.
 
-## Local AWS CLI Access
+## Future operator access (not authorized in the current closed-account state)
 
 Human CLI access should use IAM Identity Center SSO instead of long-lived root access keys. Configure
 an operator-specific profile without committing the SSO start URL or account identifiers:
@@ -285,6 +291,6 @@ workflow calls `run_backend_migrations` as a one-off ECS task and checks its exi
 before updating the backend service. Local Compose users must run the README's
 explicit migration command. Do not move migrations into every replica's startup.
 
-Live AWS proxy/header/ingress verification remains separate and deferred. A green CI
+Live AWS proxy/header/ingress verification is blocked by the closed/unavailable account and remains separate from local header tests. A green CI
 or an enabled workflow is not evidence that trusted CIDRs or origin access controls
 are correct; see documents 23–25 for the current verification boundaries.

@@ -3,15 +3,20 @@
 Portfolio application for an AI-assisted fraud investigation workspace. Local and CI
 checks provide evidence for individual features, not production readiness.
 
+**Deployment status:** the previous AWS account is closed. No AWS infrastructure is
+currently asserted operational or verified. AWS diagrams/workflows preserve historical
+architecture and a repository-supported deployment design; no cloud deployment or
+paid infrastructure work is authorized. Future hosting and its cost budget are separate decisions.
+
 ## What Is Included
 
-- FastAPI backend with SQLAlchemy 2, JWT access tokens, rotating persisted refresh tokens, ownership checks, role dependencies, audit logging and Redis or development-memory rate limiting.
+- FastAPI backend with SQLAlchemy 2, JWT access tokens, rotating persisted refresh-token families with replay detection, ownership checks, role dependencies, audit logging and Redis or development-memory rate limiting.
 - Transaction analytics and investigation cases with explicit transition rules. CSV imports require explicit currencies; manual transaction creation still has a deferred USD-default risk.
-- User-scoped uploads, PDF text extraction, embeddings and internal pgvector retrieval. Image files are validated, but OCR is not integrated.
+- User-scoped uploads, PDF text extraction, embeddings, pgvector retrieval and authenticated document Q&A with validated citation references. Image files are validated, but OCR is not integrated.
 - Next.js 15 frontend with TypeScript, Tailwind, React Query, Zustand, an investigation workspace, financial copilot, upload controls and reusable UI primitives. Some risk, graph and timeline panels remain illustrative UI, not implemented detection pipelines.
 - PostgreSQL with pgvector support.
 - Docker Compose for local full-stack development.
-- GitHub Actions pipeline for backend/frontend linting, tests, production builds, Docker image builds, Trivy scans, GHCR publishing, and AWS ECS deployment.
+- GitHub Actions pipeline for backend/frontend linting, tests, production builds, Docker image builds, Trivy scans, GHCR publishing, and a separately gated, manual-only AWS ECS deployment design.
 - Architecture, UX, security, QA, deployment, and reviewer validation documents.
 
 ## Recent Updates
@@ -87,14 +92,14 @@ evidence that a provider integration was validated.
 
 | Capability | Current behavior |
 | --- | --- |
-| Authentication | JSON register/login, refresh/logout and `/api/auth/me`; protected APIs use `Authorization: Bearer <access_token>`. Obtain a token through JSON login before using Swagger's Bearer authorization. |
+| Authentication | JSON registration returns the same HTTP 202 acknowledgement for new/existing accounts, without user details or automatic login. Login, refresh/logout and `/api/auth/me` remain available; protected APIs use `Authorization: Bearer <access_token>`. Obtain a token through JSON login before using Swagger's Bearer authorization. |
 | Passwords | Registration requires at least 10 characters; registration/login accept at most 72 UTF-8 bytes. No truncation or normalization. Shorter legacy login passwords remain accepted. No public password-change/reset endpoint exists. |
 | Cases | List/detail, audited state/assignment/decision updates and notes. Initial decisions are immutable; escalation and verification support a separate outcome followed by explicit, reasoned closure. V2 closures reject further writes. See [Case Workflow V2](docs/29-case-workflow-v2.md). |
 | Transactions | User-scoped list/create, monthly summaries and spending comparisons; currencies remain isolated. |
 | Uploads | CSV transactions; embedded PDF text extraction and chunk indexing. Images currently produce metadata placeholders, not extracted OCR text. |
 | Chat | Six keyword-routed financial intents, canonical transaction evidence and deterministic review/fallback. Responses expose transaction references in tool results. |
-| Document Q&A | Not user-accessible: retrieval runs internally, but the public financial answer path does not use retrieved documents to ground its answer. Document citations and minimum relevance thresholds are not implemented. |
-| Evaluation/observability | Internal synthetic evaluation harness and allowlisted structured AI-operation logs. These are not a public document-Q&A endpoint or full OpenTelemetry tracing. |
+| Document Q&A | Authenticated `POST /api/document-qa` and chat document mode are exposed in the frontend with owned-document selection. Returned references are validated against retrieved authorized chunks; citations and retrieved sources are distinct. `grounded=false`: semantic support is not verified. A server-enforced score floor exists but is not calibrated for answer quality. No OCR. |
+| Evaluation/observability | Internal synthetic fixtures, deterministic contract/security tests and allowlisted structured operation logs. Fixture success is not live-model quality, calibrated relevance or semantic-grounding evidence. Full OpenTelemetry remains deferred. |
 
 CSV imports use `date` (or `Date`), not the JSON transaction field `posted_at`.
 For example, an explicit-currency CSV can contain:
@@ -123,21 +128,32 @@ do not increment its counter or extend its expiry. Both backends report the gene
 limit and remaining count on admitted responses. Memory uses a process-local sliding
 window; Redis uses fixed minute windows and expiring keys. Redis failures return 503
 (`Retry-After: 1`), with no memory fallback. Exhausted quotas return 429
-(`Retry-After: 60`). Limits are per IP, not account lockouts; shared NATs share
+(`Retry-After: 60`). These middleware limits are per IP; shared NATs share
 budgets. Production requires Redis.
+
+Valid login payloads also consume a fixed-minute account-identifier quota (default 20,
+`LOGIN_ACCOUNT_RATE_LIMIT_PER_MINUTE`) before password verification. Both existing and
+absent identifiers, successful and failed attempts count. Keys use a domain-separated
+HMAC of the case-folded email, never plaintext email; case folding affects quotas only,
+not account lookup. Denials do not extend expiry and successful login does not reset it.
+This is a temporary throttle, not a permanent account lockout. Distributed attackers
+can still cause temporary denial for a targeted identifier. Memory is process-local
+and capped at 4,096 identifiers; full active capacity or Redis unavailability returns 503.
 
 Validation failures return 422; malformed CSV data returns controlled 400 errors.
 Auth validation keeps error locations/messages/types but omits submitted input to
-avoid echoing passwords or refresh tokens. Registration's existing-email 409 remains
-an explicit enumeration tradeoff. Trusted proxy CIDRs must reflect real ingress:
+avoid echoing passwords or refresh tokens. Registration no longer returns an existing-email 409. It returns a generic HTTP 202
+message and leaves existing accounts unchanged. Without email ownership verification,
+an attacker can still probe indirectly by registering a chosen password then trying to
+log in; this branch does not claim to eliminate all account enumeration. Trusted proxy CIDRs must reflect real ingress:
 see [the proxy contract](docs/23-proxy-auth-container-hardening.md).
 
 ## Environment
 
 Copy `.env.example` to `.env` and set the required secrets.
 
-Production runtime secrets are stored in AWS Secrets Manager and injected into ECS task
-definitions:
+Runtime secrets must be supplied by the selected hosting environment. The historical AWS
+design injects them from Secrets Manager into ECS task definitions:
 
 - `DATABASE_URL`
 - `OPENAI_API_KEY`
@@ -145,15 +161,15 @@ definitions:
 - `JWT_REFRESH_SECRET_KEY`
 - `REDIS_URL` when it contains credentials
 
-Non-secret production settings are configured on ECS task definitions or GitHub Actions
+In the repository-supported AWS design, non-secret settings belong on ECS task definitions or GitHub Actions
 variables, depending on whether the value is runtime app configuration or deployment
 configuration.
 
-## Production Deployment
+## Deployment Status and Historical AWS Design
 
-See [`AWS-TECHNOLOGIES.md`](AWS-TECHNOLOGIES.md) for a concise inventory and architecture diagram of the AWS services currently in use.
+See [`AWS-TECHNOLOGIES.md`](AWS-TECHNOLOGIES.md) for the historical service inventory and repository-supported architecture diagram. It is not an inventory of active infrastructure.
 
-The AWS target is ECS on Fargate behind CloudFront and an Application Load Balancer. Resource names
+The historical AWS target was ECS on Fargate behind CloudFront and an Application Load Balancer. In that design, resource names
 and endpoints are held in the protected GitHub `production` environment rather than committed.
 Production deployment is blocked unless CloudFront-to-ALB traffic is HTTPS-only, the distribution
 has WAF attached, RDS is private/encrypted/Multi-AZ, and the private uploads bucket is encrypted.
@@ -163,8 +179,20 @@ CI publishes immutable images tagged by commit SHA:
 - `ghcr.io/remo-dif/finsight-ai-backend:<commit-sha>`
 - `ghcr.io/remo-dif/finsight-ai-frontend:<commit-sha>`
 
-The `deploy-aws` workflow can deploy a specific commit SHA manually and is configured to
-deploy successful `master` commits when `AWS_DEPLOY_ENABLED=true`.
+The `deploy-aws` workflow is **manual-only** (`workflow_dispatch`), requires
+`AWS_DEPLOY_ENABLED=true` and targets the protected `production` environment. CI completion
+or an ordinary merge cannot trigger it. Do not dispatch it while the account is closed;
+all infrastructure, permissions, origins, proxy CIDRs and cost controls must be reviewed
+again before any separately authorized future deployment. No GitHub secrets/environment
+settings were changed by this maintenance cycle.
+
+Refresh tokens are stored as hashes and grouped into independent login families. Reuse
+of a valid consumed token revokes that family's refresh capability; logout also revokes
+its family, including descendants. Concurrent refreshes use a database family lock and
+single-use consumption. Strict replay handling can invalidate a session after legitimate
+multi-tab races. Already issued access tokens remain valid until expiry; family revocation
+does not provide immediate access-JWT invalidation. See [Security Hardening V2](docs/30-security-hardening-v2.md)
+for migration, concurrency and remaining trust limits.
 
 ## CI Triggers and Local Checks
 
@@ -176,7 +204,7 @@ Deployment has its own protected-environment/configuration gates; see
 [AWS CI/CD](docs/15-aws-cicd.md). A green CI result does not authorize deployment.
 
 Backend: install `backend/.[dev]` with `backend/constraints-security.txt`, set the
-required application environment and run `ruff check .` and `pytest` from `backend`.
+required application environment and run `ruff check .`, `ruff format --check .` and `pytest` from `backend`.
 `TEST_DATABASE_URL` and `TEST_REDIS_URL` must point to disposable test services:
 the migration smoke upgrades/downgrades its database. Unconfigured integrations
 skip; SQLite/mocks are not evidence of PostgreSQL/Redis validation.

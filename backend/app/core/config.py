@@ -92,6 +92,10 @@ class Settings(BaseSettings):
         default=10, gt=0, le=1000, validation_alias="LOGIN_RATE_LIMIT_PER_MINUTE"
     )
 
+    login_account_rate_limit_per_minute: int = Field(
+        default=20, gt=0, le=1000, validation_alias="LOGIN_ACCOUNT_RATE_LIMIT_PER_MINUTE"
+    )
+
     @field_validator("jwt_secret_key", "jwt_refresh_secret_key", mode="before")
     @classmethod
     def validate_jwt_secret(cls, value: str) -> str:

@@ -43,8 +43,8 @@ def create_user(db: Session) -> User:
     return user
 
 
-def test_register_response_schema_accepts_user_uuid(db: Session):
-    user = register(
+def test_registration_acknowledges_without_exposing_user_but_me_schema_keeps_uuid(db: Session):
+    acknowledgement = register(
         RegisterRequest(
             email="new-user@example.com",
             password="correct horse battery staple",
@@ -53,6 +53,8 @@ def test_register_response_schema_accepts_user_uuid(db: Session):
         db,
     )
 
+    assert set(acknowledgement.model_dump()) == {"message"}
+    user = db.scalar(select(User).where(User.email == "new-user@example.com"))
     response = UserResponse.model_validate(user, from_attributes=True)
 
     assert response.id == user.id

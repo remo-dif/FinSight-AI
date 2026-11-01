@@ -110,7 +110,7 @@ async def test_http_register_and_login_accept_72_bytes_and_never_modify_the_hash
                 "full_name": "Synthetic",
             }
             registered = await client.post("/api/auth/register", json=data)
-            assert registered.status_code == 201
+            assert registered.status_code == 202
             user = db.scalar(select(User).where(User.email == data["email"]))
             stored_hash = user.password_hash
             logged_in = await client.post(

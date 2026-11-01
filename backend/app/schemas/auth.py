@@ -56,3 +56,7 @@ class UserResponse(BaseModel):
     email: EmailStr
     full_name: str
     role: str
+
+
+class RegistrationResponse(BaseModel):
+    message: str = "Registration request processed. Sign in with your credentials; existing accounts keep their current password."
