@@ -84,29 +84,54 @@ test("network failure leaves logout outcome uncertain and offers local-only clea
 
 test("logout timeout is reported as an unknown server outcome", async ({ page, isMobile, browserName }) => {
   test.skip(isMobile, "logout behavior is viewport-independent and covered on desktop");
-  test.skip(browserName !== "chromium", "This test accelerates the browser's 10-second timer.");
+  test.skip(browserName !== "chromium", "Cross-browser logout timeout coverage is tracked in issue #14.");
 
-  await page.addInitScript(() => {
-    const originalSetTimeout = window.setTimeout.bind(window);
-    window.setTimeout = ((handler: TimerHandler, delay?: number) =>
-      originalSetTimeout(handler, delay === 10_000 ? 1 : delay)) as typeof window.setTimeout;
-  });
   await mockLogin(page);
   await mockRefreshFailure(page);
   await mockDashboardData(page);
-  await page.route("**/api/auth/logout", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    await json(route, 204, null);
-  });
 
   await page.goto("/");
   await submitLogin(page);
-  await page.getByRole("button", { name: "Sign out" }).click();
 
   const authPanel = page.getByRole("region", { name: "Analyst session" });
-  await expect(authPanel.getByRole("alert")).toContainText("timed out");
-  await expect(authPanel.getByRole("alert")).toContainText("revocation is unconfirmed");
-  await expect(authPanel.getByRole("button", { name: "Sign out" })).toBeVisible();
+  const signOut = authPanel.getByRole("button", { name: "Sign out", exact: true });
+  await expect(page.getByText("Live investigation data is active.")).toBeVisible();
+  await expect(signOut).toBeEnabled();
+
+  // Install the clock only after login succeeds. Hold logout until its real
+  // application timeout fires, without shortening login or other API timers.
+  await page.clock.install();
+  let release!: () => void;
+  const blocked = new Promise<void>((resolve) => { release = resolve; });
+  let attempts = 0;
+  await page.route("**/api/auth/logout", async (route) => {
+    attempts += 1;
+    await blocked;
+    await route.abort("timedout");
+  });
+
+  try {
+    const request = page.waitForRequest((request) =>
+      request.method() === "POST" && new URL(request.url()).pathname === "/api/auth/logout"
+    );
+    await signOut.click();
+    await request;
+    await expect(signOut).toBeDisabled();
+    await expect.poll(() => attempts).toBe(1);
+
+    await page.clock.fastForward(11_000);
+
+    await expect(authPanel.getByRole("alert")).toContainText("timed out");
+    await expect(authPanel.getByRole("alert")).toContainText("revocation is unconfirmed");
+    await expect(authPanel.getByRole("status")).toHaveCount(0);
+    await expect(signOut).toBeEnabled();
+    await expect(authPanel.getByRole("button", { name: "Clear this device's session" })).toBeVisible();
+    await expect(page.getByText("Live investigation data is active.")).toBeVisible();
+    expect(attempts).toBe(1);
+  } finally {
+    release();
+    await page.unrouteAll({ behavior: "wait" });
+  }
 });
 
 test("logout can be retried after a server failure", async ({ page, isMobile }) => {
