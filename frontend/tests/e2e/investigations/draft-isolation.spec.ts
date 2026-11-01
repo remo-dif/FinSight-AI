@@ -86,7 +86,12 @@ for (const kind of ["decision", "note"] as const) {
       return route.fallback();
     });
     try {
-      if (kind === "note") await selected.getByLabel("Add a note").fill("A saved note");
+      if (kind === "note") {
+        const note = selected.getByLabel("Add a note");
+        await note.fill("A saved note");
+        await expect(note).toHaveValue("A saved note");
+        await expect(selected.getByRole("button", { name: "Add note", exact: true })).toBeEnabled();
+      }
       else {
         await selected.getByRole("combobox", { name: /Decision/ }).selectOption("escalate");
         await selected.getByRole("textbox", { name: /^Reason/ }).fill("A saved decision");

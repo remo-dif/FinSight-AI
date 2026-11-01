@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   analystTokens,
+  activateControl,
   json,
   mockDashboardData,
   mockLogin,
@@ -17,8 +18,6 @@ async function submitLogin(page: import("@playwright/test").Page) {
 }
 
 test("valid login enables live dashboard data and logout clears the session", async ({ page, isMobile }) => {
-  test.skip(isMobile, "session storage behavior is viewport-independent and covered on desktop");
-
   await mockLogin(page);
   await mockDashboardData(page);
   await mockLogout(page);
@@ -31,7 +30,11 @@ test("valid login enables live dashboard data and logout clears the session", as
   await expect(selectedAlert.getByText("CASE-9001", { exact: true })).toBeVisible();
   await expect(selectedAlert).toContainText("Wire mule cluster");
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  const logoutResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" && new URL(response.url()).pathname === "/api/auth/logout"
+  );
+  await activateControl(page.getByRole("button", { name: "Sign out" }), isMobile);
+  expect((await logoutResponse).status()).toBe(204);
 
   await expect(
     page.getByRole("region", { name: "Analyst session" }).getByRole("status")
@@ -42,8 +45,6 @@ test("valid login enables live dashboard data and logout clears the session", as
 });
 
 test("failed logout keeps the session and does not claim that it was revoked", async ({ page, isMobile }) => {
-  test.skip(isMobile, "logout behavior is viewport-independent and covered on desktop");
-
   await mockLogin(page);
   await mockRefreshFailure(page);
   await mockDashboardData(page);
@@ -53,7 +54,11 @@ test("failed logout keeps the session and does not claim that it was revoked", a
 
   await page.goto("/");
   await submitLogin(page);
-  await page.getByRole("button", { name: "Sign out" }).click();
+  const logoutResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" && new URL(response.url()).pathname === "/api/auth/logout"
+  );
+  await activateControl(page.getByRole("button", { name: "Sign out" }), isMobile);
+  expect((await logoutResponse).status()).toBe(503);
 
   const authPanel = page.getByRole("region", { name: "Analyst session" });
   await expect(authPanel.getByRole("alert")).toContainText("revocation was not confirmed");
@@ -63,8 +68,6 @@ test("failed logout keeps the session and does not claim that it was revoked", a
 });
 
 test("network failure leaves logout outcome uncertain and offers local-only cleanup", async ({ page, isMobile }) => {
-  test.skip(isMobile, "logout behavior is viewport-independent and covered on desktop");
-
   await mockLogin(page);
   await mockRefreshFailure(page);
   await mockDashboardData(page);
@@ -72,19 +75,17 @@ test("network failure leaves logout outcome uncertain and offers local-only clea
 
   await page.goto("/");
   await submitLogin(page);
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await activateControl(page.getByRole("button", { name: "Sign out" }), isMobile);
 
   const authPanel = page.getByRole("region", { name: "Analyst session" });
   await expect(authPanel.getByRole("alert")).toContainText("outcome is unknown");
   await expect(page.getByText("Live investigation data is active.")).toBeVisible();
-  await authPanel.getByRole("button", { name: "Clear this device's session" }).click();
+  await activateControl(authPanel.getByRole("button", { name: "Clear this device's session" }), isMobile);
   await expect(authPanel.getByRole("alert")).toContainText("Signed out on this device only");
   await expect(page.getByText("Sign in to replace demo alerts with live data.")).toBeVisible();
 });
 
-test("logout timeout is reported as an unknown server outcome", async ({ page, isMobile, browserName }) => {
-  test.skip(isMobile, "logout behavior is viewport-independent and covered on desktop");
-  test.skip(browserName !== "chromium", "Cross-browser logout timeout coverage is tracked in issue #14.");
+test("logout timeout is reported as an unknown server outcome", async ({ page, isMobile }) => {
 
   await mockLogin(page);
   await mockRefreshFailure(page);
@@ -114,7 +115,7 @@ test("logout timeout is reported as an unknown server outcome", async ({ page, i
     const request = page.waitForRequest((request) =>
       request.method() === "POST" && new URL(request.url()).pathname === "/api/auth/logout"
     );
-    await signOut.click();
+    await activateControl(signOut, isMobile);
     await request;
     await expect(signOut).toBeDisabled();
     await expect.poll(() => attempts).toBe(1);
@@ -163,8 +164,6 @@ test("logout can be retried after a server failure", async ({ page, isMobile }) 
 });
 
 test("reload restores the server session when failed logout leaves its cookie valid", async ({ page, isMobile }) => {
-  test.skip(isMobile, "session restoration is viewport-independent and covered on desktop");
-
   let signedIn = false;
   let refreshCount = 0;
   await page.route("**/api/auth/login", async (route) => {
@@ -202,7 +201,7 @@ test("reload restores the server session when failed logout leaves its cookie va
     (await page.context().cookies("http://127.0.0.1:3101/api/auth/refresh"))
       .some((cookie) => cookie.name === "finsight_refresh_token");
   expect(await hasRefreshCookie()).toBe(true);
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await activateControl(page.getByRole("button", { name: "Sign out" }), isMobile);
   const authPanel = page.getByRole("region", { name: "Analyst session" });
   await expect(authPanel.getByRole("alert")).toContainText("HTTP 503");
 
@@ -211,7 +210,7 @@ test("reload restores the server session when failed logout leaves its cookie va
   await expect.poll(() => refreshCount).toBe(2);
   expect(await hasRefreshCookie()).toBe(true);
   await expect(page.getByRole("button", { name: "Session active" })).toBeVisible();
-  await page.getByRole("button", { name: "Session active" }).click();
+  await activateControl(page.getByRole("button", { name: "Session active" }), isMobile);
   await expect(page.getByText("Live investigation data is active.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 });
