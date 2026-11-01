@@ -50,6 +50,7 @@ export function DashboardWorkspace({ initialQueue }: { initialQueue?: InitialCas
   const token = useSessionStore((state) => state.accessToken);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawer, setDrawer] = useState<ToolDrawer>(null);
+  const drawerTriggerRef = useRef<HTMLElement | null>(null);
   const hasServerSession = initialQueue?.status === "live" || initialQueue?.status === "unavailable";
   const hasSession = Boolean(token) || hasServerSession;
   const cases = useQuery({
@@ -78,13 +79,18 @@ export function DashboardWorkspace({ initialQueue }: { initialQueue?: InitialCas
     [activeCases, selectedId]
   );
 
+  function changeDrawer(next: ToolDrawer, trigger?: HTMLElement) {
+    if (next && trigger) drawerTriggerRef.current = trigger;
+    setDrawer(next);
+  }
+
   return (
     <div className="space-y-4">
       <WorkspaceToolbar
         queueStatus={queueStatus}
         onRetry={() => void cases.refetch()}
         drawer={drawer}
-        onDrawerChange={setDrawer}
+        onDrawerChange={changeDrawer}
       />
 
       <div className="grid gap-4 xl:grid-cols-[190px_minmax(0,1fr)_350px]">
@@ -99,11 +105,17 @@ export function DashboardWorkspace({ initialQueue }: { initialQueue?: InitialCas
         <AlertDetailPanel
           caseRecord={selectedCase}
           canMutate={Boolean(token)}
-          onDrawerChange={setDrawer}
+          onDrawerChange={changeDrawer}
         />
       </div>
 
-      {drawer ? <ContextDrawer drawer={drawer} onClose={() => setDrawer(null)} /> : null}
+      {drawer ? (
+        <ContextDrawer
+          drawer={drawer}
+          onClose={() => setDrawer(null)}
+          triggerRef={drawerTriggerRef}
+        />
+      ) : null}
     </div>
   );
 }
@@ -117,7 +129,7 @@ function WorkspaceToolbar({
   queueStatus: "demo" | "loading" | "live" | "error";
   onRetry: () => void;
   drawer: ToolDrawer;
-  onDrawerChange: (drawer: ToolDrawer) => void;
+  onDrawerChange: (drawer: ToolDrawer, trigger?: HTMLElement) => void;
 }) {
   const tools: Array<{ id: Exclude<ToolDrawer, null>; label: string; icon: typeof UserCheck }> = [
     { id: "session", label: queueStatus !== "demo" ? "Session active" : "Sign in", icon: UserCheck },
@@ -156,7 +168,7 @@ function WorkspaceToolbar({
                   ? "border-accent bg-accent/10 text-accent"
                   : "border-border bg-white text-muted hover:border-accent/60 hover:text-foreground"
               }`}
-              onClick={() => onDrawerChange(active ? null : tool.id)}
+              onClick={(event) => onDrawerChange(active ? null : tool.id, event.currentTarget)}
               aria-pressed={active}
             >
               <Icon aria-hidden className="h-4 w-4" />
@@ -222,7 +234,7 @@ function AlertDetailPanel({
 }: {
   caseRecord?: InvestigationCase;
   canMutate: boolean;
-  onDrawerChange: (drawer: ToolDrawer) => void;
+  onDrawerChange: (drawer: ToolDrawer, trigger?: HTMLElement) => void;
 }) {
   const caseDetail = useQuery({
     queryKey: caseDetailQueryKey(caseRecord?.id ?? "none"),
@@ -269,7 +281,7 @@ function AlertDetailPanel({
             <button
               type="button"
               className="text-sm font-semibold text-accent underline-offset-4 hover:underline"
-              onClick={() => onDrawerChange("upload")}
+              onClick={(event) => onDrawerChange("upload", event.currentTarget)}
             >
               Add evidence
             </button>
@@ -306,9 +318,16 @@ function SummaryItem({ label, value, tone }: { label: string; value: string; ton
   );
 }
 
-function ContextDrawer({ drawer, onClose }: { drawer: Exclude<ToolDrawer, null>; onClose: () => void }) {
+function ContextDrawer({
+  drawer,
+  onClose,
+  triggerRef
+}: {
+  drawer: Exclude<ToolDrawer, null>;
+  onClose: () => void;
+  triggerRef: { current: HTMLElement | null };
+}) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const triggerRef = useRef<HTMLElement | null>(null);
   const titles = {
     session: "Analyst session",
     copilot: "Investigation copilot",
@@ -317,11 +336,13 @@ function ContextDrawer({ drawer, onClose }: { drawer: Exclude<ToolDrawer, null>;
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialog?.showModal();
 
-    return () => triggerRef.current?.focus();
-  }, []);
+    return () => {
+      triggerRef.current?.focus();
+      triggerRef.current = null;
+    };
+  }, [triggerRef]);
   return (
     <dialog
       ref={dialogRef}

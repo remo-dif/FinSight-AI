@@ -1,4 +1,4 @@
-import type { Page, Route } from "@playwright/test";
+import type { Locator, Page, Route } from "@playwright/test";
 import type { CaseUpdate, InvestigationCase } from "@/lib/api";
 
 export const analystTokens = {
@@ -57,6 +57,14 @@ export async function json(route: Route, status: number, body: unknown) {
   });
 }
 
+export async function activateControl(locator: Locator, isMobile: boolean) {
+  if (isMobile) {
+    await locator.tap();
+    return;
+  }
+  await locator.click();
+}
+
 export async function mockLogin(page: Page, status = 200, body: unknown = analystTokens) {
   await page.route("**/api/auth/login", async (route) => json(route, status, body));
 }
@@ -68,7 +76,7 @@ export async function mockRefreshFailure(page: Page) {
 }
 
 export async function mockLogout(page: Page) {
-  await page.route("**/api/auth/logout", async (route) => json(route, 204, null));
+  await page.route("**/api/auth/logout", async (route) => route.fulfill({ status: 204 }));
 }
 
 export async function mockDashboardData(page: Page) {

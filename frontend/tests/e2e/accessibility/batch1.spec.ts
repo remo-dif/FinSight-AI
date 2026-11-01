@@ -1,13 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { json } from "../fixtures/api";
+import { activateControl, json } from "../fixtures/api";
 
-test("authentication identifies purpose and associates structured errors without exposing input", async ({ page }) => {
+test("authentication identifies purpose and associates structured errors without exposing input", async ({ page, isMobile }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await activateControl(page.getByRole("button", { name: "Sign in", exact: true }), isMobile);
   const auth = page.getByRole("region", { name: "Analyst session" });
   await expect(auth.getByLabel("Email", { exact: true })).toHaveAttribute("autocomplete", "username");
   await expect(auth.getByLabel("Password", { exact: true })).toHaveAttribute("autocomplete", "current-password");
-  await auth.getByRole("button", { name: "Register", exact: true }).click();
+  await activateControl(auth.getByRole("button", { name: "Register", exact: true }), isMobile);
   await expect(auth.getByLabel("Full name")).toHaveAttribute("autocomplete", "name");
   await expect(auth.getByLabel("Email", { exact: true })).toHaveAttribute("autocomplete", "email");
   await expect(auth.getByLabel("Password", { exact: true })).toHaveAttribute("autocomplete", "new-password");
@@ -15,7 +15,11 @@ test("authentication identifies purpose and associates structured errors without
     { loc: ["body", "full_name"], msg: "Full name is required", input: "SECRET_INPUT" },
     { loc: ["body", "password"], msg: "Password exceeds the byte limit", input: "SECRET_PASSWORD" }
   ] }));
-  await auth.getByRole("button", { name: "Create account" }).click();
+  const responsePromise = page.waitForResponse((response) =>
+    response.request().method() === "POST" && new URL(response.url()).pathname === "/api/auth/register"
+  );
+  await activateControl(auth.getByRole("button", { name: "Create account" }), isMobile);
+  expect((await responsePromise).status()).toBe(422);
   for (const [label, text] of [["Full name", "Full name is required"], ["Password", "Password exceeds the byte limit"]]) {
     const input = auth.getByLabel(label, { exact: true });
     await expect(input).toHaveAttribute("aria-invalid", "true");

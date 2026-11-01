@@ -1,15 +1,23 @@
 import { expect, test, type Page } from "@playwright/test";
-import { json, liveTransactions, mockDashboardData, mockLogin } from "../fixtures/api";
+import { json, liveTransactions, mockDashboardData, mockLogin, mockRefreshFailure } from "../fixtures/api";
 
 async function openCase(page: Page) {
+  await mockRefreshFailure(page);
   await mockLogin(page);
   await mockDashboardData(page);
+  const refreshResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" && new URL(response.url()).pathname === "/api/auth/refresh"
+  );
   await page.goto("/");
+  expect((await refreshResponse).status()).toBe(401);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type=submit]").click();
   await expect(page.getByText("Live investigation data is active.")).toBeVisible();
   await page.getByRole("button", { name: "Close panel" }).click();
-  return page.getByRole("region", { name: "Selected alert" });
+  const selected = page.getByRole("region", { name: "Selected alert" });
+  await expect(page.getByText("Live queue is active. Select an alert to review evidence and record a decision.")).toBeVisible();
+  await expect(selected).toContainText(liveTransactions[0].id);
+  return selected;
 }
 
 async function selectCase(page: Page, id: string) {
@@ -86,7 +94,12 @@ for (const kind of ["decision", "note"] as const) {
       return route.fallback();
     });
     try {
-      if (kind === "note") await selected.getByLabel("Add a note").fill("A saved note");
+      if (kind === "note") {
+        const note = selected.getByLabel("Add a note");
+        await note.fill("A saved note");
+        await expect(note).toHaveValue("A saved note");
+        await expect(selected.getByRole("button", { name: "Add note", exact: true })).toBeEnabled();
+      }
       else {
         await selected.getByRole("combobox", { name: /Decision/ }).selectOption("escalate");
         await selected.getByRole("textbox", { name: /^Reason/ }).fill("A saved decision");
@@ -95,6 +108,7 @@ for (const kind of ["decision", "note"] as const) {
       await selected.getByRole("button", { name: kind === "note" ? "Add note" : "Record decision", exact: true }).click();
       await request;
       await selectCase(page, liveTransactions[1].id);
+      await expect(selected).toContainText(liveTransactions[1].id);
       await selected.getByLabel("Add a note").fill("B draft must survive");
       const response = page.waitForResponse(r => r.request().method() === (kind === "note" ? "POST" : "PATCH"));
       release();
@@ -102,12 +116,14 @@ for (const kind of ["decision", "note"] as const) {
       await expect(selected.getByLabel("Add a note")).toHaveValue("B draft must survive");
       await expect(selected).not.toContainText("A saved");
       await selectCase(page, liveTransactions[0].id);
+      await expect(selected).toContainText(liveTransactions[0].id);
       await expect(selected).toContainText(kind === "note" ? "A saved note" : "A saved decision");
     } finally { release(); }
   });
 }
 
 test("follow-up drafts and captured revisions stay with their intended case", async ({ page }) => {
+  await mockRefreshFailure(page);
   await mockLogin(page);
   await mockDashboardData(page);
   const records = liveTransactions.map((r, i) => ({ ...r, decision: "escalate", status: "escalated", decision_reason: "Initial", revision: 7 + i }));
@@ -116,12 +132,18 @@ test("follow-up drafts and captured revisions stay with their intended case", as
     const record = records.find(item => item.id === new URL(r.request().url()).pathname.split("/")[3]);
     return json(r, 200, { ...record, notes: [], follow_ups: [] });
   });
+  const refreshResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" && new URL(response.url()).pathname === "/api/auth/refresh"
+  );
   await page.goto("/");
+  expect((await refreshResponse).status()).toBe(401);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type=submit]").click();
   await expect(page.getByText("Live investigation data is active.")).toBeVisible();
   await page.getByRole("button", { name: "Close panel" }).click();
   const selected = page.getByRole("region", { name: "Selected alert" });
+  await expect(page.getByText("Live queue is active. Select an alert to review evidence and record a decision.")).toBeVisible();
+  await expect(selected).toContainText(records[0].id);
   await selected.getByLabel("Escalation investigation outcome").fill("A draft");
   await selectCase(page, records[1].id);
   await expect(selected.getByLabel("Escalation investigation outcome")).toHaveValue("");
