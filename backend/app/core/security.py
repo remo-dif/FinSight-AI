@@ -7,7 +7,7 @@ from typing import Annotated, Any
 from uuid import UUID, uuid4
 
 import bcrypt
-from fastapi import Cookie, Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from fastapi.security.utils import get_authorization_scheme_param
 from jose import JWTError, jwt
@@ -17,6 +17,7 @@ from starlette.requests import Request
 
 from app.core.config import settings
 from app.core.database import get_async_db, get_db
+from app.core.session_cookies import session_binding as read_session_binding
 from app.models.user import RefreshToken, RefreshTokenFamily, User, UserRole
 
 
@@ -160,7 +161,7 @@ def as_aware_utc(value: datetime) -> datetime:
 def get_current_user(
     token: Annotated[str, Depends(bearer_scheme)],
     db: Annotated[Session, Depends(get_db)],
-    session_binding: Annotated[str | None, Cookie(alias="finsight_session")] = None,
+    session_binding: Annotated[str | None, Depends(read_session_binding)] = None,
 ) -> User:
     credentials_error = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -194,7 +195,7 @@ def get_current_user(
 async def get_current_user_async(
     token: Annotated[str, Depends(bearer_scheme)],
     db: Annotated[AsyncSession, Depends(get_async_db)],
-    session_binding: Annotated[str | None, Cookie(alias="finsight_session")] = None,
+    session_binding: Annotated[str | None, Depends(read_session_binding)] = None,
 ) -> User:
     credentials_error = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

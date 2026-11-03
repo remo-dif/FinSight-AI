@@ -39,7 +39,7 @@ async def test_bound_cookies_are_httponly_secure_and_selector_is_login_only(db, 
         )
         assert login.status_code == 200
         assert login.json()["refresh_token"] == ""
-        binding = client.cookies.get("finsight_session")
+        binding = client.cookies.get("__Host-finsight_session")
         assert len(binding) == 32
         live_cookies = [c for c in login.headers.get_list("set-cookie") if "Max-Age=0" not in c]
         assert len(live_cookies) == 3
@@ -53,13 +53,14 @@ async def test_bound_cookies_are_httponly_secure_and_selector_is_login_only(db, 
         assert refreshed.status_code == 200
         assert refreshed.json()["refresh_token"] == ""
         assert not any(
-            c.startswith("finsight_session=") for c in refreshed.headers.get_list("set-cookie")
+            c.startswith("__Host-finsight_session=")
+            for c in refreshed.headers.get_list("set-cookie")
         )
         late_access = refreshed.json()["access_token"]
         out = await client.post("/api/auth/logout", json={})
         assert out.status_code == 204
         assert not any(
-            c.startswith("finsight_session=") for c in out.headers.get_list("set-cookie")
+            c.startswith("__Host-finsight_session=") for c in out.headers.get_list("set-cookie")
         )
         assert (
             await client.get("/api/auth/me", headers={"Authorization": f"Bearer {late_access}"})
@@ -127,3 +128,34 @@ def test_async_authorization_rejects_revoked_bound_access(case_pg):
     # Psycopg async I/O requires a selector loop on Windows, without changing global policy.
     with asyncio.Runner(loop_factory=asyncio.SelectorEventLoop) as runner:
         runner.run(verify())
+
+
+@pytest.mark.asyncio
+async def test_duplicate_selector_is_rejected_before_authentication(db):
+    user = create_user(db)
+    response = auth.Response()
+    tokens = auth.login(
+        LoginRequest(email=user.email, password="correct horse battery staple"), response, db
+    )
+    selector = next(
+        value.split(";", 1)[0]
+        for value in response.headers.getlist("set-cookie")
+        if value.startswith("finsight_session=")
+    )
+    app = create_app()
+    app.dependency_overrides[get_db] = lambda: db
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        headers = [
+            ("Cookie", selector),
+            ("Cookie", selector),
+            ("Authorization", f"Bearer {tokens.access_token}"),
+        ]
+        for path in ("refresh", "logout"):
+            result = await client.post(f"/api/auth/{path}", json={}, headers=headers)
+            assert result.status_code == 401
+            assert result.json()["detail"] == "Ambiguous session cookies"
+        result = await client.get("/api/auth/me", headers=headers)
+        assert result.status_code == 401
+        assert result.json()["detail"] == "Ambiguous session cookies"

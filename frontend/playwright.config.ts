@@ -21,6 +21,7 @@ export default defineConfig({
     { name: "tablet", use: { ...devices["iPad Pro 11"] } }
   ],
   webServer: {
+    env: { FINSIGHT_LOCAL_HTTP_COOKIES: "true" },
     command: process.env.PLAYWRIGHT_WEB_SERVER_COMMAND ?? "npm run test:e2e:server",
     url: "http://127.0.0.1:3101",
     reuseExistingServer: false

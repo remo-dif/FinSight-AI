@@ -111,3 +111,19 @@ test("upload authorization failures are visible to analysts", async ({ page, isM
 
   await expect(page.getByText("Only analysts can upload evidence")).toBeVisible();
 });
+
+
+test("SSR rejects duplicate session selectors before choosing a cookie", async ({ request }) => {
+  const binding = "11111111111111111111111111111111";
+  const single = await request.get("/cases", {
+    headers: { Cookie: `finsight_session=${binding}; finsight_access_${binding}=expired-access-token` }
+  });
+  expect(await single.text()).toContain("Live cases are unavailable. No demo cases are shown.");
+  const response = await request.get("/cases", {
+    headers: {
+      Cookie: `finsight_session=${binding}; finsight_session=${binding}; finsight_access_${binding}=expired-access-token`
+    }
+  });
+  expect(response.ok()).toBe(true);
+  expect(await response.text()).not.toContain("Live cases are unavailable. No demo cases are shown.");
+});

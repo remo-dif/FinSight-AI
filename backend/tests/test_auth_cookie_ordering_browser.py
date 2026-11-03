@@ -6,28 +6,38 @@ import shutil
 import socket
 import subprocess
 import threading
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 import uvicorn
-from fastapi import Request
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import NameOID
+from fastapi import Request, Response
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.main import create_app
+from app.models.user import RefreshTokenFamily
 from tests import test_case_workflow_postgres as pg_fixtures
 
 case_pg = pg_fixtures.case_pg
 
 
 @pytest.fixture
-def cookie_server(case_pg, monkeypatch):
+def cookie_server(case_pg, monkeypatch, scenario, tmp_path):
     engine, _ = case_pg
     monkeypatch.setattr("app.main.settings.rate_limit_backend", "memory")
     # Control/probe requests are additional to the auth journey, not a rate-limit test.
     monkeypatch.setattr("app.main.settings.rate_limit_per_minute", 100)
-    monkeypatch.setattr("app.api.routes.auth.settings.app_env", "development")
+    tls = scenario == "sibling"
+    monkeypatch.setattr(
+        "app.api.routes.auth.settings.app_env", "production" if tls else "development"
+    )
     app = create_app()
 
     def database():
@@ -37,6 +47,7 @@ def cookie_server(case_pg, monkeypatch):
     app.dependency_overrides[get_db] = database
     ready, release = threading.Event(), threading.Event()
     cross_site = {"cookie_sent": None}
+    held_request = {"carried_refresh_cookie": False}
 
     @app.get("/__cookie-test", response_class=HTMLResponse)
     def document():
@@ -50,7 +61,7 @@ def cookie_server(case_pg, monkeypatch):
 
     @app.get("/__held")
     async def held():
-        return {"ready": await asyncio.to_thread(ready.wait, 8)}
+        return {"ready": await asyncio.to_thread(ready.wait, 8), **held_request}
 
     @app.post("/__release")
     def unlock():
@@ -66,10 +77,33 @@ def cookie_server(case_pg, monkeypatch):
     def observed():
         return cross_site
 
+    @app.post("/__revoke")
+    def revoke(request: Request):
+        binding = request.cookies["finsight_session"]
+        with Session(engine) as db:
+            db.get(RefreshTokenFamily, UUID(binding)).revoked_at = datetime.now(UTC)
+            db.commit()
+        return {"revoked": True}
+
+    @app.get("/__toss/{binding}")
+    def toss(binding: str):
+        response = Response("sibling")
+        response.set_cookie(
+            "__Host-finsight_session", binding, domain="finsight.test", secure=True, path="/"
+        )
+        response.set_cookie(
+            "finsight_session", binding, domain="finsight.test", secure=True, path="/"
+        )
+        return response
+
     class DelayHeaders:
         async def __call__(self, scope, receive, send):
             if scope["type"] != "http" or scope.get("query_string") != b"hold=1":
                 return await app(scope, receive, send)
+            held_request["carried_refresh_cookie"] = any(
+                name == b"cookie" and b"finsight_refresh_" in value
+                for name, value in scope["headers"]
+            )
             messages = []
 
             async def capture(message):
@@ -87,7 +121,34 @@ def cookie_server(case_pg, monkeypatch):
     sock.bind(("127.0.0.1", 0))
     sock.listen()
     port = sock.getsockname()[1]
-    server = uvicorn.Server(uvicorn.Config(DelayHeaders(), log_level="error", lifespan="off"))
+    ssl_options = {}
+    if tls:
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "*.finsight.test")])
+        now = datetime.now(UTC)
+        cert = (
+            x509.CertificateBuilder()
+            .subject_name(subject)
+            .issuer_name(subject)
+            .public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(minutes=1))
+            .not_valid_after(now + timedelta(hours=1))
+            .sign(key, hashes.SHA256())
+        )
+        key_path, cert_path = tmp_path / "key.pem", tmp_path / "cert.pem"
+        key_path.write_bytes(
+            key.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption(),
+            )
+        )
+        cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+        ssl_options = {"ssl_keyfile": str(key_path), "ssl_certfile": str(cert_path)}
+    server = uvicorn.Server(
+        uvicorn.Config(DelayHeaders(), log_level="error", lifespan="off", **ssl_options)
+    )
     thread = threading.Thread(target=server.run, kwargs={"sockets": [sock]}, daemon=True)
     thread.start()
     import time
@@ -98,7 +159,7 @@ def cookie_server(case_pg, monkeypatch):
             raise RuntimeError("Cookie integration HTTP server did not start")
         time.sleep(0.01)
     try:
-        yield f"http://127.0.0.1:{port}"
+        yield f"https://app.finsight.test:{port}" if tls else f"http://127.0.0.1:{port}"
     finally:
         release.set()
         server.should_exit = True
@@ -116,6 +177,11 @@ def cookie_server(case_pg, monkeypatch):
         "stale-failure",
         "concurrent-replay",
         "stale-logout",
+        "sibling",
+        "competing-login",
+        "repeated-login",
+        "browser-contract",
+        "stale-tab-binding",
     ],
 )
 def test_real_browser_cookie_ordering(cookie_server, scenario):

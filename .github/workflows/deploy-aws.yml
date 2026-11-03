@@ -42,6 +42,10 @@ jobs:
       BACKEND_IMAGE: ghcr.io/remo-dif/finsight-ai-backend
       FRONTEND_IMAGE: ghcr.io/remo-dif/finsight-ai-frontend
     steps:
+      - name: Block deployment pending authentication cutover automation
+        run: |
+          echo "::error::Family-bound authentication requires verified drain and rollback isolation. See docs/35-auth-cookie-hardening.md."
+          exit 1
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.IMAGE_SHA }}

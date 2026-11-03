@@ -54,7 +54,7 @@ services:
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL with the configured Redis credentials}
       RATE_LIMIT_BACKEND: redis
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - backend_uploads:/app/uploads
     depends_on:
@@ -84,8 +84,9 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
       API_INTERNAL_URL: http://backend:8000
+      FINSIGHT_LOCAL_HTTP_COOKIES: "true"
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       backend:
         condition: service_healthy

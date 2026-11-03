@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import type { CaseStatus, InvestigationCase } from "@/lib/api";
 
 export type InitialCaseQueue = {
@@ -6,7 +6,10 @@ export type InitialCaseQueue = {
   cases: InvestigationCase[] | null;
 };
 
-const SESSION_COOKIE_NAME = "finsight_session";
+function uniqueCookie(raw: string, name: string) {
+  const matches = raw.split(";").map(part => part.trim()).filter(part => part.split("=", 1)[0].trim() === name && part.includes("="));
+  return matches.length === 1 ? matches[0].slice(matches[0].indexOf("=") + 1).trim() : undefined;
+}
 
 function isInvestigationCase(value: unknown): value is InvestigationCase {
   if (!value || typeof value !== "object") return false;
@@ -23,10 +26,16 @@ function isInvestigationCase(value: unknown): value is InvestigationCase {
 }
 
 export async function fetchInitialCaseQueue(): Promise<InitialCaseQueue> {
-  const jar = await cookies();
-  const binding = jar.get(SESSION_COOKIE_NAME)?.value;
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("host") ?? "";
+  const local = process.env.FINSIGHT_LOCAL_HTTP_COOKIES === "true" &&
+    process.env.APP_ENV !== "production" && process.env.APP_ENV !== "staging" &&
+    /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/.test(host);
+  const prefix = local ? "" : "__Host-";
+  const rawCookies = requestHeaders.get("cookie") ?? "";
+  const binding = uniqueCookie(rawCookies, `${prefix}finsight_session`);
   const accessToken = binding && /^[a-f0-9]{32}$/.test(binding)
-    ? jar.get(`finsight_access_${binding}`)?.value : undefined;
+    ? uniqueCookie(rawCookies, `${prefix}finsight_access_${binding}`) : undefined;
   if (!accessToken) {
     return { status: "unauthenticated", cases: null };
   }

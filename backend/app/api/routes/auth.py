@@ -23,6 +23,14 @@ from app.core.security import (
     utc_now,
     verify_password,
 )
+from app.core.session_cookies import (
+    cookie_name,
+    raw_cookies,
+    secure_cookies,
+    session_binding,
+    session_cookie_path,
+    unique_cookie,
+)
 from app.models.user import RefreshToken, RefreshTokenFamily, User
 from app.schemas.auth import (
     LoginRequest,
@@ -41,15 +49,16 @@ SESSION_COOKIE_NAME = "finsight_session"
 
 
 def _cookie_name(kind: str, family_id: UUID) -> str:
-    return f"finsight_{kind}_{family_id.hex}"
+    return cookie_name(f"finsight_{kind}_{family_id.hex}")
 
 
 def _request_refresh(payload: RefreshTokenRequest, request: Request | None, legacy: str | None):
+    binding = session_binding(request) if request is not None else None
     if payload.refresh_token:
         return payload.refresh_token, None
     if request is None:
         return refresh_token_from_request(payload, legacy), None
-    binding = request.cookies.get(SESSION_COOKIE_NAME, "")
+    binding = binding or ""
     try:
         family_id = UUID(hex=binding)
         if family_id.hex != binding:
@@ -74,7 +83,7 @@ def _request_refresh(payload: RefreshTokenRequest, request: Request | None, lega
                 raise ValueError
         except (ValueError, JWTError):
             raise invalid_refresh_token_error() from None
-    token = request.cookies.get(_cookie_name("refresh", family_id))
+    token = unique_cookie(request, _cookie_name("refresh", family_id))
     if not token:
         raise invalid_refresh_token_error()
     return token, family_id
@@ -86,7 +95,7 @@ def set_access_cookie(response: Response, token: str, family_id: UUID | None = N
         value=token,
         max_age=settings.access_token_minutes * 60,
         httponly=True,
-        secure=settings.app_env == "production",
+        secure=secure_cookies(),
         samesite="lax",
         path="/",
     )
@@ -98,7 +107,7 @@ def clear_access_cookie(response: Response, family_id: UUID | None = None) -> No
         path="/",
         samesite="lax",
         httponly=True,
-        secure=settings.app_env == "production",
+        secure=secure_cookies(),
     )
 
 
@@ -108,19 +117,19 @@ def set_refresh_cookie(response: Response, token: str, family_id: UUID | None = 
         value=token,
         max_age=settings.refresh_token_days * 60 * 60 * 24,
         httponly=True,
-        secure=settings.app_env == "production",
+        secure=secure_cookies(),
         samesite="lax",
-        path="/api/auth",
+        path=session_cookie_path() if family_id else "/api/auth",
     )
 
 
 def clear_refresh_cookie(response: Response, family_id: UUID | None = None) -> None:
     response.delete_cookie(
         key=_cookie_name("refresh", family_id) if family_id else REFRESH_COOKIE_NAME,
-        path="/api/auth",
+        path=session_cookie_path() if family_id else "/api/auth",
         samesite="lax",
         httponly=True,
-        secure=settings.app_env == "production",
+        secure=secure_cookies(),
     )
 
 
@@ -176,6 +185,7 @@ def login(
     response: Response,
     db: Annotated[Session, Depends(get_db)],
     cookie_session: Annotated[bool, Header(alias="X-FinSight-Cookie-Session")] = False,
+    request: Request = None,
 ) -> TokenResponse:
     user = db.scalar(select(User).where(User.email == payload.email))
     password_hash = (
@@ -194,13 +204,34 @@ def login(
     except Exception:
         db.rollback()
         raise
+    # Delete only slots observed in this request. Concurrent logins issue fresh UUIDs.
+    if request is not None:
+        observed = dict.fromkeys(name for name, _ in raw_cookies(request))
+        remaining = 16
+        for name in observed:
+            if remaining == 0:
+                break
+            for kind in ("refresh", "access"):
+                prefix = cookie_name(f"finsight_{kind}_")
+                if name.startswith(prefix):
+                    suffix = name[len(prefix) :]
+                    try:
+                        previous = UUID(hex=suffix)
+                    except ValueError:
+                        continue
+                    if previous.hex == suffix and previous != family.id:
+                        remaining -= 1
+                        if kind == "refresh":
+                            clear_refresh_cookie(response, previous)
+                        else:
+                            clear_access_cookie(response, previous)
     # Only login changes the selected family. Refresh/logout never write this selector.
     response.set_cookie(
-        SESSION_COOKIE_NAME,
+        cookie_name(SESSION_COOKIE_NAME),
         family.id.hex,
         max_age=settings.refresh_token_days * 86400,
         httponly=True,
-        secure=settings.app_env == "production",
+        secure=secure_cookies(),
         samesite="lax",
         path="/",
     )
