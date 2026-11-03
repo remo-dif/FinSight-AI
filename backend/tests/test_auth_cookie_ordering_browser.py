@@ -133,6 +133,7 @@ def test_real_browser_cookie_ordering(cookie_server, scenario):
         [node, "tests/integration/auth-cookie-ordering.mjs", scenario],
         cwd=frontend,
         env={**os.environ, "COOKIE_TEST_ORIGIN": cookie_server},
+        check=False,
         capture_output=True,
         text=True,
         timeout=40,

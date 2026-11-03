@@ -1,23 +1,23 @@
 """Protocol invariants beyond browser header ordering."""
 
 import asyncio
+from datetime import timedelta
 
 import httpx
 import pytest
-from datetime import timedelta
+from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import Session
-from fastapi import HTTPException
 
 from app.api.routes import auth
 from app.core.database import get_db
 from app.core.security import TokenType, create_token, get_current_user_async
 from app.main import create_app
+from app.schemas.auth import LoginRequest, RefreshTokenRequest
 from tests import test_auth as auth_fixtures
 from tests import test_case_workflow_postgres as pg_fixtures
 from tests.test_auth import create_user
-from app.schemas.auth import LoginRequest, RefreshTokenRequest
 
 db = auth_fixtures.db
 case_pg = pg_fixtures.case_pg
