@@ -169,7 +169,7 @@ export class ApiError extends Error {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "production" ? "" : "http://localhost:8000");
 const API_REQUEST_TIMEOUT_MS = 10_000;
-let refreshRequest: Promise<string | null> | null = null;
+let refreshRequest: { generation: number; promise: Promise<string | null> } | null = null;
 
 function formatApiError(status: number, fallback: string, hasToken: boolean, requiresAuth: boolean) {
   if ((status === 401 || status === 403) && requiresAuth && !hasToken) {
@@ -218,7 +218,7 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
   }
 }
 
-async function performTokenRefresh(): Promise<string | null> {
+async function performTokenRefresh(generation: number): Promise<string | null> {
   try {
     const response = await fetchWithTimeout(`${API_URL}/api/auth/refresh`, {
       method: "POST",
@@ -226,27 +226,33 @@ async function performTokenRefresh(): Promise<string | null> {
       credentials: "include",
       body: JSON.stringify({})
     });
+    if (useSessionStore.getState().sessionGeneration !== generation) return null;
     if (!response.ok) {
       useSessionStore.getState().clearSession();
       return null;
     }
 
     const data = (await response.json()) as TokenResponse;
-    useSessionStore.getState().setAccessToken(data.access_token);
-    return data.access_token;
+    return useSessionStore.getState().rotateAccessToken(data.access_token, generation) ? data.access_token : null;
   } catch {
-    useSessionStore.getState().clearSession();
+    if (useSessionStore.getState().sessionGeneration === generation) useSessionStore.getState().clearSession();
     return null;
   }
 }
 
 async function refreshAccessToken(): Promise<string | null> {
-  if (!refreshRequest) {
-    refreshRequest = performTokenRefresh().finally(() => {
-      refreshRequest = null;
-    });
+  const generation = useSessionStore.getState().sessionGeneration;
+  if (!refreshRequest || refreshRequest.generation !== generation) {
+    const request = {
+      generation,
+      promise: performTokenRefresh(generation).finally(() => {
+        // A stale flight must not release a newer generation's single-flight slot.
+        if (refreshRequest === request) refreshRequest = null;
+      })
+    };
+    refreshRequest = request;
   }
-  return refreshRequest;
+  return refreshRequest.promise;
 }
 
 export async function restoreSession(): Promise<boolean> {
@@ -271,9 +277,16 @@ async function requestWithToken(path: string, init: ApiFetchInit | undefined, to
 }
 
 export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
+  const generation = useSessionStore.getState().sessionGeneration;
+  function assertSameSession() {
+    if (init?.requireAuth && useSessionStore.getState().sessionGeneration !== generation) {
+      throw new ApiError("The session changed while this request was running. Please try again.", 401);
+    }
+  }
   let token = useSessionStore.getState().accessToken;
   if (init?.requireAuth && !token) {
     token = await refreshAccessToken();
+    if (token) assertSameSession();
   }
   if (init?.requireAuth && !token) {
     throw new ApiError(
@@ -285,10 +298,15 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
   let response: Response;
   try {
     response = await requestWithToken(path, init, token);
+    assertSameSession();
     if (response.status === 401 && token && init?.refreshOnUnauthorized !== false) {
-      const refreshedToken = await refreshAccessToken();
+      // Another request may already have rotated this session's expired token.
+      const currentToken = useSessionStore.getState().accessToken;
+      const refreshedToken = currentToken && currentToken !== token ? currentToken : await refreshAccessToken();
+      assertSameSession();
       if (refreshedToken) {
         response = await requestWithToken(path, init, refreshedToken);
+        assertSameSession();
       }
     }
   } catch (error) {
@@ -324,7 +342,9 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
   if (response.status === 204) {
     return undefined as T;
   }
-  return response.json() as Promise<T>;
+  const data = await response.json() as T;
+  assertSameSession();
+  return data;
 }
 
 export type ChatRequest = {
@@ -396,6 +416,9 @@ export function refreshSession(refreshToken: string): Promise<TokenResponse> {
 }
 
 export async function logout(): Promise<void> {
+  // Fence earlier refreshes at logout initiation, without claiming revocation.
+  // Failed/uncertain logout retains the current token; only the UI's 204 path clears it.
+  useSessionStore.getState().invalidateRefreshes();
   await apiFetch<void>("/api/auth/logout", {
     method: "POST",
     body: JSON.stringify({}),
