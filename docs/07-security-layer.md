@@ -2,7 +2,7 @@
 
 ## Controls Implemented
 
-- JWT access tokens and persisted, hashed refresh-token families with one-use rotation, replay detection and family-scoped revocation. Already issued access JWTs remain valid until expiry.
+- JWT access tokens and persisted, hashed refresh-token families with one-use rotation, replay detection and family-scoped revocation. New access JWTs are bound to a refresh family and rejected after its revocation. Legacy JWTs without that claim remain valid until expiry.
 - bcrypt passwords: registration minimum 10 characters, both auth requests maximum 72 UTF-8 bytes, no truncation or normalization. No public password-change/reset endpoint exists.
 - Authenticated ownership checks; role dependencies restrict uploads to user/admin roles. This is not a complete analyst-role authorization model.
 - Secure upload validation for extension, MIME type, size, and path isolation.
@@ -33,3 +33,5 @@ when the downstream handler returns 401 or 422. See the policy and remaining lim
 in [the consistency report](25-api-docs-configuration-consistency.md).
 
 The previous AWS account is closed. All production infrastructure controls above remain unverified deployment requirements; no active cloud deployment is asserted. The retained AWS workflow is manual-only, with explicit enablement and production-environment gates. See [Security Hardening V2](30-security-hardening-v2.md) for the current API, migration, concurrency and remaining-risk contract; historical cycle reports retain their original evidence.
+
+Browser cookie protocol: a login-only HttpOnly selector chooses family-specific HttpOnly refresh/access cookies. Refresh and logout never overwrite or delete that selector. Browser refresh carries the current access token as a signed family hint, preventing an old tab from silently switching account when the shared selector changes. Expiry is ignored only for that binding check; the refresh cookie still supplies the credential. New cookie-mode responses do not disclose a refresh token in JSON. Legacy fixed-name cookie sessions require a new login. See [the ordering proof, compatibility changes and tests](34-http-only-cookie-ordering.md).

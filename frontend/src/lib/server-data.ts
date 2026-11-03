@@ -6,7 +6,7 @@ export type InitialCaseQueue = {
   cases: InvestigationCase[] | null;
 };
 
-const ACCESS_COOKIE_NAME = "finsight_access_token";
+const SESSION_COOKIE_NAME = "finsight_session";
 
 function isInvestigationCase(value: unknown): value is InvestigationCase {
   if (!value || typeof value !== "object") return false;
@@ -23,7 +23,10 @@ function isInvestigationCase(value: unknown): value is InvestigationCase {
 }
 
 export async function fetchInitialCaseQueue(): Promise<InitialCaseQueue> {
-  const accessToken = (await cookies()).get(ACCESS_COOKIE_NAME)?.value;
+  const jar = await cookies();
+  const binding = jar.get(SESSION_COOKIE_NAME)?.value;
+  const accessToken = binding && /^[a-f0-9]{32}$/.test(binding)
+    ? jar.get(`finsight_access_${binding}`)?.value : undefined;
   if (!accessToken) {
     return { status: "unauthenticated", cases: null };
   }

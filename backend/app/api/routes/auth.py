@@ -1,7 +1,8 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response, status
+from jose import JWTError, jwt
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -36,11 +37,52 @@ from app.services.audit import AuditService
 router = APIRouter(prefix="/auth", tags=["auth"])
 REFRESH_COOKIE_NAME = "finsight_refresh_token"
 ACCESS_COOKIE_NAME = "finsight_access_token"
+SESSION_COOKIE_NAME = "finsight_session"
 
 
-def set_access_cookie(response: Response, token: str) -> None:
+def _cookie_name(kind: str, family_id: UUID) -> str:
+    return f"finsight_{kind}_{family_id.hex}"
+
+
+def _request_refresh(payload: RefreshTokenRequest, request: Request | None, legacy: str | None):
+    if payload.refresh_token:
+        return payload.refresh_token, None
+    if request is None:
+        return refresh_token_from_request(payload, legacy), None
+    binding = request.cookies.get(SESSION_COOKIE_NAME, "")
+    try:
+        family_id = UUID(hex=binding)
+        if family_id.hex != binding:
+            raise ValueError
+    except ValueError:
+        raise invalid_refresh_token_error() from None
+    authorization = request.headers.get("authorization", "")
+    if authorization:
+        try:
+            scheme, access_token = authorization.split(" ", 1)
+            access = jwt.decode(
+                access_token,
+                settings.jwt_secret_key,
+                algorithms=[settings.jwt_algorithm],
+                options={"verify_exp": False},
+            )
+            if (
+                scheme.lower() != "bearer"
+                or access.get("type") != "access"
+                or UUID(str(access.get("sid"))) != family_id
+            ):
+                raise ValueError
+        except (ValueError, JWTError):
+            raise invalid_refresh_token_error() from None
+    token = request.cookies.get(_cookie_name("refresh", family_id))
+    if not token:
+        raise invalid_refresh_token_error()
+    return token, family_id
+
+
+def set_access_cookie(response: Response, token: str, family_id: UUID | None = None) -> None:
     response.set_cookie(
-        key=ACCESS_COOKIE_NAME,
+        key=_cookie_name("access", family_id) if family_id else ACCESS_COOKIE_NAME,
         value=token,
         max_age=settings.access_token_minutes * 60,
         httponly=True,
@@ -50,18 +92,19 @@ def set_access_cookie(response: Response, token: str) -> None:
     )
 
 
-def clear_access_cookie(response: Response) -> None:
+def clear_access_cookie(response: Response, family_id: UUID | None = None) -> None:
     response.delete_cookie(
-        key=ACCESS_COOKIE_NAME,
+        key=_cookie_name("access", family_id) if family_id else ACCESS_COOKIE_NAME,
         path="/",
         samesite="lax",
+        httponly=True,
         secure=settings.app_env == "production",
     )
 
 
-def set_refresh_cookie(response: Response, token: str) -> None:
+def set_refresh_cookie(response: Response, token: str, family_id: UUID | None = None) -> None:
     response.set_cookie(
-        key=REFRESH_COOKIE_NAME,
+        key=_cookie_name("refresh", family_id) if family_id else REFRESH_COOKIE_NAME,
         value=token,
         max_age=settings.refresh_token_days * 60 * 60 * 24,
         httponly=True,
@@ -71,8 +114,14 @@ def set_refresh_cookie(response: Response, token: str) -> None:
     )
 
 
-def clear_refresh_cookie(response: Response) -> None:
-    response.delete_cookie(key=REFRESH_COOKIE_NAME, path="/api/auth", samesite="lax")
+def clear_refresh_cookie(response: Response, family_id: UUID | None = None) -> None:
+    response.delete_cookie(
+        key=_cookie_name("refresh", family_id) if family_id else REFRESH_COOKIE_NAME,
+        path="/api/auth",
+        samesite="lax",
+        httponly=True,
+        secure=settings.app_env == "production",
+    )
 
 
 def refresh_token_from_request(
@@ -126,6 +175,7 @@ def login(
     payload: LoginRequest,
     response: Response,
     db: Annotated[Session, Depends(get_db)],
+    cookie_session: Annotated[bool, Header(alias="X-FinSight-Cookie-Session")] = False,
 ) -> TokenResponse:
     user = db.scalar(select(User).where(User.email == payload.email))
     password_hash = (
@@ -135,18 +185,33 @@ def login(
     if user is None or not user.is_active or not password_valid:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
     try:
-        refresh_token = create_persisted_refresh_token(user.id, db)
+        family = RefreshTokenFamily(user_id=user.id)
+        db.add(family)
+        db.flush()
+        refresh_token = create_persisted_refresh_token(user.id, db, family_id=family.id)
         AuditService(db).record("auth.login", user.id)
         db.commit()
     except Exception:
         db.rollback()
         raise
-    set_refresh_cookie(response, refresh_token)
-    access_token = create_token(user.id, TokenType.ACCESS)
-    set_access_cookie(response, access_token)
+    # Only login changes the selected family. Refresh/logout never write this selector.
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        family.id.hex,
+        max_age=settings.refresh_token_days * 86400,
+        httponly=True,
+        secure=settings.app_env == "production",
+        samesite="lax",
+        path="/",
+    )
+    clear_refresh_cookie(response)  # Retire legacy cookie identity; never select it again.
+    clear_access_cookie(response)
+    set_refresh_cookie(response, refresh_token, family.id)
+    access_token = create_token(user.id, TokenType.ACCESS, session_id=family.id)
+    set_access_cookie(response, access_token, family.id)
     return TokenResponse(
         access_token=access_token,
-        refresh_token=refresh_token,
+        refresh_token="" if cookie_session else refresh_token,
     )
 
 
@@ -156,12 +221,15 @@ def refresh(
     response: Response,
     db: Annotated[Session, Depends(get_db)],
     cookie_token: str | None = Cookie(default=None, alias=REFRESH_COOKIE_NAME),
+    request: Request = None,
 ) -> TokenResponse:
-    refresh_token = refresh_token_from_request(payload, cookie_token)
+    refresh_token, selected_family = _request_refresh(payload, request, cookie_token)
     decoded = decode_refresh_token(refresh_token)
     user_id = UUID(str(decoded["sub"]))
     jti = str(decoded["jti"])
     stored, family = _verified_refresh_family(refresh_token, user_id, jti, db)
+    if selected_family is not None and family.id != selected_family:
+        raise invalid_refresh_token_error()
     now = utc_now()
     if family.revoked_at is not None:
         raise invalid_refresh_token_error()
@@ -199,10 +267,12 @@ def refresh(
     except Exception:
         db.rollback()
         raise
-    set_refresh_cookie(response, next_refresh_token)
-    access_token = create_token(user.id, TokenType.ACCESS)
-    set_access_cookie(response, access_token)
-    return TokenResponse(access_token=access_token, refresh_token=next_refresh_token)
+    set_refresh_cookie(response, next_refresh_token, family.id)
+    access_token = create_token(user.id, TokenType.ACCESS, session_id=family.id)
+    set_access_cookie(response, access_token, family.id)
+    return TokenResponse(
+        access_token=access_token, refresh_token=next_refresh_token if payload.refresh_token else ""
+    )
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -211,11 +281,14 @@ def logout(
     response: Response,
     db: Annotated[Session, Depends(get_db)],
     cookie_token: str | None = Cookie(default=None, alias=REFRESH_COOKIE_NAME),
+    request: Request = None,
 ) -> Response:
-    refresh_token = refresh_token_from_request(payload, cookie_token)
+    refresh_token, selected_family = _request_refresh(payload, request, cookie_token)
     decoded = decode_refresh_token(refresh_token)
     user_id = UUID(str(decoded["sub"]))
     stored = db.scalar(select(RefreshToken).where(RefreshToken.jti == str(decoded["jti"])))
+    if selected_family is not None and (stored is None or stored.family_id != selected_family):
+        raise invalid_refresh_token_error()
     if (
         stored is not None
         and stored.user_id == user_id
@@ -234,8 +307,11 @@ def logout(
             except Exception:
                 db.rollback()
                 raise
-    clear_refresh_cookie(response)
-    clear_access_cookie(response)
+    if stored is not None:
+        clear_refresh_cookie(response, stored.family_id)
+        clear_access_cookie(response, stored.family_id)
+    # Keep the selector: deleting a fixed cookie could erase a later login.
+    # A selected revoked family cannot refresh or authorize its bound access JWT.
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
 

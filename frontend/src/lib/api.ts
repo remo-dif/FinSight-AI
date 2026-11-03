@@ -220,9 +220,10 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
 
 async function performTokenRefresh(generation: number): Promise<string | null> {
   try {
+    const accessToken = useSessionStore.getState().accessToken;
     const response = await fetchWithTimeout(`${API_URL}/api/auth/refresh`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-FinSight-Cookie-Session": "true", ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
       credentials: "include",
       body: JSON.stringify({})
     });
@@ -270,6 +271,7 @@ async function requestWithToken(path: string, init: ApiFetchInit | undefined, to
     credentials: "include",
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
+      ...(path.startsWith("/api/auth/") ? { "X-FinSight-Cookie-Session": "true" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(requestInit.headers ?? {})
     }

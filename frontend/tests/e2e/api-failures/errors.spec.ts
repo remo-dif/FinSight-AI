@@ -67,8 +67,9 @@ test("cases page renders an authenticated data failure without demo records", as
   test.skip(isMobile, "server-rendered case queue behavior is viewport-independent and covered on desktop");
 
   await page.context().addCookies([
+    { name: "finsight_session", value: "11111111111111111111111111111111", url: "http://127.0.0.1:3101/", httpOnly: true, sameSite: "Lax" },
     {
-      name: "finsight_access_token",
+      name: "finsight_access_11111111111111111111111111111111",
       value: "expired-access-token",
       url: "http://127.0.0.1:3101/",
       httpOnly: true,

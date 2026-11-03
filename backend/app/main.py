@@ -89,7 +89,12 @@ def create_app() -> FastAPI:
         allow_origins=settings.allowed_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "X-Request-ID",
+            "X-FinSight-Cookie-Session",
+        ],
     )
     app.add_middleware(RequestContextMiddleware)
     rate_limit_middleware = (

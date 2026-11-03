@@ -7,7 +7,7 @@ from typing import Annotated, Any
 from uuid import UUID, uuid4
 
 import bcrypt
-from fastapi import Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from fastapi.security.utils import get_authorization_scheme_param
 from jose import JWTError, jwt
@@ -69,6 +69,7 @@ def create_token(
     token_type: TokenType,
     expires_delta: timedelta | None = None,
     jti: str | None = None,
+    session_id: UUID | None = None,
 ) -> str:
     now = datetime.now(UTC)
     expiry = now + (expires_delta or timedelta(minutes=settings.access_token_minutes))
@@ -83,6 +84,8 @@ def create_token(
         "iat": int(now.timestamp()),
         "exp": int(expiry.timestamp()),
     }
+    if session_id is not None:
+        payload["sid"] = str(session_id)
     if jti is not None:
         payload["jti"] = jti
     return jwt.encode(payload, secret, algorithm=settings.jwt_algorithm)
@@ -157,6 +160,7 @@ def as_aware_utc(value: datetime) -> datetime:
 def get_current_user(
     token: Annotated[str, Depends(bearer_scheme)],
     db: Annotated[Session, Depends(get_db)],
+    session_binding: Annotated[str | None, Cookie(alias="finsight_session")] = None,
 ) -> User:
     credentials_error = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -171,6 +175,16 @@ def get_current_user(
     except (JWTError, ValueError):
         raise credentials_error from None
 
+    if payload.get("sid") is not None:
+        try:
+            family_id = UUID(str(payload["sid"]))
+            if session_binding is not None and UUID(session_binding) != family_id:
+                raise ValueError
+        except ValueError:
+            raise credentials_error from None
+        family = db.get(RefreshTokenFamily, family_id)
+        if family is None or family.user_id != user_id or family.revoked_at is not None:
+            raise credentials_error
     user = db.get(User, user_id)
     if user is None or not user.is_active:
         raise credentials_error
@@ -180,6 +194,7 @@ def get_current_user(
 async def get_current_user_async(
     token: Annotated[str, Depends(bearer_scheme)],
     db: Annotated[AsyncSession, Depends(get_async_db)],
+    session_binding: Annotated[str | None, Cookie(alias="finsight_session")] = None,
 ) -> User:
     credentials_error = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -194,6 +209,16 @@ async def get_current_user_async(
     except (JWTError, ValueError):
         raise credentials_error from None
 
+    if payload.get("sid") is not None:
+        try:
+            family_id = UUID(str(payload["sid"]))
+            if session_binding is not None and UUID(session_binding) != family_id:
+                raise ValueError
+        except ValueError:
+            raise credentials_error from None
+        family = await db.get(RefreshTokenFamily, family_id)
+        if family is None or family.user_id != user_id or family.revoked_at is not None:
+            raise credentials_error
     user = await db.get(User, user_id)
     if user is None or not user.is_active:
         raise credentials_error

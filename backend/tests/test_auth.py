@@ -85,7 +85,7 @@ def test_login_persists_hashed_refresh_token(db: Session):
     access_cookie = next(
         cookie
         for cookie in http_response.headers.getlist("set-cookie")
-        if cookie.startswith("finsight_access_token=")
+        if cookie.startswith(f"finsight_access_{stored.family_id.hex}=")
     )
     assert "HttpOnly" in access_cookie
     assert "Path=/" in access_cookie
@@ -125,7 +125,7 @@ def test_refresh_rotates_and_revokes_previous_refresh_token(db: Session):
     )
     assert rotated.access_token
     assert any(
-        cookie.startswith("finsight_access_token=")
+        cookie.startswith(f"finsight_access_{original.family_id.hex}=")
         for cookie in refresh_http_response.headers.getlist("set-cookie")
     )
     assert rotated.refresh_token != login_response.refresh_token
@@ -157,7 +157,7 @@ def test_logout_revokes_refresh_token(db: Session):
     assert response.status_code == 204
     assert stored.revoked_at is not None
     assert any(
-        cookie.startswith("finsight_access_token=") and "Max-Age=0" in cookie
+        cookie.startswith(f"finsight_access_{stored.family_id.hex}=") and "Max-Age=0" in cookie
         for cookie in http_response.headers.getlist("set-cookie")
     )
 

@@ -190,7 +190,10 @@ test("reload restores the server session when failed logout leaves its cookie va
   await page.goto("/");
   await submitLogin(page);
   await page.context().addCookies([{
-    name: "finsight_refresh_token",
+    name: "finsight_session", value: "11111111111111111111111111111111",
+    url: "http://127.0.0.1:3101/", httpOnly: true, sameSite: "Lax"
+  }, {
+    name: "finsight_refresh_11111111111111111111111111111111",
     value: "test-refresh-token",
     url: "http://127.0.0.1:3101/api/auth/refresh",
     httpOnly: true,
@@ -199,7 +202,7 @@ test("reload restores the server session when failed logout leaves its cookie va
   }]);
   const hasRefreshCookie = async () =>
     (await page.context().cookies("http://127.0.0.1:3101/api/auth/refresh"))
-      .some((cookie) => cookie.name === "finsight_refresh_token");
+      .some((cookie) => cookie.name === "finsight_refresh_11111111111111111111111111111111");
   expect(await hasRefreshCookie()).toBe(true);
   await activateControl(page.getByRole("button", { name: "Sign out" }), isMobile);
   const authPanel = page.getByRole("region", { name: "Analyst session" });

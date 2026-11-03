@@ -190,9 +190,10 @@ Refresh tokens are stored as hashes and grouped into independent login families.
 of a valid consumed token revokes that family's refresh capability; logout also revokes
 its family, including descendants. Concurrent refreshes use a database family lock and
 single-use consumption. Strict replay handling can invalidate a session after legitimate
-multi-tab races. Already issued access tokens remain valid until expiry; family revocation
-does not provide immediate access-JWT invalidation. See [Security Hardening V2](docs/30-security-hardening-v2.md)
+multi-tab races. Family revocation now invalidates newly issued family-bound access JWTs as well. Legacy JWTs without a family claim remain valid until expiry. See [Security Hardening V2](docs/30-security-hardening-v2.md)
 for migration, concurrency and remaining trust limits.
+
+Browser authentication uses a login-only HttpOnly family selector and family-specific refresh/access cookie names, preventing delayed refresh/logout responses from replacing a newer login. Cookie-mode login (`X-FinSight-Cookie-Session: true`) and cookie-based refresh return an empty `refresh_token` field; explicit JSON-token clients retain their token exchange contract. The new cookie protocol requires reauthentication for existing fixed-name cookie sessions and a coordinated backend/frontend cutover. The selector has the configured refresh lifetime measured from login; rotation does not extend that selection lifetime. See [cookie ordering and rollout requirements](docs/34-http-only-cookie-ordering.md).
 
 ## CI Triggers and Local Checks
 
