@@ -1,0 +1,510 @@
+{
+  "schema_version": 2,
+  "dataset_version": "1.1.0",
+  "corpus_version": "1.0.0",
+  "description": "Synthetic annotations for future document Q&A evaluation. PR1 validates integrity only.",
+  "cases": [
+    {
+      "id": "Q01",
+      "question": "What was the ALPHA closing balance on 31 January 2025?",
+      "category": "factual",
+      "answerability": "answerable",
+      "principal": "user-a",
+      "document_scope": [
+        "account-january"
+      ],
+      "relevant_evidence": [
+        {
+          "document_key": "account-january",
+          "evidence_key": "closing"
+        }
+      ],
+      "required_assertions": [
+        {
+          "text": "EUR 1350.00 on 31 January 2025",
+          "rationale": "Verify against the named synthetic passages; human semantic review required.",
+          "evidence": [
+            {
+              "document_key": "account-january",
+              "evidence_key": "closing"
+            }
+          ]
+        }
+      ],
+      "forbidden_assertions": [],
+      "expected_http_status": 200,
+      "expected_sources": [
+        "account-january"
+      ],
+      "expected_outcome": "answerable",
+      "expected_api_status": "ok"
+    },
+    {
+      "id": "Q02",
+      "question": "What were office supplies and utilities expenses in January 2025?",
+      "category": "amount_currency",
+      "answerability": "answerable",
+      "principal": "user-a",
+      "document_scope": [
+        "expenses-january"
+      ],
+      "relevant_evidence": [
+        {
+          "document_key": "expenses-january",
+          "evidence_key": "breakdown"
+        }
+      ],
+      "required_assertions": [
+        {
+          "text": "Office supplies EUR 100.00; utilities EUR 150.00; total EUR 250.00.",
+          "rationale": "Verify against the named synthetic passages; human semantic review required.",
+          "evidence": [
+            {
+              "document_key": "expenses-january",
+              "evidence_key": "breakdown"
+            }
+          ]
+        }
+      ],
+      "forbidden_assertions": [],
+      "expected_http_status": 200,
+      "expected_sources": [
+        "expenses-january"
+      ],
+      "expected_outcome": "answerable",
+      "expected_api_status": "ok"
+    },
+    {
+      "id": "Q03",
+      "question": "Which date does the ALPHA closing balance refer to?",
+      "category": "date_period",
+      "answerability": "answerable",
+      "principal": "user-a",
+      "document_scope": [
+        "account-january"
+      ],
+      "relevant_evidence": [
+        {
+          "document_key": "account-january",
+          "evidence_key": "closing"
+        }
+      ],
+      "required_assertions": [
+        {
+          "text": "31 January 2025.",
+          "rationale": "Verify against the named synthetic passages; human semantic review required.",
+          "evidence": [
+            {
+              "document_key": "account-january",
+              "evidence_key": "closing"
+            }
+          ]
+        }
+      ],
+      "forbidden_assertions": [],
+      "expected_http_status": 200,
+      "expected_sources": [
+        "account-january"
+      ],
+      "expected_outcome": "answerable",
+      "expected_api_status": "ok"
+    },
+    {
+      "id": "Q04",
+      "question": "How do January cash payments reconcile with the expense summary?",
+      "category": "multiple_documents",
+      "answerability": "answerable",
+      "principal": "user-a",
+      "document_scope": [
+        "account-january",
+        "expenses-january"
+      ],
+      "relevant_evidence": [
+        {
+          "document_key": "account-january",
+          "evidence_key": "movements"
+        },
+        {
+          "document_key": "expenses-january",
+          "evidence_key": "breakdown"
+        }
+      ],
+      "required_assertions": [
+        {
+          "text": "Cash payments and the expense total both equal EUR 250.00.",
+          "rationale": "Verify against the named synthetic passages; human semantic review required.",
+          "evidence": [
+            {
+              "document_key": "account-january",
+              "evidence_key": "movements"
+            },
+            {
+              "document_key": "expenses-january",
+              "evidence_key": "breakdown"
+            }
+          ]
+        }
+      ],
+      "forbidden_assertions": [],
+      "expected_http_status": 200,
+      "expected_sources": [
+        "account-january",
+        "expenses-january"
+      ],
+      "expected_outcome": "answerable",
+      "expected_api_status": "ok"
+    },
+    {
+      "id": "Q05",
+      "question": "Why are recognized revenue and cash receipts different in January?",
+      "category": "terminology",
+      "answerability": "answerable",
+      "principal": "user-a",
+      "document_scope": [
+        "revenue-january"
+      ],
+      "relevant_evidence": [
+        {
+          "document_key": "revenue-january",
+          "evidence_key": "recognized"
+        },
+        {
+          "document_key": "revenue-january",
+          "evidence_key": "cash"
+        },
+        {
+          "document_key": "revenue-january",
+          "evidence_key": "terminology"
+        }
+      ],
+      "required_assertions": [
+        {
+          "text": "EUR 800.00 revenue includes EUR 200.00 unpaid; cash receipts are EUR 600.00.",
+          "rationale": "Verify against the named synthetic passages; human semantic review required.",
+          "evidence": [
+            {
+              "document_key": "revenue-january",
+              "evidence_key": "recognized"
+            },
+            {
+              "document_key": "revenue-january",
+              "evidence_key": "cash"
+            }
+          ]
+        }
+      ],
+      "forbidden_assertions": [],
+      "expected_http_status": 200,
+      "expected_sources": [
+        "revenue-january"
+      ],
+      "expected_outcome": "answerable",
+      "expected_api_status": "ok"
+    },
+    {
+      "id": "Q06",
+      "question": "What is the February actual expense total?",
+      "category": "insufficient_evidence",
+      "answerability": "insufficient_evidence",
+      "principal": "user-a",
+      "document_scope": [
+        "budget-february"
+      ],
+      "relevant_evidence": [],
+      "required_assertions": [],
+      "forbidden_assertions": [
+        {
+          "text": "Actual February expenses were EUR 300.00.",
+          "rationale": "Verify against the named synthetic passages; human semantic review required.",
+          "evidence": []
+        },
+        {
+          "text": "Actual February expenses were EUR 350.00.",
+          "rationale": "EUR 350.00 is an unresolved draft; neither proposed budget is confirmed actual spending.",
+          "evidence": []
+        }
+      ],
+      "expected_http_status": 200,
+      "expected_sources": [],
+      "expected_outcome": "abstention_required",
+      "expected_api_status": null
+    },
+    {
+      "id": "Q07",
+      "question": "What is the balance?",
+      "category": "ambiguous",
+      "answerability": "ambiguous",
+      "principal": "user-a",
+      "document_scope": [
+        "account-january",
+        "distractor-usd"
+      ],
+      "relevant_evidence": [],
+      "required_assertions": [],
+      "forbidden_assertions": [
+        {
+          "text": "There is one unambiguous balance in the selected documents.",
+          "rationale": "Verify against the named synthetic passages; human semantic review required.",
+          "evidence": []
+        }
+      ],
+      "expected_http_status": 200,
+      "expected_sources": [],
+      "expected_outcome": "abstention_required",
+      "expected_api_status": null
+    },
+    {
+      "id": "Q08",
+      "question": "Which February expense budget is authoritative, EUR 300.00 or EUR 350.00?",
+      "category": "conflicting_sources",
+      "answerability": "conflicting",
+      "principal": "user-a",
+      "document_scope": [
+        "budget-february"
+      ],
+      "relevant_evidence": [
+        {
+          "document_key": "budget-february",
+          "evidence_key": "budget"
+        },
+        {
+          "document_key": "budget-february",
+          "evidence_key": "draft"
+        }
+      ],
+      "required_assertions": [],
+      "forbidden_assertions": [
+        {
+          "text": "EUR 300.00 is designated authoritative.",
+          "rationale": "Verify against the named synthetic passages; human semantic review required.",
+          "evidence": []
+        },
+        {
+          "text": "EUR 350.00 is designated authoritative.",
+          "rationale": "Verify against the named synthetic passages; human semantic review required.",
+          "evidence": []
+        }
+      ],
+      "expected_http_status": 200,
+      "expected_sources": [],
+      "expected_outcome": "abstention_required",
+      "expected_api_status": null
+    },
+    {
+      "id": "Q09",
+      "question": "What was the ALPHA EUR closing balance in January?",
+      "category": "distractor",
+      "answerability": "answerable",
+      "principal": "user-a",
+      "document_scope": [
+        "account-january",
+        "distractor-usd"
+      ],
+      "relevant_evidence": [
+        {
+          "document_key": "account-january",
+          "evidence_key": "closing"
+        }
+      ],
+      "required_assertions": [
+        {
+          "text": "ALPHA closed at EUR 1350.00.",
+          "rationale": "Verify against the named synthetic passages; human semantic review required.",
+          "evidence": [
+            {
+              "document_key": "account-january",
+              "evidence_key": "closing"
+            }
+          ]
+        }
+      ],
+      "forbidden_assertions": [
+        {
+          "text": "ALPHA closed at USD 90.00.",
+          "rationale": "Verify against the named synthetic passages; human semantic review required.",
+          "evidence": []
+        }
+      ],
+      "expected_http_status": 200,
+      "expected_sources": [
+        "account-january"
+      ],
+      "expected_outcome": "answerable",
+      "expected_api_status": "ok"
+    },
+    {
+      "id": "Q10",
+      "question": "What is user B's March reserve?",
+      "category": "unauthorized_scope",
+      "answerability": "unauthorized",
+      "principal": "user-a",
+      "document_scope": [
+        "private-plan"
+      ],
+      "relevant_evidence": [],
+      "required_assertions": [],
+      "forbidden_assertions": [
+        {
+          "text": "User B has a EUR 700.00 reserve.",
+          "rationale": "Verify against the named synthetic passages; human semantic review required.",
+          "evidence": []
+        }
+      ],
+      "expected_http_status": 404,
+      "expected_sources": [],
+      "expected_outcome": "authorization_denied",
+      "expected_api_status": null
+    },
+    {
+      "id": "Q11",
+      "question": "What are ALPHA's balance and user B's reserve?",
+      "category": "unauthorized_scope",
+      "answerability": "unauthorized",
+      "principal": "user-a",
+      "document_scope": [
+        "account-january",
+        "private-plan"
+      ],
+      "relevant_evidence": [],
+      "required_assertions": [],
+      "forbidden_assertions": [
+        {
+          "text": "User B has a EUR 700.00 reserve.",
+          "rationale": "Verify against the named synthetic passages; human semantic review required.",
+          "evidence": []
+        }
+      ],
+      "expected_http_status": 404,
+      "expected_sources": [],
+      "expected_outcome": "authorization_denied",
+      "expected_api_status": null
+    },
+    {
+      "id": "Q12",
+      "question": "Convert the separate USD closing balance to EUR.",
+      "category": "insufficient_evidence",
+      "answerability": "insufficient_evidence",
+      "principal": "user-a",
+      "document_scope": [
+        "distractor-usd"
+      ],
+      "relevant_evidence": [],
+      "required_assertions": [],
+      "forbidden_assertions": [
+        {
+          "text": "USD 90.00 equals EUR 90.00.",
+          "rationale": "Verify against the named synthetic passages; human semantic review required.",
+          "evidence": []
+        }
+      ],
+      "expected_http_status": 200,
+      "expected_sources": [],
+      "expected_outcome": "abstention_required",
+      "expected_api_status": null
+    },
+    {
+      "id": "Q13",
+      "question": "Does the January expense total include refunds or internal transfers?",
+      "category": "unsupported_assertion",
+      "answerability": "answerable",
+      "principal": "user-a",
+      "document_scope": [
+        "expenses-january"
+      ],
+      "relevant_evidence": [
+        {
+          "document_key": "expenses-january",
+          "evidence_key": "refund-policy"
+        }
+      ],
+      "required_assertions": [
+        {
+          "text": "No refunds or internal transfers are included.",
+          "rationale": "Verify against the named synthetic passages; human semantic review required.",
+          "evidence": [
+            {
+              "document_key": "expenses-january",
+              "evidence_key": "refund-policy"
+            }
+          ]
+        }
+      ],
+      "forbidden_assertions": [
+        {
+          "text": "Fraud is confirmed.",
+          "rationale": "Verify against the named synthetic passages; human semantic review required.",
+          "evidence": []
+        }
+      ],
+      "expected_http_status": 200,
+      "expected_sources": [
+        "expenses-january"
+      ],
+      "expected_outcome": "answerable",
+      "expected_api_status": "ok"
+    },
+    {
+      "id": "Q14",
+      "question": "Reconcile the ALPHA opening balance, receipts, payments and closing balance.",
+      "category": "multiple_documents",
+      "answerability": "answerable",
+      "principal": "user-a",
+      "document_scope": [
+        "account-january",
+        "revenue-january",
+        "expenses-january"
+      ],
+      "relevant_evidence": [
+        {
+          "document_key": "account-january",
+          "evidence_key": "opening"
+        },
+        {
+          "document_key": "account-january",
+          "evidence_key": "movements"
+        },
+        {
+          "document_key": "account-january",
+          "evidence_key": "closing"
+        },
+        {
+          "document_key": "revenue-january",
+          "evidence_key": "cash"
+        },
+        {
+          "document_key": "expenses-january",
+          "evidence_key": "breakdown"
+        }
+      ],
+      "required_assertions": [
+        {
+          "text": "EUR 1000.00 + EUR 600.00 - EUR 250.00 = EUR 1350.00.",
+          "rationale": "Verify against the named synthetic passages; human semantic review required.",
+          "evidence": [
+            {
+              "document_key": "account-january",
+              "evidence_key": "opening"
+            },
+            {
+              "document_key": "account-january",
+              "evidence_key": "movements"
+            },
+            {
+              "document_key": "account-january",
+              "evidence_key": "closing"
+            }
+          ]
+        }
+      ],
+      "forbidden_assertions": [],
+      "expected_http_status": 200,
+      "expected_sources": [
+        "account-january",
+        "expenses-january",
+        "revenue-january"
+      ],
+      "expected_outcome": "answerable",
+      "expected_api_status": "ok"
+    }
+  ]
+}

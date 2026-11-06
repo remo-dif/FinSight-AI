@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "corpus_version": "1.0.0",
+  "description": "Entirely fictional financial corpus; no customer information.",
+  "documents": [
+    {
+      "key": "account-january",
+      "owner": "user-a",
+      "path": "account-january.txt",
+      "revision_sha256": "222aef4871ca575fb6c04ccc7b7b30e80784a70735404ae54d2aa61307c9ecac",
+      "evidence": [
+        {
+          "key": "opening",
+          "text": "Fictional account ALPHA opened January 2025 with EUR 1000.00."
+        },
+        {
+          "key": "movements",
+          "text": "During January 2025, cash receipts were EUR 600.00 and cash payments were EUR 250.00."
+        },
+        {
+          "key": "closing",
+          "text": "The closing balance on 31 January 2025 was EUR 1350.00."
+        }
+      ]
+    },
+    {
+      "key": "expenses-january",
+      "owner": "user-a",
+      "path": "expenses-january.txt",
+      "revision_sha256": "991510024846c869670146d89105c3f93d8f831fb7624a8413a460e825815b38",
+      "evidence": [
+        {
+          "key": "breakdown",
+          "text": "January 2025 cash expenses were office supplies EUR 100.00 and utilities EUR 150.00, totaling EUR 250.00."
+        },
+        {
+          "key": "refund-policy",
+          "text": "The EUR 250.00 total includes no refunds and no internal transfers."
+        }
+      ]
+    },
+    {
+      "key": "revenue-january",
+      "owner": "user-a",
+      "path": "revenue-january.txt",
+      "revision_sha256": "5710a2b9d1521db2099d6e6342fb0058efe7cb0cfc17b2b4b3b53a34b4e8fb2c",
+      "evidence": [
+        {
+          "key": "recognized",
+          "text": "January 2025 recognized revenue was EUR 800.00, including EUR 200.00 not yet collected."
+        },
+        {
+          "key": "cash",
+          "text": "January 2025 customer cash receipts were EUR 600.00."
+        },
+        {
+          "key": "terminology",
+          "text": "Recognized revenue and cash receipts are different measures; unpaid invoices can explain the difference."
+        }
+      ]
+    },
+    {
+      "key": "budget-february",
+      "owner": "user-a",
+      "path": "budget-february.txt",
+      "revision_sha256": "f6dcae2936e896ef3d36fb8c0f50c8db87a0e8a4302bafcde9a27e2df765f317",
+      "evidence": [
+        {
+          "key": "budget",
+          "text": "February 2025 planned expenses are EUR 300.00. This is a plan, not an actual expense."
+        },
+        {
+          "key": "draft",
+          "text": "An unresolved draft dated 20 January 2025 proposes February expenses of EUR 350.00. Neither figure is designated authoritative."
+        }
+      ]
+    },
+    {
+      "key": "distractor-usd",
+      "owner": "user-a",
+      "path": "distractor-usd.txt",
+      "revision_sha256": "47468a64d968ac517a46a9086b535c3191a6b8b7a7bc46e1262adc5b06df86ca",
+      "evidence": [
+        {
+          "key": "usd",
+          "text": "A separate fictional USD account has a January 2025 closing balance of USD 90.00. No exchange rate is provided."
+        }
+      ]
+    },
+    {
+      "key": "private-plan",
+      "owner": "user-b",
+      "path": "private-plan.txt",
+      "revision_sha256": "8e08f28c5472edeaf081ff8f904f8676d6f6f3749c1d08e7a5083e2a0c022ebb",
+      "evidence": [
+        {
+          "key": "private",
+          "text": "User B's fictional March 2025 planning reserve is EUR 700.00."
+        }
+      ]
+    }
+  ]
+}
