@@ -1,6 +1,7 @@
 """Run reproducible local-hash retrieval and mocked financial-response evaluations.
 
-Document Q&A is explicitly partial, not a passed answer-quality gate. No live
+Document Q&A exists in the application; this runner does not evaluate its semantic
+answer quality. Legacy document cases remain partial. No live
 provider, customer database, pricing lookup or model-based judge is used.
 """
 
@@ -122,6 +123,8 @@ def grade_case(dataset: dict, case: dict, state: dict, retrieved: list, prompts:
         "id": case["id"],
         "status": "failed" if failures else "partial" if partial else "passed",
         "failure_reasons": failures,
+        # Historical machine-readable value retained for report compatibility.
+        # It describes this runner's missing evaluation, not application capabilities.
         "capability_gap": "document_qa_and_document_citations_not_implemented" if partial else None,
         "retrieved_source_ids": sorted(observed),
         "k": case.get("k", 5),

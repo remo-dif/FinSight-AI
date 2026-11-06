@@ -1,0 +1,86 @@
+# RAG Evaluation V1 foundations
+
+## Purpose and boundary
+
+PR1 provides a versioned synthetic corpus and document-Q&A annotations. Passing the PR1 validation tests does not establish retrieval accuracy, groundedness or production AI quality.
+
+The new loader performs no ingestion, retrieval, generation, answer grading or provider calls. It does not connect to a database. The application already exposes document Q&A. Semantic document-answer evaluation is not implemented in the legacy runner.
+
+## Files and schema
+
+- `backend/evaluation/schemas.py` defines strict Pydantic v2 structures and `load_document_dataset()`.
+- `backend/evaluation/data/corpus/manifest.json` has schema version 1, corpus version 1.0.0, description and document entries.
+- Each document has a logical key, fictional owner, relative UTF-8 text path, SHA-256 of exact file bytes and evidence passages with logical keys and exact text.
+- `backend/evaluation/data/document_qa_v1.json` has schema version 1, dataset version 1.0.0, matching corpus version, description and cases.
+- Each case names its question, category, answerability, principal, explicit document scope, relevant evidence, required/forbidden assertion annotations, expected response status, HTTP status and expected sources.
+- Assertions contain text, review rationale and evidence references. Required assertions must reference relevant evidence. Forbidden assertions may have no supporting evidence because they describe unsupported claims.
+- `backend/evaluation/data/corpus/.gitattributes` preserves LF endings in text documents, including on Windows checkouts, so byte hashes remain reproducible.
+
+Logical document/evidence keys identify fixture concepts. Runtime database UUIDs and chunk indices are deliberately absent. A future isolated loader must map these keys to newly created runtime records under the specified synthetic owners. No annotations grant runtime access.
+
+A document content revision is its exact SHA-256. Preserve logical keys while updating content, revision hash, corpus version and dependent annotations together. Evidence keys remain stable only while their meaning remains stable. Evidence text must appear exactly once in its named document. Repeated or missing anchors require an unambiguous new passage annotation.
+
+## Corpus and cases
+
+There are six entirely fictional documents and twelve evidence passages. The documents cover an EUR account statement, expense breakdown, recognized revenue and receipts, February budget proposals, an unrelated USD account and a second owner's private plan.
+
+The January EUR arithmetic is 1000.00 opening + 600.00 receipts - 250.00 payments = 1350.00 closing. Office supplies 100.00 + utilities 150.00 = 250.00 expenses. Recognized revenue 800.00 less uncollected 200.00 = 600.00 receipts. EUR and USD accounts have separate identities, with no asserted exchange rate. The two February budget figures are intentionally unresolved competing proposals, not inconsistent actual transactions.
+
+The fourteen cases cover factual answers, amounts/currencies, dates, terminology, multiple documents, distractors, missing actuals/exchange rates, ambiguity, conflicting proposals, unsupported assertions, foreign-only scope and mixed owned/foreign scope.
+
+The annotations were checked against the synthetic text and deterministic financial reconciliation tests during implementation. A separate human semantic review has not been performed. Required/forbidden assertions are review annotations, not substring grading rules. Future graders must consider negation, units, scope and unsupported additional claims.
+
+## Integrity guarantees
+
+The combined bundle rejects duplicate cases, documents, paths and per-document evidence identifiers; unknown scope/evidence/source references; empty questions; malformed revision hashes; hash mismatches; missing or ambiguous passage anchors; incompatible corpus versions; unknown fields; malformed assertions; contradictory statuses and overlapping identical required/forbidden assertions.
+
+Ordinary cases can reference only documents in scope owned by their principal. An authorization-negative case must include a foreign document and use category `unauthorized_scope`, answerability `unauthorized`, expected status `authorization_denied` and HTTP 404. That status is a dataset annotation for an HTTP rejection, not a new application response status. Such cases cannot expect returned sources or required answer assertions. Their optional evidence annotations may identify known foreign passages for negative testing, without granting access.
+
+Answerable cases require evidence, supported assertion references and expected sources matching the relevant documents. Other cases expect abstention with HTTP 200 and no used sources. Relevant passages may still be annotated for conflicts. Expected sources mean used citations; future checks must distinguish them from the application's retrieved `sources` field.
+
+Paths must resolve inside the local corpus directory and name text files. This loader is an offline developer utility reading repository-controlled files. It is not an API or a general sandbox for attacker-controlled corpora.
+
+Schema validation cannot establish semantic truth, completeness of relevance labels, resistance to prompt injection, correct application authorization, retrieval rank, citation entailment or answer quality. It detects structural contradictions and exact assertion overlap, not logically contradictory paraphrases.
+
+## Validation and extension
+
+From `backend/`, validate without providers or environment secrets:
+
+```sh
+python -B -c "from evaluation.schemas import load_document_dataset; b = load_document_dataset(); print(len(b.corpus.documents), len(b.dataset.cases))"
+python -B -m pytest -q -p no:cacheprovider tests/test_rag_evaluation_schema.py
+```
+
+To add a case, first inspect the corpus, select a unique case ID and explicit principal/scope, annotate answerability and HTTP behavior, then select evidence passages and independently author expected/forbidden assertions. Add a new synthetic document only when needed. Update the exact-byte hash and version metadata for changed corpus content. Run integrity and legacy tests. Have another reviewer inspect numerical facts and semantic expectations before using the dataset to assess model quality.
+
+No private customer documents, account secrets or provider credentials belong in this corpus or future reports. Future integrations must instantiate both synthetic owners in an isolated database and call the existing authorized services. Direct reads of all embeddings must never stand in for an authorization test.
+
+## Legacy compatibility
+
+The existing `python -m evaluation.runner` benchmark retains its 18 synthetic cases, SQLite environment, local-hash retrieval, mocked financial provider, metric definitions, classifications and versioned baseline. Only explanatory text/comments were clarified in PR1. The historical `document_qa_and_document_citations_not_implemented` capability-gap string is retained for machine-readable compatibility; it describes missing evaluation in that runner, not the application's available Q&A endpoints.
+
+A regression test compares the entire freshly evaluated legacy report with `evaluation/baseline.json`. The new document dataset is not automatically evaluated by that runner. Passing legacy results does not measure production document-Q&A quality.
+
+## Next increments
+
+PR2 will ingest the fixed corpus through the actual production preparation path in an isolated test environment, preserve ranked results and measure document/passage retrieval. It must label SQLite and PostgreSQL/pgvector results separately and record configuration/model/chunker versions.
+
+PR3 will exercise document answers, citation validity and abstention, combining deterministic contract checks with explicitly identified human semantic review. Optional model judges require separate justification and calibration.
+
+PR4 will compare compatible run manifests, record baseline/candidate deltas and integrate deterministic checks into CI. Quality thresholds require observed baselines and review. No new metric, judge, baseline comparator or CI gate is introduced by PR1.
+
+## Verification during implementation
+
+Commands were executed from `backend/` using Python 3.12, installed Pydantic 2.13.4 and Ruff 0.17.3. No dependencies were installed. Test processes used explicit synthetic DATABASE_URL=sqlite://, JWT placeholders, a non-provider OPENAI_API_KEY placeholder and EMBEDDING_BACKEND=local. TEST_DATABASE_URL and TEST_REDIS_URL were unset for the full suite. Bytecode and pytest cache generation were disabled.
+
+- Initial schema run, `python -B -m pytest -q -p no:cacheprovider tests/test_rag_evaluation_schema.py --tb=short`, passed 41 tests. Four additional integrity/compatibility tests were then added.
+- Final focused run, `python -B -m pytest -q -p no:cacheprovider tests/test_rag_evaluation_schema.py tests/test_rag_evaluation.py tests/test_document_grounded_qa.py tests/test_rag.py tests/test_ai_observability.py tests/test_ai_rag_integration.py --tb=short`, passed 106 tests with 2 skipped and zero failures. The skipped tests require TEST_DATABASE_URL for real PostgreSQL/pgvector.
+- Full backend run, `python -B -m pytest -q -p no:cacheprovider --tb=short`, passed 652 tests with 48 skipped and zero failures in 135.57 seconds. Service-backed PostgreSQL/Redis checks, including dependent real-cookie browser checks, were unavailable without isolated service URLs. These skips are not integration success evidence.
+- `python -m ruff check .` passed. `python -m ruff format --check .` passed with 115 files formatted. The formatter was applied only to the two new Python files.
+- `python -B -c "from evaluation.schemas import load_document_dataset; b = load_document_dataset(); print(len(b.corpus.documents), len(b.dataset.cases))"` loaded 6 documents and 14 cases successfully.
+- The new full-report compatibility assertion passed against the unchanged legacy baseline.
+- `git diff --check` passed. Git attributes reported text=set and eol=lf for the corpus documents.
+
+No PostgreSQL/pgvector integration result is claimed from SQLite execution. Frontend checks, live model evaluation and hosted CI were not run for these backend-only dataset foundations.
+
+Production retrieval, chunking, embeddings, document-Q&A behavior, LLM prompts, frontend, authentication, deployment workflows and safety gates are outside these changes. No dependencies or migrations are added. Work remains local and uncommitted.
