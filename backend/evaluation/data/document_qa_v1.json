@@ -1,6 +1,6 @@
 {
-  "schema_version": 1,
-  "dataset_version": "1.0.0",
+  "schema_version": 2,
+  "dataset_version": "1.1.0",
   "corpus_version": "1.0.0",
   "description": "Synthetic annotations for future document Q&A evaluation. PR1 validates integrity only.",
   "cases": [
@@ -32,11 +32,12 @@
         }
       ],
       "forbidden_assertions": [],
-      "expected_status": "ok",
       "expected_http_status": 200,
       "expected_sources": [
         "account-january"
-      ]
+      ],
+      "expected_outcome": "answerable",
+      "expected_api_status": "ok"
     },
     {
       "id": "Q02",
@@ -66,11 +67,12 @@
         }
       ],
       "forbidden_assertions": [],
-      "expected_status": "ok",
       "expected_http_status": 200,
       "expected_sources": [
         "expenses-january"
-      ]
+      ],
+      "expected_outcome": "answerable",
+      "expected_api_status": "ok"
     },
     {
       "id": "Q03",
@@ -100,11 +102,12 @@
         }
       ],
       "forbidden_assertions": [],
-      "expected_status": "ok",
       "expected_http_status": 200,
       "expected_sources": [
         "account-january"
-      ]
+      ],
+      "expected_outcome": "answerable",
+      "expected_api_status": "ok"
     },
     {
       "id": "Q04",
@@ -143,12 +146,13 @@
         }
       ],
       "forbidden_assertions": [],
-      "expected_status": "ok",
       "expected_http_status": 200,
       "expected_sources": [
         "account-january",
         "expenses-january"
-      ]
+      ],
+      "expected_outcome": "answerable",
+      "expected_api_status": "ok"
     },
     {
       "id": "Q05",
@@ -190,11 +194,12 @@
         }
       ],
       "forbidden_assertions": [],
-      "expected_status": "ok",
       "expected_http_status": 200,
       "expected_sources": [
         "revenue-january"
-      ]
+      ],
+      "expected_outcome": "answerable",
+      "expected_api_status": "ok"
     },
     {
       "id": "Q06",
@@ -212,11 +217,17 @@
           "text": "Actual February expenses were EUR 300.00.",
           "rationale": "Verify against the named synthetic passages; human semantic review required.",
           "evidence": []
+        },
+        {
+          "text": "Actual February expenses were EUR 350.00.",
+          "rationale": "EUR 350.00 is an unresolved draft; neither proposed budget is confirmed actual spending.",
+          "evidence": []
         }
       ],
-      "expected_status": "abstained",
       "expected_http_status": 200,
-      "expected_sources": []
+      "expected_sources": [],
+      "expected_outcome": "abstention_required",
+      "expected_api_status": null
     },
     {
       "id": "Q07",
@@ -237,9 +248,10 @@
           "evidence": []
         }
       ],
-      "expected_status": "abstained",
       "expected_http_status": 200,
-      "expected_sources": []
+      "expected_sources": [],
+      "expected_outcome": "abstention_required",
+      "expected_api_status": null
     },
     {
       "id": "Q08",
@@ -273,9 +285,10 @@
           "evidence": []
         }
       ],
-      "expected_status": "abstained",
       "expected_http_status": 200,
-      "expected_sources": []
+      "expected_sources": [],
+      "expected_outcome": "abstention_required",
+      "expected_api_status": null
     },
     {
       "id": "Q09",
@@ -312,11 +325,12 @@
           "evidence": []
         }
       ],
-      "expected_status": "ok",
       "expected_http_status": 200,
       "expected_sources": [
         "account-january"
-      ]
+      ],
+      "expected_outcome": "answerable",
+      "expected_api_status": "ok"
     },
     {
       "id": "Q10",
@@ -336,9 +350,10 @@
           "evidence": []
         }
       ],
-      "expected_status": "authorization_denied",
       "expected_http_status": 404,
-      "expected_sources": []
+      "expected_sources": [],
+      "expected_outcome": "authorization_denied",
+      "expected_api_status": null
     },
     {
       "id": "Q11",
@@ -359,9 +374,10 @@
           "evidence": []
         }
       ],
-      "expected_status": "authorization_denied",
       "expected_http_status": 404,
-      "expected_sources": []
+      "expected_sources": [],
+      "expected_outcome": "authorization_denied",
+      "expected_api_status": null
     },
     {
       "id": "Q12",
@@ -381,9 +397,10 @@
           "evidence": []
         }
       ],
-      "expected_status": "abstained",
       "expected_http_status": 200,
-      "expected_sources": []
+      "expected_sources": [],
+      "expected_outcome": "abstention_required",
+      "expected_api_status": null
     },
     {
       "id": "Q13",
@@ -419,11 +436,12 @@
           "evidence": []
         }
       ],
-      "expected_status": "ok",
       "expected_http_status": 200,
       "expected_sources": [
         "expenses-january"
-      ]
+      ],
+      "expected_outcome": "answerable",
+      "expected_api_status": "ok"
     },
     {
       "id": "Q14",
@@ -479,13 +497,14 @@
         }
       ],
       "forbidden_assertions": [],
-      "expected_status": "ok",
       "expected_http_status": 200,
       "expected_sources": [
         "account-january",
         "expenses-january",
         "revenue-january"
-      ]
+      ],
+      "expected_outcome": "answerable",
+      "expected_api_status": "ok"
     }
   ]
 }

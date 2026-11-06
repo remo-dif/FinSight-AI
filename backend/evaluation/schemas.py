@@ -88,13 +88,14 @@ class EvaluationCase(AnnotationModel):
     relevant_evidence: list[EvidenceReference]
     required_assertions: list[Assertion]
     forbidden_assertions: list[Assertion]
-    expected_status: Literal["ok", "abstained", "authorization_denied"]
+    expected_outcome: Literal["answerable", "abstention_required", "authorization_denied"]
+    expected_api_status: Literal["ok", "abstained", "insufficient_evidence"] | None
     expected_http_status: Literal[200, 404]
     expected_sources: list[Key]
 
 
 class DocumentDataset(AnnotationModel):
-    schema_version: Literal[1]
+    schema_version: Literal[2]
     dataset_version: Version
     corpus_version: Version
     description: Text
@@ -130,17 +131,29 @@ class EvaluationBundle(AnnotationModel):
                 raise ValueError(f"Invalid ownership for authorization scenario in {case.id}")
             if (case.category == "unauthorized_scope") != unauthorized:
                 raise ValueError(f"Invalid authorization category in {case.id}")
-            status = (
+            outcome = (
                 "authorization_denied"
                 if unauthorized
-                else "ok"
+                else "answerable"
                 if case.answerability == "answerable"
-                else "abstained"
+                else "abstention_required"
             )
-            if case.expected_status != status or case.expected_http_status != (
+            if case.expected_outcome != outcome or case.expected_http_status != (
                 404 if unauthorized else 200
             ):
                 raise ValueError(f"Contradictory expected status in {case.id}")
+            if unauthorized:
+                valid_api_status = case.expected_api_status is None
+            elif outcome == "answerable":
+                valid_api_status = case.expected_api_status == "ok"
+            else:
+                valid_api_status = case.expected_api_status in (
+                    None,
+                    "abstained",
+                    "insufficient_evidence",
+                )
+            if not valid_api_status:
+                raise ValueError(f"Contradictory expected API status in {case.id}")
             relevant = {(ref.document_key, ref.evidence_key) for ref in case.relevant_evidence}
             if len(relevant) != len(case.relevant_evidence):
                 raise ValueError(f"Duplicate relevance references in {case.id}")
@@ -152,7 +165,7 @@ class EvaluationBundle(AnnotationModel):
                 pair = (ref.document_key, ref.evidence_key)
                 if pair not in passages:
                     raise ValueError(f"Unknown evidence reference in {case.id}")
-                if not unauthorized and ref.document_key not in scope:
+                if ref.document_key not in scope:
                     raise ValueError(f"Evidence outside document scope in {case.id}")
             sources = set(case.expected_sources)
             relevant_documents = {key for key, _ in relevant}
@@ -161,7 +174,7 @@ class EvaluationBundle(AnnotationModel):
                 or not sources <= scope & relevant_documents
             ):
                 raise ValueError(f"Inconsistent expected sources in {case.id}")
-            if status == "ok":
+            if outcome == "answerable":
                 if not relevant or not case.required_assertions or sources != relevant_documents:
                     raise ValueError(f"Answerable case lacks evidence or assertions in {case.id}")
             elif sources or case.required_assertions:

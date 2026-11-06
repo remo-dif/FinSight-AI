@@ -37,7 +37,7 @@ def test_valid_dataset_and_corpus():
         ("case", "question", "  \n\t "),
         ("case", "question", "x" * 4001),
         ("case", "question", 123),
-        ("case", "expected_status", "abstained"),
+        ("case", "expected_outcome", "abstention_required"),
         ("case", "expected_http_status", 404),
         ("case", "expected_sources", ["missing"]),
         ("case", "expected_sources", ["account-january", "account-january"]),
@@ -220,3 +220,62 @@ def test_synthetic_financial_facts_reconcile():
     assert opening + receipts - payments == closing
     assert supplies + utilities == expenses == payments
     assert revenue - unpaid == collected == receipts
+
+
+def test_unauthorized_case_rejects_evidence_outside_requested_scope(data):
+    # Q10 requests only private-plan, but this known passage belongs to account-january.
+    data["dataset"]["cases"][9]["relevant_evidence"] = [
+        {"document_key": "account-january", "evidence_key": "closing"}
+    ]
+    with pytest.raises(ValidationError, match="Evidence outside document scope"):
+        EvaluationBundle.model_validate(data)
+
+
+def test_semantic_outcome_and_literal_status_are_separate():
+    cases = {case.id: case for case in load_document_dataset().dataset.cases}
+    assert cases["Q01"].expected_outcome == "answerable"
+    assert cases["Q01"].expected_api_status == "ok"
+    assert cases["Q06"].expected_outcome == "abstention_required"
+    assert cases["Q06"].expected_api_status is None
+    for key in ("Q10", "Q11"):
+        assert cases[key].expected_outcome == "authorization_denied"
+        assert cases[key].expected_api_status is None
+        assert cases[key].expected_http_status == 404
+
+
+def test_q06_forbids_plan_and_draft_as_confirmed_actuals():
+    case = next(case for case in load_document_dataset().dataset.cases if case.id == "Q06")
+    assert case.answerability == "insufficient_evidence"
+    assert {assertion.text for assertion in case.forbidden_assertions} >= {
+        "Actual February expenses were EUR 300.00.",
+        "Actual February expenses were EUR 350.00.",
+    }
+
+
+@pytest.mark.parametrize(
+    ("case_index", "api_status"),
+    [
+        (0, None),
+        (0, "abstained"),
+        (5, "ok"),
+        (9, "insufficient_evidence"),
+        (9, "authorization_denied"),
+        (5, "provider_error"),
+    ],
+)
+def test_contradictory_literal_api_status_rejected(data, case_index, api_status):
+    data["dataset"]["cases"][case_index]["expected_api_status"] = api_status
+    with pytest.raises(ValidationError):
+        EvaluationBundle.model_validate(data)
+
+
+@pytest.mark.parametrize("api_status", [None, "abstained", "insufficient_evidence"])
+def test_abstention_can_have_nullable_or_explicit_api_status(data, api_status):
+    data["dataset"]["cases"][5]["expected_api_status"] = api_status
+    assert EvaluationBundle.model_validate(data).dataset.cases[5].expected_api_status == api_status
+
+
+def test_retired_expected_status_field_is_rejected(data):
+    data["dataset"]["cases"][0]["expected_status"] = "ok"
+    with pytest.raises(ValidationError):
+        EvaluationBundle.model_validate(data)

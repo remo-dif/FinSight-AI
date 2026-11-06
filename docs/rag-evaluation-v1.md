@@ -11,8 +11,8 @@ The new loader performs no ingestion, retrieval, generation, answer grading or p
 - `backend/evaluation/schemas.py` defines strict Pydantic v2 structures and `load_document_dataset()`.
 - `backend/evaluation/data/corpus/manifest.json` has schema version 1, corpus version 1.0.0, description and document entries.
 - Each document has a logical key, fictional owner, relative UTF-8 text path, SHA-256 of exact file bytes and evidence passages with logical keys and exact text.
-- `backend/evaluation/data/document_qa_v1.json` has schema version 1, dataset version 1.0.0, matching corpus version, description and cases.
-- Each case names its question, category, answerability, principal, explicit document scope, relevant evidence, required/forbidden assertion annotations, expected response status, HTTP status and expected sources.
+- `backend/evaluation/data/document_qa_v1.json` has schema version 2, dataset version 1.1.0, matching corpus version, description and cases.
+- Each case names its question, category, answerability, principal, explicit document scope, relevant evidence, required/forbidden assertion annotations, semantic expected outcome, nullable literal API status, HTTP status and expected sources.
 - Assertions contain text, review rationale and evidence references. Required assertions must reference relevant evidence. Forbidden assertions may have no supporting evidence because they describe unsupported claims.
 - `backend/evaluation/data/corpus/.gitattributes` preserves LF endings in text documents, including on Windows checkouts, so byte hashes remain reproducible.
 
@@ -28,19 +28,34 @@ The January EUR arithmetic is 1000.00 opening + 600.00 receipts - 250.00 payment
 
 The fourteen cases cover factual answers, amounts/currencies, dates, terminology, multiple documents, distractors, missing actuals/exchange rates, ambiguity, conflicting proposals, unsupported assertions, foreign-only scope and mixed owned/foreign scope.
 
-The annotations were checked against the synthetic text and deterministic financial reconciliation tests during implementation. A separate human semantic review has not been performed. Required/forbidden assertions are review annotations, not substring grading rules. Future graders must consider negation, units, scope and unsupported additional claims.
+The annotations were checked against the synthetic text and deterministic financial reconciliation tests during implementation. A separate human semantic review has not been performed. Required/forbidden assertions are review annotations, not substring grading rules. Forbidden assertions are representative, not exhaustive. Q06 forbids both EUR 300.00 (plan) and EUR 350.00 (unresolved draft) as confirmed February actual expenses; the corpus provides no actual total. Future graders must consider negation, units, scope and unsupported additional claims.
 
 ## Integrity guarantees
 
 The combined bundle rejects duplicate cases, documents, paths and per-document evidence identifiers; unknown scope/evidence/source references; empty questions; malformed revision hashes; hash mismatches; missing or ambiguous passage anchors; incompatible corpus versions; unknown fields; malformed assertions; contradictory statuses and overlapping identical required/forbidden assertions.
 
-Ordinary cases can reference only documents in scope owned by their principal. An authorization-negative case must include a foreign document and use category `unauthorized_scope`, answerability `unauthorized`, expected status `authorization_denied` and HTTP 404. That status is a dataset annotation for an HTTP rejection, not a new application response status. Such cases cannot expect returned sources or required answer assertions. Their optional evidence annotations may identify known foreign passages for negative testing, without granting access.
+Ordinary cases can reference only documents in scope owned by their principal. An authorization-negative case must include a foreign document and use category `unauthorized_scope`, answerability `unauthorized`, expected outcome `authorization_denied` and HTTP 404. The literal expected API status is null because HTTP 404 does not return a document-Q&A response body. Such cases cannot expect returned sources or required answer assertions. All evidence references, including assertion evidence, must belong to the explicit document scope in every case. Authorization-negative annotations may identify foreign-owned passages only when their documents are requested in that scope; ownership rules remain separate.
 
-Answerable cases require evidence, supported assertion references and expected sources matching the relevant documents. Other cases expect abstention with HTTP 200 and no used sources. Relevant passages may still be annotated for conflicts. Expected sources mean used citations; future checks must distinguish them from the application's retrieved `sources` field.
+Answerable cases require evidence, supported assertion references and expected sources matching the relevant documents. Other cases expect semantic abstention with HTTP 200 and no used citations. Relevant passages may still be annotated for conflicts. Expected sources mean used citations; future checks must distinguish them from the application's retrieved `sources` field.
 
 Paths must resolve inside the local corpus directory and name text files. This loader is an offline developer utility reading repository-controlled files. It is not an API or a general sandbox for attacker-controlled corpora.
 
 Schema validation cannot establish semantic truth, completeness of relevance labels, resistance to prompt injection, correct application authorization, retrieval rank, citation entailment or answer quality. It detects structural contradictions and exact assertion overlap, not logically contradictory paraphrases.
+
+
+## Outcome and API status contract
+
+Dataset schema version 2 replaces the former ambiguous `expected_status` with three separate fields. This is an intentional dataset-schema change; corpus schema/version and legacy datasets/reports are unchanged.
+
+| Semantic `expected_outcome` | Literal `expected_api_status` | `expected_http_status` |
+| --- | --- | --- |
+| `answerable` | `ok` | 200 |
+| `abstention_required` | null, or an explicitly justified `abstained` / `insufficient_evidence` | 200 |
+| `authorization_denied` | null | 404 |
+
+All current nonanswer cases use null because the exact API status depends on retrieval and synthesis. `DocumentQAService` returns `insufficient_evidence` when no usable chunks are found, and `abstained` when synthesis abstains or valid references cannot be established. Null means no exact literal-status assertion is specified; the semantic outcome remains required. A future evaluator must still classify provider failures separately, rather than count any status as successful abstention. Provider-error behavior is outside this dataset's semantic fixtures.
+
+Q10 and Q11 continue to expect HTTP 404 for foreign-only and mixed requested scopes. There is no literal document-Q&A status `authorization_denied`. No response grader is implemented here.
 
 ## Validation and extension
 
@@ -84,3 +99,20 @@ Commands were executed from `backend/` using Python 3.12, installed Pydantic 2.1
 No PostgreSQL/pgvector integration result is claimed from SQLite execution. Frontend checks, live model evaluation and hosted CI were not run for these backend-only dataset foundations.
 
 Production retrieval, chunking, embeddings, document-Q&A behavior, LLM prompts, frontend, authentication, deployment workflows and safety gates are outside these changes. No dependencies or migrations are added. Work remains local and uncommitted.
+
+## Independent review corrections
+
+The three reviewed P2 findings were reproduced with new regression tests before changes. The RED command was `python -B -m pytest -q -p no:cacheprovider tests/test_rag_evaluation_schema.py -k 'outside_requested_scope or literal_status or q06' --tb=short`. It produced 3 failed, 45 deselected. Q10 accepted a known account-january passage outside its private-plan scope; the semantic/API split was missing; Q06 lacked the EUR 350.00 forbidden annotation.
+
+Current correction verification results are recorded below. The earlier verification section records historical PR1 results.
+
+Commands below were executed from `backend/` with the same synthetic/offline configuration described above. TEST_DATABASE_URL and TEST_REDIS_URL were unset.
+
+- `python -B -m pytest -q -p no:cacheprovider tests/test_rag_evaluation_schema.py tests/test_rag_evaluation.py tests/test_document_grounded_qa.py tests/test_ai_rag_integration.py --tb=short -rs` produced 106 passed, 2 skipped, zero failures. Both skips require PostgreSQL/pgvector via TEST_DATABASE_URL.
+- `python -B -m pytest -q -p no:cacheprovider --tb=short -rs` produced 665 passed, 48 skipped, zero failures in 53.24 seconds. Skips require isolated PostgreSQL/pgvector or Redis, including dependent authentication, real-cookie, concurrency and migration tests.
+- Ruff 0.17.3, `python -m ruff check .` and `python -m ruff format --check .`, passed with 115 Python files formatted.
+- `python -B -c "from evaluation.schemas import load_document_dataset; b=load_document_dataset(); print(len(b.dataset.cases), len(b.corpus.documents))"` confirmed 14 valid cases and six verified corpus hashes. Q06 retains semantic abstention; Q10/Q11 retain HTTP 404 and no literal Q&A status.
+- The full legacy-report/baseline equality regression passed. Git diff confirms no changes to the legacy dataset, baseline, corpus, runner, production services, dependencies, authentication or deployment files.
+- `git diff --check` passed. Only schemas.py, document_qa_v1.json, test_rag_evaluation_schema.py and this document changed.
+
+The existing branch is named `feat/rag-evaluation-v1-foundations` (plural), based on commit 74fb4c6934a1bc1ce1e57caae2fb15de90ff93ec. Corrections remain uncommitted. No PR2 functionality, response grader, deployment or publishing operation was introduced.
