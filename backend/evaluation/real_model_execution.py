@@ -2,6 +2,7 @@
 
 import json
 from contextlib import asynccontextmanager
+from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -36,6 +37,8 @@ from evaluation.real_model_provider import (
     Phase,
     SafetyError,
     SyncTransport,
+    observation_state,
+    unit_key,
 )
 from evaluation.real_model_runner import atomic_write
 from evaluation.retrieval_runner import (
@@ -263,7 +266,8 @@ async def ask(http, headers, principals, case, unit, ids, persisted, boundary):
             public = {}
 
     raw = boundary.journal.db.execute(
-        "SELECT response FROM attempts WHERE unit=? AND endpoint=?", (unit, COMPLETIONS)
+        "SELECT response FROM attempts WHERE unit=? AND endpoint=? AND state='confirmed'",
+        (unit, COMPLETIONS),
     ).fetchone()
     parsed = None
     if raw and raw[0]:
@@ -271,7 +275,10 @@ async def ask(http, headers, principals, case, unit, ids, persisted, boundary):
             content = json.loads(raw[0])["body"]["choices"][0]["message"]["content"]
             parsed = CapturedDraft.model_validate_json(content).model_dump(mode="json")
         except (KeyError, TypeError, IndexError, ValueError):
-            error = error or "response_parse_failure"
+            if status == 200 and public.get("status") == "provider_error" and not boundary.failure:
+                error = "model_response_parse_failure"
+            else:
+                error = error or "evaluation_contract_error"
     return {
         "schema_version": 1,
         "http_status": status,
@@ -288,7 +295,11 @@ async def ask(http, headers, principals, case, unit, ids, persisted, boundary):
 
 
 def published_observation(row):
-    return row["observation"] | {"case": row["case"], "repetition": row["repetition"]}
+    return row["observation"] | {
+        "case": row["case"],
+        "repetition": row["repetition"],
+        "state": observation_state(row["observation"]["error"]),
+    }
 
 
 def review_records(directory, journal, identity):
@@ -314,7 +325,7 @@ def review_records(directory, journal, identity):
     return payload
 
 
-def artifacts(directory, journal, identity, run_error):
+def artifacts(directory, journal, identity, run_error, reused=0):
     observations = [
         json.loads(row[0])
         for row in journal.db.execute("SELECT body FROM observations ORDER BY unit")
@@ -329,8 +340,10 @@ def artifacts(directory, journal, identity, run_error):
         cost,
         response,
         usage,
+        state,
+        error,
     ) in journal.db.execute(
-        "SELECT unit, endpoint, payload, input_tokens, output_tokens, cost, response, usage FROM attempts ORDER BY unit,endpoint"
+        "SELECT unit, endpoint, payload, input_tokens, output_tokens, cost, response, usage, state, error FROM attempts ORDER BY unit,endpoint"
     ):
         body = json.loads(response) if response else None
         attempts.append(
@@ -341,10 +354,13 @@ def artifacts(directory, journal, identity, run_error):
                 "reserved_input_tokens": input_tokens,
                 "reserved_output_tokens": output_tokens,
                 "reserved_cost": cost,
-                "usage_tokens": usage,
-                "confirmed": body is not None,
-                "model": body["body"].get("model") if body else None,
+                "usage_tokens": int(usage) if usage is not None else None,
+                "state": state,
+                "error": error,
+                "confirmed": state == "confirmed",
+                "model": body["body"].get("model") if body and body["body"] else None,
                 "request_id": body["request_id"] if body else None,
+                "http_status": body["status"] if body else None,
             }
         )
     distributions = {}
@@ -365,27 +381,39 @@ def artifacts(directory, journal, identity, run_error):
                 total = totals.setdefault(name, {"sum": 0.0, "denominator": 0})
                 total["sum"] += value
                 total["denominator"] += 1
+    counts = dict(journal.db.execute("SELECT state, count(*) FROM observations GROUP BY state"))
+    planned = len(identity["plan"]["units"])
+    successful = counts.get("successful", 0)
+    failed = counts.get("operational_failure", 0)
     summary = {
-        "schema_version": 1,
+        "schema_version": 2,
         "run_error": run_error,
         "aggregates": {
             name: {"mean": item["sum"] / item["denominator"], "denominator": item["denominator"]}
             for name, item in totals.items()
         },
         "manifest_sha256": digest(identity),
-        "planned": len(identity["plan"]["units"]),
-        "completed": len(observations),
-        "errors": sum(bool(row["observation"]["error"]) for row in observations),
+        "planned": planned,
+        "terminal_observations": successful + failed,
+        "successful_evaluations": successful,
+        "operational_failures": failed,
+        "incomplete_units": planned - successful - failed,
+        "uncertain_attempts": sum(row["state"] == "uncertain" for row in attempts),
+        "reserved_attempts": sum(row["state"] == "reserved" for row in attempts),
+        "rejected_attempts": sum(row["state"] == "rejected" for row in attempts),
+        "reused_confirmed_responses": reused,
         "per_case": distributions,
         "requests": attempts,
+        "reserved_requests": len(attempts),
+        "reserved_tokens": sum(
+            row["reserved_input_tokens"] + row["reserved_output_tokens"] for row in attempts
+        ),
+        "reserved_cost": str(sum((Decimal(row["reserved_cost"]) for row in attempts), Decimal(0))),
         "usage_unknown": sum(row["usage_tokens"] is None for row in attempts),
         "known_usage_tokens": sum(row["usage_tokens"] or 0 for row in attempts),
     }
     files = {
-        "observations.jsonl": [
-            row["observation"] | {"case": row["case"], "repetition": row["repetition"]}
-            for row in observations
-        ],
+        "observations.jsonl": [published_observation(row) for row in observations],
         "grades.jsonl": [
             row["grade"]
             | {
@@ -418,7 +446,13 @@ async def execute(
     bundle = load_document_dataset()
     rubrics = {case.id: case for case in load_answer_rubric(bundle).cases}
     cases = {case.id: case for case in bundle.dataset.cases}
+    units = identity["plan"]["units"]
+    journal.assert_resumable({unit_key(entry) for entry in units})
     review_records(directory, journal, identity)
+    recorded = {unit for (unit,) in journal.db.execute("SELECT unit FROM observations")}
+    pending = [entry for entry in units if unit_key(entry) not in recorded]
+    if not pending:
+        return artifacts(directory, journal, identity, None)
     boundary = Boundary(profile, journal, credential)
     run_error = None
     sync_client = OpenAI(
@@ -471,12 +505,8 @@ async def execute(
                     ids, passages, persisted = await ingest(
                         bundle, http, headers, principals, engine, upload_dir, boundary
                     )
-                    for entry in identity["plan"]["units"]:
-                        unit = f"{entry['case']}:{entry['repetition']:02}"
-                        if journal.db.execute(
-                            "SELECT 1 FROM observations WHERE unit=?", (unit,)
-                        ).fetchone():
-                            continue
+                    for entry in pending:
+                        unit = unit_key(entry)
                         case = cases[entry["case"]]
                         observation = await ask(
                             http, headers, principals, case, unit, ids, persisted, boundary
@@ -498,7 +528,8 @@ async def execute(
                                 "grade": grade(observation, rubrics[case.id], gold, profile.limit),
                             },
                         )
-                        if observation["error"]:
+                        if observation_state(observation["error"]) == "incomplete":
+                            run_error = observation["error"]
                             break
     except BaseException:
         run_error = boundary.failure or "incomplete_execution"
@@ -506,5 +537,5 @@ async def execute(
     finally:
         sync_client.close()
         await async_client.close()
-        summary = artifacts(directory, journal, identity, run_error)
+        summary = artifacts(directory, journal, identity, run_error, boundary.reused)
     return summary

@@ -31,21 +31,22 @@ class Journal:
                 self.db.execute(
                     """CREATE TABLE IF NOT EXISTS attempts (
                     unit TEXT, endpoint TEXT, payload TEXT, input_tokens INTEGER, output_tokens INTEGER, cost TEXT,
-                    response TEXT, usage INTEGER, seal TEXT, PRIMARY KEY (unit, endpoint))"""
+                    response TEXT, usage TEXT, seal TEXT, state TEXT NOT NULL, error TEXT,
+                    PRIMARY KEY (unit, endpoint))"""
                 )
                 self.db.execute(
-                    "CREATE TABLE IF NOT EXISTS observations (unit TEXT PRIMARY KEY, body TEXT, seal TEXT)"
+                    "CREATE TABLE IF NOT EXISTS observations (unit TEXT PRIMARY KEY, body TEXT, seal TEXT, state TEXT NOT NULL)"
                 )
                 stored = self.db.execute("SELECT identity FROM manifest").fetchone()
                 expected = canonical(
-                    {"version": 1, **identity, "budget": budget.model_dump(mode="json")}
+                    {**identity, "version": 2, "budget": budget.model_dump(mode="json")}
                 ).decode()
                 if stored is None and resume:
                     raise SafetyError("Resume requires the original initialized journal")
                 if stored is None:
                     self.db.execute("INSERT INTO manifest VALUES (?)", (expected,))
                 elif stored != (expected,):
-                    raise SafetyError("Journal identity or inherited budget differs")
+                    raise SafetyError("Journal version, identity or inherited budget differs")
         except BaseException:
             self.db.close()
             raise
@@ -67,11 +68,11 @@ class Journal:
     ):
         with self.transaction():
             row = self.db.execute(
-                "SELECT payload, response FROM attempts WHERE unit=? AND endpoint=?",
+                "SELECT payload, response, state FROM attempts WHERE unit=? AND endpoint=?",
                 (unit, endpoint),
             ).fetchone()
             if row:
-                if row[0] != payload or row[1] is None:
+                if row[0] != payload or row[2] != "confirmed":
                     raise SafetyError("Cannot resend changed or uncertain provider request")
                 return json.loads(row[1])
             totals = self.db.execute(
@@ -85,36 +86,126 @@ class Journal:
             ):
                 raise SafetyError("Provider budget exhausted before transmission")
             self.db.execute(
-                "INSERT INTO attempts VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL)",
+                "INSERT INTO attempts VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 'reserved', NULL)",
                 (unit, endpoint, payload, input_tokens, output_tokens, str(cost)),
             )
         return None
 
-    def confirm(self, unit, endpoint, response, usage):
+    def mark_sending(self, unit, endpoint):
         with self.transaction():
-            self.db.execute(
-                "UPDATE attempts SET response=?, usage=?, seal=? WHERE unit=? AND endpoint=? AND response IS NULL",
-                (canonical(response).decode(), usage, digest(response), unit, endpoint),
+            cursor = self.db.execute(
+                "UPDATE attempts SET state='uncertain' WHERE unit=? AND endpoint=? AND state='reserved'",
+                (unit, endpoint),
             )
+            if cursor.rowcount != 1:
+                raise SafetyError("Provider attempt lacks a fresh reservation")
 
-    def assert_resumable(self):
-        for tokens, usage, response, seal in self.db.execute(
-            "SELECT input_tokens + output_tokens, usage, response, seal FROM attempts WHERE response IS NOT NULL"
+    def finish(self, unit, endpoint, response, usage=None, error=None):
+        with self.transaction():
+            row = self.db.execute(
+                "SELECT payload, input_tokens, output_tokens, cost FROM attempts "
+                "WHERE unit=? AND endpoint=? AND state='uncertain'",
+                (unit, endpoint),
+            ).fetchone()
+            if row is None:
+                raise SafetyError("Provider attempt was not marked for transmission")
+            if usage is not None:
+                details = response["body"]["usage"]
+                parts = (details.get("prompt_tokens"), details.get("completion_tokens"))
+                limits = row[1:3]
+                if any(
+                    key in details and (type(details[key]) is not int or details[key] < 0)
+                    for key in ("prompt_tokens", "completion_tokens")
+                ):
+                    error = "invalid_provider_usage"
+                elif usage > sum(limits) or any(
+                    part is not None and part > limit
+                    for part, limit in zip(parts, limits, strict=True)
+                ):
+                    error = "usage_exceeded_reservation"
+                elif all(part is not None for part in parts) and sum(parts) != usage:
+                    error = "invalid_provider_usage"
+            state = "rejected" if error else "confirmed"
+            seal = digest([unit, endpoint, row, state, error, usage, response])
+            self.db.execute(
+                "UPDATE attempts SET response=?, usage=?, seal=?, state=?, error=? "
+                "WHERE unit=? AND endpoint=?",
+                (
+                    canonical(response).decode(),
+                    str(usage) if usage is not None else None,
+                    seal,
+                    state,
+                    error,
+                    unit,
+                    endpoint,
+                ),
+            )
+        return error
+
+    def assert_resumable(self, planned=None):
+        for (
+            unit,
+            endpoint,
+            payload,
+            inputs,
+            outputs,
+            cost,
+            state,
+            error,
+            usage,
+            response,
+            seal,
+        ) in self.db.execute(
+            "SELECT unit, endpoint, payload, input_tokens, output_tokens, cost, state, error, usage, response, seal FROM attempts"
         ):
-            if seal != digest(json.loads(response)) or (usage is not None and usage > tokens):
-                raise SafetyError("Provider journal integrity or token bound failed")
-        for body, seal in self.db.execute("SELECT body, seal FROM observations"):
-            if seal != digest(json.loads(body)):
+            if state != "confirmed" or error is not None or not response:
+                raise SafetyError("Uncertain or rejected attempt blocks resume")
+            if seal != digest(
+                [
+                    unit,
+                    endpoint,
+                    (payload, inputs, outputs, cost),
+                    state,
+                    error,
+                    int(usage) if usage is not None else None,
+                    json.loads(response),
+                ]
+            ):
+                raise SafetyError("Provider journal integrity failed")
+        for unit, body, seal, state in self.db.execute(
+            "SELECT unit, body, seal, state FROM observations"
+        ):
+            record = json.loads(body)
+            if seal != digest([state, record]):
                 raise SafetyError("Observation journal integrity failed")
-        if self.db.execute("SELECT 1 FROM attempts WHERE response IS NULL").fetchone():
-            raise SafetyError("Uncertain attempt in journal. Reconcile it before any new run.")
+            if state not in {"successful", "operational_failure"}:
+                raise SafetyError("Incomplete observation blocks resume")
+            if planned is not None and (
+                unit not in planned
+                or unit != unit_key(record)
+                or state != observation_state(record["observation"]["error"])
+            ):
+                raise SafetyError("Observation is outside the plan or has an invalid state")
 
     def observe(self, unit, body):
+        state = observation_state(body["observation"]["error"])
         with self.transaction():
             self.db.execute(
-                "INSERT INTO observations VALUES (?, ?, ?)",
-                (unit, canonical(body).decode(), digest(body)),
+                "INSERT INTO observations VALUES (?, ?, ?, ?)",
+                (unit, canonical(body).decode(), digest([state, body]), state),
             )
+
+
+def unit_key(entry):
+    return f"{entry['case']}:{entry['repetition']:02}"
+
+
+def observation_state(error):
+    if error is None:
+        return "successful"
+    if error == "model_response_parse_failure":
+        return "operational_failure"
+    return "incomplete"
 
 
 @dataclass
@@ -132,6 +223,7 @@ class Boundary:
         self.phase: Phase | None = None
         self.seen: set[str] = set()
         self.failure: str | None = None
+        self.reused = 0
 
     @contextmanager
     def during(self, phase: Phase):
@@ -208,41 +300,41 @@ class Boundary:
         except SafetyError:
             self.failure = "reservation_denied"
             raise
+        if cached is not None:
+            self.reused += 1
         return phase.unit, endpoint, cached
 
     def after(self, response, content, unit, endpoint):
         status = response.status_code
+        envelope = {
+            "status": status,
+            "body": None,
+            "request_id": safe_request_id(response.headers.get("x-request-id")),
+        }
+        error, tokens = None, None
         if not 200 <= status < 300:
-            self.failure = "rate_limited" if status == 429 else "provider_http_error"
-            # Error bodies may contain secrets. Keep the pre-send reservation and
-            # leave the attempt unresolved, preventing an automatic replay.
-            raise SafetyError("Provider returned a non-success HTTP status")
-        try:
-            decoded = json.loads(content)
-            if not isinstance(decoded, dict):
-                raise TypeError
-            if self.credential and self.credential in canonical(decoded).decode():
-                raise ValueError
-            usage = decoded.get("usage")
-            tokens = usage.get("total_tokens") if isinstance(usage, dict) else None
-            if type(tokens) is not int or tokens < 0:
-                tokens = None
-            envelope = {
-                "status": status,
-                "body": decoded,
-                "request_id": safe_request_id(response.headers.get("x-request-id")),
-            }
-            self.journal.confirm(unit, endpoint, envelope, tokens)
-            reserved = self.journal.db.execute(
-                "SELECT input_tokens + output_tokens FROM attempts WHERE unit=? AND endpoint=?",
-                (unit, endpoint),
-            ).fetchone()[0]
-            if tokens is not None and tokens > reserved:
-                self.failure = "usage_exceeded_reservation"
-                raise SafetyError("Provider usage exceeded the reserved token bound")
-        except (TypeError, ValueError, UnicodeError):
-            self.failure = "response_parse_failure"
-            raise SafetyError("Provider response could not be safely persisted") from None
+            # Error bodies may contain secrets. Persist only sanitized metadata.
+            error = "rate_limited" if status == 429 else "provider_http_error"
+        else:
+            try:
+                decoded = json.loads(content)
+                if not isinstance(decoded, dict):
+                    raise TypeError
+                if self.credential and self.credential in canonical(decoded).decode():
+                    raise ValueError
+                envelope["body"] = decoded
+                usage = decoded.get("usage")
+                if usage is not None:
+                    tokens = usage.get("total_tokens") if isinstance(usage, dict) else None
+                    if type(tokens) is not int or tokens < 0:
+                        tokens = None
+                        error = "invalid_provider_usage"
+            except (TypeError, ValueError, UnicodeError):
+                error = "response_parse_failure"
+
+        self.failure = self.journal.finish(unit, endpoint, envelope, tokens, error)
+        if self.failure:
+            raise SafetyError(self.failure)
         return as_response(envelope)
 
 
@@ -269,6 +361,7 @@ class SyncTransport(httpx.BaseTransport):
         unit, endpoint, cached = self.boundary.before(request, request.read())
         if cached is not None:
             return as_response(cached)
+        self.boundary.journal.mark_sending(unit, endpoint)
         try:
             response = self.send(request)
             try:
@@ -294,6 +387,7 @@ class AsyncTransport(httpx.AsyncBaseTransport):
         unit, endpoint, cached = self.boundary.before(request, await request.aread())
         if cached is not None:
             return as_response(cached)
+        self.boundary.journal.mark_sending(unit, endpoint)
         try:
             response = await self.send(request)
             try:

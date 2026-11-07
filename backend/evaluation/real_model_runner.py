@@ -94,6 +94,21 @@ def run_async(coroutine):
     return asyncio.run(coroutine, loop_factory=asyncio.SelectorEventLoop)
 
 
+def exit_status(summary):
+    blocked = (
+        "run_error",
+        "incomplete_units",
+        "uncertain_attempts",
+        "reserved_attempts",
+        "rejected_attempts",
+    )
+    if any(summary[key] for key in blocked):
+        return 2
+    if summary["operational_failures"]:
+        return 1
+    return 0 if summary["successful_evaluations"] == summary["planned"] else 2
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -152,7 +167,7 @@ def main(argv=None):
             )
         finally:
             journal.db.close()
-        return 0 if summary["completed"] == summary["planned"] and not summary["errors"] else 1
+        return exit_status(summary)
     except ValidationError:
         print("Invalid evaluation profile, budget, or artifact.", file=sys.stderr)
     except Exception:  # noqa: BLE001 - redact unexpected failures at the CLI boundary
