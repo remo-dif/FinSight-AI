@@ -48,14 +48,29 @@ function statusFor(status: InvestigationCase["status"]) {
 type TransactionsTableProps = {
   transactions?: InvestigationCase[];
   selectedId?: string;
-  onSelect?: (caseRecord: InvestigationCase) => void;
+  queueStatus?: "ready" | "loading" | "error";
+  onSelect?: (caseRecord: InvestigationCase, options?: { focusDetail?: boolean }) => void;
 };
 
 export function TransactionsTable({
   transactions = demoTransactions,
   selectedId,
+  queueStatus = "ready",
   onSelect
 }: TransactionsTableProps) {
+  const queueMessage = queueStatus === "loading"
+    ? "Loading cases…"
+    : queueStatus === "error"
+      ? "The case queue is unavailable. Retry to load live cases."
+      : transactions.length === 0
+        ? "No cases are available in the current queue."
+        : null;
+  const queueGuidance = queueStatus === "loading"
+    ? "The queue will appear when loading finishes."
+    : queueStatus === "error"
+      ? "Your current selection and drafts are unchanged."
+      : "New cases will appear here when they are assigned or detected.";
+
   return (
     <Panel as="section" className="p-0" aria-labelledby="recent-transactions-heading">
       <div className="flex flex-col gap-1 border-b border-border px-4 py-4 sm:flex-row sm:items-end sm:justify-between">
@@ -65,6 +80,16 @@ export function TransactionsTable({
         </div>
         <p className="text-xs font-semibold uppercase tracking-wide text-muted">{transactions.length} cases</p>
       </div>
+      {queueMessage ? (
+        <div className="p-6 text-center" role="status" aria-live="polite">
+          <p className="font-semibold">{queueMessage}</p>
+          <p className="mt-1 text-sm text-muted">
+            {queueGuidance}
+          </p>
+        </div>
+      ) : null}
+      {!queueMessage ? (
+      <>
       <ul className="divide-y divide-border md:hidden" aria-label="Fraud cases">
         {transactions.map((caseRecord) => {
           const isSelected = caseRecord.id === selectedId;
@@ -73,8 +98,9 @@ export function TransactionsTable({
               <button
                 type="button"
                 className={`grid w-full gap-3 p-4 text-left transition hover:bg-accent/5 ${isSelected ? "bg-accent/10" : "bg-panel"}`}
-                onClick={() => onSelect?.(caseRecord)}
+                onClick={() => onSelect?.(caseRecord, { focusDetail: true })}
                 aria-pressed={isSelected}
+                aria-controls="selected-alert-panel"
               >
                 <span className="flex items-start justify-between gap-3">
                   <span>
@@ -115,25 +141,15 @@ export function TransactionsTable({
               return (
                 <tr
                   key={caseRecord.id}
-                  className={`cursor-pointer transition hover:bg-accent/5 ${isSelected ? "bg-accent/10" : ""}`}
-                  onClick={() => onSelect?.(caseRecord)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      onSelect?.(caseRecord);
-                    }
-                  }}
-                  tabIndex={0}
-                  aria-selected={isSelected}
+                  className={isSelected ? "bg-accent/10" : ""}
                 >
                   <td className="px-4 py-3">
                     <button
                       type="button"
-                      className="break-all text-left font-semibold text-accent underline-offset-4 hover:underline"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onSelect?.(caseRecord);
-                      }}
+                      className="min-h-8 break-all text-left font-semibold text-accent underline-offset-4 hover:underline"
+                      onClick={() => onSelect?.(caseRecord)}
+                      aria-pressed={isSelected}
+                      aria-controls="selected-alert-panel"
                     >
                       {caseRecord.id}
                     </button>
@@ -152,6 +168,8 @@ export function TransactionsTable({
           </tbody>
         </table>
       </div>
+      </>
+      ) : null}
     </Panel>
   );
 }

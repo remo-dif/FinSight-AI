@@ -49,8 +49,10 @@ const filters = [
 export function DashboardWorkspace({ initialQueue }: { initialQueue?: InitialCaseQueue }) {
   const token = useSessionStore((state) => state.accessToken);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [focusDetailRequested, setFocusDetailRequested] = useState(false);
   const [drawer, setDrawer] = useState<ToolDrawer>(null);
   const drawerTriggerRef = useRef<HTMLElement | null>(null);
+  const detailHeadingRef = useRef<HTMLHeadingElement>(null);
   const hasServerSession = initialQueue?.status === "live" || initialQueue?.status === "unavailable";
   const hasSession = Boolean(token) || hasServerSession;
   const cases = useQuery({
@@ -79,6 +81,13 @@ export function DashboardWorkspace({ initialQueue }: { initialQueue?: InitialCas
     [activeCases, selectedId]
   );
 
+  useEffect(() => {
+    if (!focusDetailRequested || !selectedId) return;
+    detailHeadingRef.current?.focus();
+    detailHeadingRef.current?.scrollIntoView({ block: "start" });
+    setFocusDetailRequested(false);
+  }, [focusDetailRequested, selectedId]);
+
   function changeDrawer(next: ToolDrawer, trigger?: HTMLElement) {
     if (next && trigger) drawerTriggerRef.current = trigger;
     setDrawer(next);
@@ -99,13 +108,18 @@ export function DashboardWorkspace({ initialQueue }: { initialQueue?: InitialCas
           <TransactionsTable
             transactions={activeCases}
             selectedId={selectedCase?.id}
-            onSelect={(caseRecord) => setSelectedId(caseRecord.id)}
+            queueStatus={queueStatus === "loading" ? "loading" : queueStatus === "error" ? "error" : "ready"}
+            onSelect={(caseRecord, options) => {
+              setSelectedId(caseRecord.id);
+              setFocusDetailRequested(Boolean(options?.focusDetail));
+            }}
           />
         </div>
         <AlertDetailPanel
           caseRecord={selectedCase}
           canMutate={Boolean(token)}
           onDrawerChange={changeDrawer}
+          headingRef={detailHeadingRef}
         />
       </div>
 
@@ -230,11 +244,13 @@ function QueueFilters({ caseCount }: { caseCount: number }) {
 function AlertDetailPanel({
   caseRecord,
   canMutate,
-  onDrawerChange
+  onDrawerChange,
+  headingRef
 }: {
   caseRecord?: InvestigationCase;
   canMutate: boolean;
   onDrawerChange: (drawer: ToolDrawer, trigger?: HTMLElement) => void;
+  headingRef: { current: HTMLHeadingElement | null };
 }) {
   const caseDetail = useQuery({
     queryKey: caseDetailQueryKey(caseRecord?.id ?? "none"),
@@ -247,11 +263,11 @@ function AlertDetailPanel({
   });
 
   return (
-    <Panel as="section" className="p-0 xl:sticky xl:top-[96px] xl:max-h-[calc(100vh-120px)] xl:overflow-y-auto" aria-labelledby="selected-alert-heading">
+    <Panel id="selected-alert-panel" as="section" className="p-0 xl:sticky xl:top-[96px] xl:max-h-[calc(100vh-120px)] xl:overflow-y-auto" aria-labelledby="selected-alert-heading">
       <div className="border-b border-border p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 id="selected-alert-heading" className="text-xs font-semibold uppercase tracking-wide text-muted">Selected alert</h2>
+            <h2 ref={headingRef} id="selected-alert-heading" tabIndex={-1} className="scroll-mt-28 text-xs font-semibold uppercase tracking-wide text-muted">Selected alert</h2>
             <p className="mt-1 break-all text-xl font-semibold leading-tight">
               {caseRecord?.id ?? "No alert selected"}
             </p>

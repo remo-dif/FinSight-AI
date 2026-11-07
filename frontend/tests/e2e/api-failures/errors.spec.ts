@@ -59,8 +59,31 @@ test("dashboard API failures do not fall back to demo cases for an authenticated
     .click();
 
   await expect(page.getByText("Live cases are unavailable. No demo cases are shown.")).toBeVisible();
+  await expect(page.getByText("The case queue is unavailable. Retry to load live cases.")).toBeVisible();
   await expect(page.getByRole("button", { name: "CASE-1042" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
+});
+
+test("case queue distinguishes loading and empty live states", async ({ page, isMobile }) => {
+  test.skip(isMobile, "queue state transitions are viewport-independent and covered on desktop");
+
+  await mockLogin(page);
+  let release!: () => void;
+  const blocked = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/api/cases?limit=50", async (route) => {
+    await blocked;
+    await json(route, 200, []);
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
+  await expect(page.getByText("Loading cases…", { exact: true })).toBeVisible();
+
+  release();
+  await expect(page.getByText("No cases are available in the current queue.")).toBeVisible();
+  await expect(page.getByRole("table")).toHaveCount(0);
+  await expect(page.getByRole("list", { name: "Fraud cases" })).toHaveCount(0);
 });
 
 test("cases page renders an authenticated data failure without demo records", async ({ page, isMobile }) => {
