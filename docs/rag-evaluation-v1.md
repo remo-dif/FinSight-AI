@@ -78,7 +78,7 @@ A regression test compares the entire freshly evaluated legacy report with `eval
 
 ## Next increments
 
-PR2 will ingest the fixed corpus through the actual production preparation path in an isolated test environment, preserve ranked results and measure document/passage retrieval. It must label SQLite and PostgreSQL/pgvector results separately and record configuration/model/chunker versions.
+PR2 evaluates the fixed corpus through production upload and pgvector retrieval in an isolated test environment. See the retrieval evaluation section below.
 
 PR3 will exercise document answers, citation validity and abstention, combining deterministic contract checks with explicitly identified human semantic review. Optional model judges require separate justification and calibration.
 
@@ -116,3 +116,61 @@ Commands below were executed from `backend/` with the same synthetic/offline con
 - `git diff --check` passed. Only schemas.py, document_qa_v1.json, test_rag_evaluation_schema.py and this document changed.
 
 The existing branch is named `feat/rag-evaluation-v1-foundations` (plural), based on commit 74fb4c6934a1bc1ce1e57caae2fb15de90ff93ec. Corrections remain uncommitted. No PR2 functionality, response grader, deployment or publishing operation was introduced.
+
+## PR2 retrieval evaluation
+
+Run from `backend/` with installed development dependencies and a disposable local PostgreSQL database using the existing pgvector/PG16 image. Use synthetic application settings and a dedicated test URL. The port below is an example for a container published on loopback.
+
+```powershell
+$env:DATABASE_URL = 'sqlite://'
+$env:JWT_SECRET_KEY = 'retrieval-eval-access-placeholder-1234567890'
+$env:JWT_REFRESH_SECRET_KEY = 'retrieval-eval-refresh-placeholder-1234567890'
+$env:OPENAI_API_KEY = 'retrieval-eval-placeholder-no-provider'
+$env:APP_ENV = 'development'
+$env:TEST_DATABASE_URL = 'postgresql+psycopg://eval_user:eval_password@127.0.0.1:55432/finsight_retrieval_test'
+python -B -m evaluation.retrieval_runner --k 5 --min-score 0.05
+```
+
+The SQLite value above only initializes unused default application settings. The runner requires `TEST_DATABASE_URL`, rejects non-loopback addresses and URL query overrides, and routes every ASGI database dependency to a fresh PostgreSQL schema. Use a dedicated disposable server because setup may install the `vector` extension in its database. Tables and test accounts live in the temporary schema, with upload storage in a temporary directory. The runner drops its schema and releases its storage on exit. Redis is unnecessary for this harness, which uses the in-memory rate limiter.
+
+The CLI writes a versioned JSON report to stdout and returns a nonzero code on an incomplete run. It forces local embeddings and uses authenticated synthetic users. Fixed synthetic upload identities stabilize the production SQL tie breaker. Reported identifiers are logical document keys and chunk positions. Score, hash and span metadata are included without raw documents, queries, credentials or vectors. The manifest includes HEAD and whether the working tree is dirty. Keep a clean checkout when saving a reproducible baseline. The schema uses real pgvector operators, while the HNSW index created by migrations is absent from the metadata-created test schema.
+
+### Evidence alignment
+
+The deterministic PDF renderer uses explicit WinAnsi encoding and wraps text across lines and pages. The production extractor must reproduce the original text after whitespace normalization and preserve all annotated anchors. The real upload endpoint runs extraction, chunking, local embedding and persistence. Persisted text and SHA-256 must match the expected positions in the normalized document under the production chunk size and overlap. Missing, duplicated or misaligned positions fail the run. Anchors that become ambiguous or disappear after extraction also fail the run. Mapping uses half-open document-local token spans; the union of retrieved spans credits each covered token once. The long fixture tests overlap and split passages separately from the PR1 corpus.
+
+### Metrics and tracks
+
+For the first k ranked positions, let c(e) be the fraction of an annotated passage e covered by the union of retrieved spans in its document.
+
+| Metric | Calculation |
+| --- | --- |
+| Evidence Recall@k | Number of passages with c(e) = 1 divided by number of annotated passages |
+| Evidence Coverage@k | Mean c(e) across annotated passages |
+| Chunk Precision@k | Number of returned positions with any positive evidence overlap divided by k |
+| Novel Evidence Precision@k | Number of positions containing at least one complete passage not previously credited to a chunk divided by k |
+| MRR@k | Reciprocal rank of first evidence contact, or zero if no chunk overlaps |
+
+Duplicates can count for conventional precision. They add no novel credit for a passage already credited. Missing positions count against both precision denominators. A passage split across chunks can be fully covered by their union even if no chunk earns novel credit. MRR measures first contact, independent of full passage coverage.
+
+Eight answerable cases feed the primary retrieval aggregate. Q08 has a separate conflict aggregate. Q06, Q07 and Q12 report counts and rankings with null relevance metrics; a retrieval result alone says nothing about answer abstention. Q10 and Q11 use the authenticated document-Q&A endpoint. They require HTTP 404 before any retrieval or generation call and contribute no retrieval scores. An applicable empty result scores zero. Case errors invalidate the affected aggregate and mark the run incomplete. Reports retain applicable, measured and failed counts.
+
+Latency fields record query embedding, DBAPI vector query execution, and full retrieval through result materialization. SQL execution excludes subsequent fetch and hydration. Timing is observational and varies between runs.
+
+### Verification and limits
+
+`tests/test_rag_retrieval_units.py` covers the renderer, production chunking, mapping and hand-calculated metrics. `tests/test_rag_retrieval_evaluation.py` exercises the real PostgreSQL path, validates ownership and rank order, and compares two runs while excluding timing. The existing CI PostgreSQL service and pytest job support these tests. Without `TEST_DATABASE_URL`, pytest explicitly skips the PostgreSQL test and the CLI exits with a configuration error.
+
+Provider-backed evaluation is deferred. Local hash results measure deterministic integration behavior on the synthetic corpus. PR3 will evaluate response correctness, citations and semantic abstention separately.
+
+The isolated PostgreSQL/pgvector run completed all 14 cases at k=5 and a score floor of 0.05. PostgreSQL used pgvector 0.8.7 with no HNSW index in the test schema. Eight primary cases had recall and coverage 1.0, precision and novel precision 0.275, and MRR 1.0. The conflict case had recall and coverage 1.0, precision and novel precision 0.2, and MRR 1.0. Both authorization cases returned HTTP 404 before retrieval or generation. These scores describe the deterministic synthetic run.
+
+Commands run from `backend/` with synthetic settings and disposable PostgreSQL and Redis:
+
+- `python -B -m evaluation.retrieval_runner --k 5 --min-score 0.05` produced a complete JSON report.
+- `python -B -m pytest -q -p no:cacheprovider tests/test_rag_retrieval_units.py tests/test_rag_retrieval_evaluation.py tests/test_rag_evaluation_schema.py tests/test_rag_evaluation.py tests/test_ai_rag_integration.py tests/test_document_grounded_qa.py --tb=short -rs` passed 132 tests with zero skips or failures, including final malformed-URL handling.
+- `python -B -m pytest -q -p no:cacheprovider --tb=short -rs` passed 736 tests with zero skips or failures on the snapshot before the final malformed-URL guard. Two existing websockets deprecation warnings appeared. The full suite included real-cookie browser integration.
+- With no test database URL, `python -B -m pytest -q -p no:cacheprovider tests/test_rag_retrieval_evaluation.py -rs` passed 6 tests and skipped the one real PostgreSQL test. Missing or malformed URLs gave CLI exit code 2.
+- `python -m ruff check .`, `python -m ruff format --check .` and `git diff --check` passed. The legacy full-report comparison passed against the unchanged baseline.
+
+Hosted CI was not run for these local changes.
