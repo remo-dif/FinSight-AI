@@ -187,7 +187,7 @@ A real provider key is unnecessary. The application settings accept the syntheti
 
 ### Rubric and controlled assertions
 
-The versioned document_answer_rubric_v1.json sidecar binds its ordered 14 cases to PR1 by canonical dataset SHA-256. Each fact has a stable ID, a typed value, a required flag and alternative sufficient evidence groups. Each group is a conjunction of logical document/passage references. Monetary amounts are Decimal in the named currency's major units. Date facts use ISO dates. Boolean facts encode polarity. Equations represent the stated relation with Decimal operands and the applicable currency and accounting period. The loader validates references, checks equation consistency and rejects mismatched or incomplete rubrics. Semantic sufficiency of annotated groups remains a rubric authoring decision.
+The versioned document_answer_rubric_v1.json sidecar binds its ordered 14 cases to PR1 by canonical dataset SHA-256. Each fact has a stable ID, a typed value, a required flag and alternative sufficient evidence groups. Each group is a conjunction of logical document/passage references. Monetary amounts are Decimal in the named currency's major units. Date facts use ISO dates. Boolean facts encode polarity. Equations represent the stated relation with Decimal operands and the applicable currency and accounting period. A causal relationship uses two controlled identifiers in the form cause explains effect. The loader validates references, checks equation consistency and rejects mismatched or incomplete rubrics. Semantic sufficiency of annotated groups remains a rubric authoring decision.
 
 The controlled grammar accepts one fact per line, for example:
 
@@ -196,15 +196,16 @@ closing-balance: 1,350.00 EUR @ 2025-01
 closing-date: 2025-01-31
 includes-refunds: false
 payments-equal-expenses: 250 = 250 EUR @ 2025-01
+revenue-cash-relationship: uncollected-revenue explains revenue-cash-gap
 ~~~
 
 The numeric grammar accepts an optional sign, comma thousands grouping and dot decimals. Supported negation is an explicit not prefix before a typed value. The grader treats recognizable wrong values, polarity, currency, period and additional structured claims as failures. Prose or attribution outside the grammar requires review. Clearly detected contradictions still fail if the answer also contains unclassified text. Semantic metrics whose numerator may depend on unclassified text remain null. This grammar is for fixtures and leaves the application prompt and public API intact.
 
-Q02 requires the two requested categories and records the total as optional corroboration. Q04 requires both documents for the equality. Q05 includes recognized, uncollected and received amounts. Q09 excludes the USD distractor from sufficient evidence. Q13 records two separate negatives. Q14 requires the four amounts and the reconciliation using account evidence. Other corroborating documents are optional for its citations.
+Q02 requires the two requested categories and records the total as optional corroboration. Q04 requires both documents for the equality. Q05 requires the three amounts and the explanation that uncollected recognized revenue accounts for the difference. The relationship's sufficient evidence group includes the recognized revenue, cash receipts and terminology passages. Q09 excludes the USD distractor from sufficient evidence. Q13 records two separate negatives. Q14 requires the four amounts and the reconciliation using account evidence. Other corroborating documents are optional for its citations.
 
 ### Metrics and report interpretation
 
-The harness observes the exact context supplied to the SDK, cross-checks its references and text against persisted authorized chunks, and validates the identity of all public sources. It grades the delivered response separately from the raw controlled draft and parsed result. Raw context and answers stay in memory. The report includes bounded outcomes, hashes and counts.
+The harness observes the exact context supplied to the SDK, cross-checks its references and text against persisted authorized chunks, and validates the identity of all public sources. It grades the delivered response separately from the draft decoded from the actual SDK completion and the parsed result. Missing or invalid completions cannot pass draft evaluation. Raw context and answers stay in memory. The report includes bounded outcomes, hashes and counts.
 
 | Metric | Definition |
 | --- | --- |
@@ -222,7 +223,7 @@ Citation precision and validity are null when no citations are published. Identi
 
 Q08 is tracked separately from ordinary abstention. The draft test requires both EUR 300 and EUR 350 and no authoritative choice. A unilateral choice or invented reconciliation fails the draft rubric. The production parser replaces the draft on abstention, so the public conflict explanation is unobservable. A fabricated draft that is discarded does not count as publicly delivered. Provider errors and invalid SDK JSON produce execution_error grades rather than successful abstentions.
 
-Baseline aggregates use only the 14 baseline scenarios and report applicable and evaluated counts. A mean stays null for an incomplete population. Adversarial results are separate. The evaluator contract passes if all scenarios execute and match their expected grades, including deliberate failures, review outcomes and injected provider errors. An unexpected infrastructure or generation error makes the run incomplete. Authorization has its own gate. Expected injected errors are scenario outcomes rather than infrastructure failures.
+Baseline aggregates use only the 14 baseline scenarios and report applicable and evaluated counts. A mean stays null for an incomplete population. Adversarial results are separate. The evaluator contract passes if all scenarios execute and match their expected grades, including deliberate failures, review outcomes and injected provider errors. An unexpected infrastructure or generation error makes the run incomplete. The report omits the former report_valid flag. Consumers can use execution completeness, evaluator contract and authorization results as separate checks. Authorization has its own gate. Expected injected errors are scenario outcomes rather than infrastructure failures.
 
 **Passing deterministic fake-model evaluation does not demonstrate the answer quality of GPT-4o or any real provider.** Model quality is explicitly unmeasured and the quality threshold is null. Provider-backed evaluation and free-form semantic grading are deferred.
 
@@ -235,3 +236,12 @@ Baseline aggregates use only the 14 baseline scenarios and report applicable and
 - PR2's before and after JSON matched after excluding measured latency and the working-tree dirty flag. The legacy baseline also matched. The PR2 invalid-k diagnostic was corrected to ASCII.
 - Ruff lint, Ruff format check and git diff --check passed.
 - The final full backend run used python -B -m pytest -q -p no:cacheprovider --tb=short -rs with disposable PostgreSQL and Redis and COOKIE_BROWSER_REQUIRED=1. It passed 770 tests with zero skips or failures and two existing websockets deprecation warnings.
+
+### PR #19 review follow-up
+
+Rubric version 1.1.0 adds the required Q05 causal relationship. With all three amounts correct, both missing causality and a wrong controlled cause fail answer correctness. Correct causality without complete support fails citation completeness. Unsupported free-form causal phrasing still requires review.
+
+Q08 and the Q06 discarded-draft diagnostic now consume the actual SDK completion. The regression tests replace a configured correct conflict draft with incomplete content, change the abstention flag, and inject malformed or absent payloads. The tests also replace a configured Q06 fabrication with an empty captured draft and verify that the diagnostic does not fire.
+
+The deterministic CLI completed 30 scenarios, with all 14 baselines satisfying the evaluator contract. The eight baseline answers retained means of 1.0 for factual and citation metrics. Ordinary abstention remained 3/3, with Q08 assessed separately, and authorization remained 2/2. The 16 adversarial scenarios produced 10 detected failures, 3 passes, 1 review and 2 expected error grades. PR2's stable report matched after excluding timings and Git metadata.
+- Review verification: 174 focused tests and 779 full backend tests passed with zero failures or skips using isolated PostgreSQL/pgvector and Redis. The full run emitted two existing websockets deprecation warnings. Ruff, formatting and diff checks passed.

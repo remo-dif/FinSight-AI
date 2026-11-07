@@ -30,6 +30,11 @@ def json_digest(value) -> str:
 
 def parse_value(kind: str, text: str):
     """Parse only the documented fixture grammar, with no inference from prose."""
+    if kind == "relationship":
+        match = re.fullmatch(r"([a-z][a-z0-9-]*) explains ([a-z][a-z0-9-]*)", text)
+        if not match:
+            raise ValueError("Expected explicit cause explains effect")
+        return match.groups()
     if kind == "date":
         if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", text):
             raise ValueError("Expected ISO date")
@@ -54,7 +59,7 @@ def parse_value(kind: str, text: str):
 
 class Fact(AnnotationModel):
     id: Key
-    kind: Literal["money", "date", "boolean", "equation"]
+    kind: Literal["money", "date", "boolean", "equation", "relationship"]
     value: str
     required: bool = True
     support: list[list[EvidenceReference]] = Field(min_length=1)
@@ -100,7 +105,7 @@ class CaseRubric(AnnotationModel):
 
 
 class AnswerRubric(AnnotationModel):
-    rubric_version: Literal["1.0.0"]
+    rubric_version: Literal["1.1.0"]
     dataset_version: str
     dataset_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     cases: list[CaseRubric]

@@ -153,3 +153,63 @@ def test_unknown_prose_leaves_semantic_metrics_null():
     assert result.metrics["answer_correctness"] is None
     assert result.metrics["citation_completeness"] is None
     assert result.metrics["citation_validity"] == 1
+
+
+Q05_AMOUNTS = (
+    "recognized-revenue: 800 EUR @ 2025-01\n"
+    "uncollected-revenue: 200 EUR @ 2025-01\n"
+    "cash-receipts: 600 EUR @ 2025-01"
+)
+Q05_RELATIONSHIP = "\nrevenue-cash-relationship: uncollected-revenue explains revenue-cash-gap"
+
+
+@pytest.mark.parametrize(
+    ("explanation", "include_terminology", "status", "correctness", "completeness", "support"),
+    [
+        ("", True, "fail", 0, 0.75, 1),
+        (Q05_RELATIONSHIP, True, "pass", 1, 1, 1),
+        (
+            Q05_RELATIONSHIP.replace("uncollected-revenue", "foreign-exchange"),
+            True,
+            "fail",
+            0,
+            0.75,
+            0.75,
+        ),
+        (Q05_RELATIONSHIP, False, "fail", 1, 1, 0.75),
+        (
+            "\nThe figures differ because part of the revenue is unpaid.",
+            True,
+            "needs_review",
+            None,
+            None,
+            None,
+        ),
+    ],
+)
+def test_q05_requires_causality_and_complete_evidence(
+    explanation, include_terminology, status, correctness, completeness, support
+):
+    document = "revenue-january"
+    passages = {
+        (document, "recognized"): (0, 10),
+        (document, "cash"): (10, 20),
+        (document, "terminology"): (20, 30),
+    }
+    spans = {"revenue": (document, (0, 30 if include_terminology else 20))}
+    result = grade_response(
+        RUBRICS["Q05"],
+        {
+            "status": "ok",
+            "answer": Q05_AMOUNTS + explanation,
+            "abstained": False,
+            "citations": [{"reference": "revenue"}],
+        },
+        spans,
+        passages,
+    )
+    assert result.status == status
+    assert result.metrics["answer_correctness"] == correctness
+    assert result.metrics["required_fact_completeness"] == completeness
+    assert result.metrics["claim_support"] == support
+    assert result.metrics["citation_validity"] == 1

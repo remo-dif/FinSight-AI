@@ -46,7 +46,7 @@ def classify_claims(rubric: CaseRubric, answer: str) -> tuple[set[str], int, boo
             continue
         fact = facts.get(key)
         if fact is None:
-            for kind in ("money", "date", "boolean", "equation"):
+            for kind in ("money", "date", "boolean", "equation", "relationship"):
                 try:
                     parse_value(kind, value)
                 except ValueError:

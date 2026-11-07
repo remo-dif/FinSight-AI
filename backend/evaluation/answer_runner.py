@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from openai import OpenAIError
+from pydantic import ValidationError
 
 from app.core.config import settings
 from app.core.openai_resilience import CircuitBreaker
@@ -37,7 +38,7 @@ from evaluation.retrieval_runner import (
     probe_authorization,
     validate_test_database_url,
 )
-from evaluation.schemas import load_document_dataset
+from evaluation.schemas import AnnotationModel, load_document_dataset
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,12 @@ class Scenario:
 # Fixed SDK stimuli, independent of the assertions loaded by the grader.
 CLOSING = "closing-balance: 1,350.00 EUR @ 2025-01"
 CONFLICT = "plan: 300 EUR @ 2025-02\ndraft: 350 EUR @ 2025-02\nauthoritative-value-exists: false"
+REVENUE_AMOUNTS = (
+    "recognized-revenue: 800 EUR @ 2025-01\n"
+    "uncollected-revenue: 200 EUR @ 2025-01\n"
+    "cash-receipts: 600 EUR @ 2025-01"
+)
+REVENUE_CAUSE = "\nrevenue-cash-relationship: uncollected-revenue explains revenue-cash-gap"
 BASE = {
     "Q01": Scenario("baseline", CLOSING + "\nclosing-date: 2025-01-31", ("account-january",)),
     "Q02": Scenario(
@@ -66,11 +73,7 @@ BASE = {
         "payments-equal-expenses: 250 = 250 EUR @ 2025-01",
         ("account-january", "expenses-january"),
     ),
-    "Q05": Scenario(
-        "baseline",
-        "recognized-revenue: 800 EUR @ 2025-01\nuncollected-revenue: 200 EUR @ 2025-01\ncash-receipts: 600 EUR @ 2025-01",
-        ("revenue-january",),
-    ),
+    "Q05": Scenario("baseline", REVENUE_AMOUNTS + REVENUE_CAUSE, ("revenue-january",)),
     "Q06": Scenario("baseline", "", abstained=True),
     "Q07": Scenario("baseline", "", abstained=True),
     "Q08": Scenario("baseline", CONFLICT, ("budget-february",), abstained=True),
@@ -90,6 +93,15 @@ BASE = {
 ADVERSARIAL = {
     "Q04": (
         Scenario("incomplete_citations", BASE["Q04"].answer, ("account-january",), expected="fail"),
+    ),
+    "Q05": (
+        Scenario("missing_causality", REVENUE_AMOUNTS, ("revenue-january",), expected="fail"),
+        Scenario(
+            "incorrect_causality",
+            REVENUE_AMOUNTS + REVENUE_CAUSE.replace("uncollected-revenue", "foreign-exchange"),
+            ("revenue-january",),
+            expected="fail",
+        ),
     ),
     "Q06": (
         Scenario("discarded_fabrication", "actuals: 350 EUR @ 2025-02", abstained=True),
@@ -136,6 +148,12 @@ ADVERSARIAL = {
 }
 
 
+class CapturedDraft(AnnotationModel):
+    answer: str
+    references: list[str]
+    abstained: bool
+
+
 class FakeCompletion:
     def __init__(
         self, scenario: Scenario, foreign_reference: str, document_prefixes: tuple[str, ...]
@@ -145,7 +163,6 @@ class FakeCompletion:
         self.document_prefixes = document_prefixes
         self.prompt_hash = None
         self.context = {}
-        self.raw_references = ()
         self.parsed_status = None
         self.parameters = None
 
@@ -171,7 +188,6 @@ class FakeCompletion:
             references = [self.foreign_reference]
         if scenario.fault == "duplicate":
             references *= 2
-        self.raw_references = tuple(references)
         if scenario.fault == "provider":
             raise OpenAIError("Synthetic provider error")
         content = (
@@ -235,7 +251,20 @@ async def run_scenario(fixture, case, rubric, scenario, persisted):
         fake.parsed_status = result["status"]
         return result
 
-    client = SimpleNamespace(chat=SimpleNamespace(completions=fake))
+    captured_content = None
+
+    def capture_completion(**kwargs):
+        nonlocal captured_content
+        response = fake.create(**kwargs)
+        choices = getattr(response, "choices", None)
+        if choices:
+            message = getattr(choices[0], "message", None)
+            captured_content = getattr(message, "content", None)
+        return response
+
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=capture_completion))
+    )
     with (
         patch("app.services.llm.create_openai_client", return_value=client),
         patch.object(LLMService, "synthesize_document_answer_result", observe),
@@ -254,16 +283,28 @@ async def run_scenario(fixture, case, rubric, scenario, persisted):
         public, fake.context, persisted, case.document_scope, fixture.users[case.principal]
     )
     grade = grade_response(rubric, public, verified, passages)
+    draft = None
+    if isinstance(captured_content, str):
+        try:
+            draft = CapturedDraft.model_validate_json(captured_content)
+        except ValidationError:
+            pass
+    raw_reference_count = len(draft.references) if draft is not None else 0
     draft_status = None
     public_explanation = None
     if case.id == "Q08":
-        draft_status = grade_conflict_draft(rubric, scenario.answer, scenario.abstained)
+        draft_status = (
+            grade_conflict_draft(rubric, draft.answer, draft.abstained)
+            if draft is not None
+            else "execution_error"
+        )
         public_explanation = "unobservable" if public["status"] != "ok" else "delivered"
     draft_warning = (
         "discarded_unexpected_claim"
-        if scenario.abstained
+        if draft is not None
+        and draft.abstained
         and rubric.reason != "conflicting_proposals"
-        and classify_claims(rubric, scenario.answer)[1]
+        and classify_claims(rubric, draft.answer)[1]
         else None
     )
     must_generate = (
@@ -277,10 +318,7 @@ async def run_scenario(fixture, case, rubric, scenario, persisted):
             or fake.parsed_status == "provider_error"
         )
         and (scenario.fault != "foreign" or public["status"] == "abstained")
-        and (
-            scenario.fault != "duplicate"
-            or len(public["citations"]) == 1 < len(fake.raw_references)
-        )
+        and (scenario.fault != "duplicate" or len(public["citations"]) == 1 < raw_reference_count)
         and (case.id != "Q08" or draft_status == ("pass" if scenario.id == "baseline" else "fail"))
         and (scenario.id != "discarded_fabrication" or draft_warning is not None)
     )
@@ -290,7 +328,7 @@ async def run_scenario(fixture, case, rubric, scenario, persisted):
         "prompt_hash": fake.prompt_hash,
         "generation_parameters": fake.parameters,
         "prompt_chunks": len(fake.context),
-        "raw_reference_count": len(fake.raw_references),
+        "raw_reference_count": raw_reference_count,
         "parsed_status": fake.parsed_status,
         "public_citation_count": len(public["citations"]),
         "draft_warning": draft_warning,
@@ -414,7 +452,6 @@ async def evaluate_answers(url):
         },
         "requested_generation_model": settings.openai_model,
         "generation": {"provider_calls": 0},
-        "report_valid": True,
         "execution": {
             "complete": complete,
             "planned": planned,

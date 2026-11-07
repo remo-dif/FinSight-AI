@@ -1,5 +1,5 @@
 {
-  "rubric_version": "1.0.0",
+  "rubric_version": "1.1.0",
   "dataset_version": "1.1.0",
   "dataset_sha256": "48809598e9d90412d161998242f3031f1aca4b864e76731bc5f4786c03a2e0ea",
   "cases": [
@@ -179,6 +179,28 @@
               {
                 "document_key": "revenue-january",
                 "evidence_key": "cash"
+              }
+            ]
+          ]
+        },
+        {
+          "id": "revenue-cash-relationship",
+          "kind": "relationship",
+          "value": "uncollected-revenue explains revenue-cash-gap",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "revenue-january",
+                "evidence_key": "recognized"
+              },
+              {
+                "document_key": "revenue-january",
+                "evidence_key": "cash"
+              },
+              {
+                "document_key": "revenue-january",
+                "evidence_key": "terminology"
               }
             ]
           ]

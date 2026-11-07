@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -11,7 +12,7 @@ os.environ.setdefault("JWT_REFRESH_SECRET_KEY", "evaluation-test-refresh-placeho
 os.environ.setdefault("OPENAI_API_KEY", "evaluation-placeholder-not-provider")
 
 from evaluation.answer_rubric import RUBRIC_PATH, load_answer_rubric
-from evaluation.answer_runner import evaluate_answers, verified_citations
+from evaluation.answer_runner import CONFLICT, FakeCompletion, evaluate_answers, verified_citations
 from evaluation.retrieval_runner import validate_test_database_url
 from evaluation.schemas import load_document_dataset
 
@@ -88,8 +89,8 @@ def test_real_answer_evaluation_and_repeatability(pg_url):
     assert report == repeat
     assert report["execution"] == {
         "complete": True,
-        "planned": 28,
-        "executed": 28,
+        "planned": 30,
+        "executed": 30,
         "errors": 0,
         "skipped": 0,
     }
@@ -99,9 +100,13 @@ def test_real_answer_evaluation_and_repeatability(pg_url):
     assert report["authorization"] == {"planned": 2, "passed": 2, "contract_passed": True}
     assert report["model_quality_measured"] is False
     assert report["threshold_result"] is None
+    assert "report_valid" not in report
     assert report["baseline_aggregate"]["pass"] == 14
     assert report["baseline_aggregate"]["metrics"]["abstention_correctness"]["applicable"] == 3
     rows = {(row["id"], row["scenario"]): row for row in report["cases"]}
+    for scenario in ("missing_causality", "incorrect_causality"):
+        assert rows["Q05", scenario]["grade"]["status"] == "fail"
+        assert rows["Q05", scenario]["grade"]["metrics"]["required_fact_completeness"] == 0.75
     assert rows["Q04", "baseline"]["grade"]["metrics"]["citation_completeness"] == 1
     assert rows["Q04", "incomplete_citations"]["grade"]["metrics"]["citation_completeness"] == 0
     assert rows["Q08", "baseline"]["conflict_draft"] == "pass"
@@ -152,3 +157,45 @@ def test_public_sources_cannot_leak_when_generation_never_runs():
     public = {"sources": [{"reference": "private"}], "citations": []}
     with pytest.raises(ValueError, match="ownership"):
         verified_citations(public, {}, persisted, ["account-january"], "owner")
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        (
+            json.dumps({"answer": "plan: 300 EUR @ 2025-02", "references": [], "abstained": True}),
+            "fail",
+        ),
+        (json.dumps({"answer": CONFLICT, "references": [], "abstained": False}), "fail"),
+        ("{", "execution_error"),
+        (None, "execution_error"),
+    ],
+)
+def test_draft_diagnostics_grade_the_actual_sdk_payload(pg_url, monkeypatch, payload, expected):
+    original = FakeCompletion.create
+
+    def intercept(self, **kwargs):
+        response = original(self, **kwargs)
+        if self.scenario.answer == CONFLICT:
+            if payload is None:
+                return SimpleNamespace(choices=[])
+            response.choices[0].message.content = payload
+        elif self.scenario.id == "discarded_fabrication":
+            # The configured draft fabricates an amount, but the actual response does not.
+            response.choices[0].message.content = json.dumps(
+                {"answer": "", "references": [], "abstained": True}
+            )
+        return response
+
+    monkeypatch.setattr(FakeCompletion, "create", intercept)
+    with asyncio.Runner(loop_factory=asyncio.SelectorEventLoop) as runner:
+        report = runner.run(evaluate_answers(pg_url))
+    cases = {(row["id"], row["scenario"]): row for row in report["cases"]}
+    conflict = cases["Q08", "baseline"]
+    assert conflict["conflict_draft"] == expected
+    assert conflict["api_status"] == ("abstained" if expected == "fail" else "provider_error")
+    assert not conflict["contract_passed"]
+    discarded = cases["Q06", "discarded_fabrication"]
+    assert discarded["grade"]["status"] == "pass"
+    assert discarded["draft_warning"] is None
+    assert not discarded["contract_passed"]
