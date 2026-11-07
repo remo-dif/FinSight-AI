@@ -104,11 +104,13 @@ def test_budget_denied_before_network(profile, tmp_path, requests, tokens, cost)
     )
     try:
         boundary = Boundary(profile, journal, "secret-placeholder")
-        with boundary.during(Phase("test", embedding_input=["approved"])):
-            with pytest.raises(SafetyError, match="budget"):
-                SyncTransport(boundary, lambda _: pytest.fail("egress")).handle_request(
-                    embedding_request(profile)
-                )
+        with (
+            boundary.during(Phase("test", embedding_input=["approved"])),
+            pytest.raises(SafetyError, match="budget"),
+        ):
+            SyncTransport(boundary, lambda _: pytest.fail("egress")).handle_request(
+                embedding_request(profile)
+            )
         assert journal.db.execute("SELECT count(*) FROM attempts").fetchone() == (0,)
     finally:
         journal.db.close()
@@ -138,9 +140,11 @@ def test_request_count_and_safe_resume(profile, tmp_path):
         journal.assert_resumable()
         with boundary.during(Phase("first", embedding_input=["approved"])):
             transport.handle_request(embedding_request(profile))
-        with boundary.during(Phase("second", embedding_input=["approved"])):
-            with pytest.raises(SafetyError, match="budget"):
-                transport.handle_request(embedding_request(profile))
+        with (
+            boundary.during(Phase("second", embedding_input=["approved"])),
+            pytest.raises(SafetyError, match="budget"),
+        ):
+            transport.handle_request(embedding_request(profile))
         assert len(calls) == 1
         tokens, cost, usage = journal.db.execute(
             "SELECT input_tokens + output_tokens, cost, usage FROM attempts"
@@ -165,9 +169,11 @@ def test_uncertain_delivery_is_never_replayed(profile, budget, tmp_path, outcome
             return httpx.Response(307, headers={"location": "https://example.org"})
         return httpx.Response(200, json={"content": "never-persist-this-key"})
 
-    with boundary.during(Phase("test", embedding_input=["approved"])):
-        with pytest.raises((httpx.ReadTimeout, SafetyError)):
-            SyncTransport(boundary, send).handle_request(embedding_request(profile))
+    with (
+        boundary.during(Phase("test", embedding_input=["approved"])),
+        pytest.raises((httpx.ReadTimeout, SafetyError)),
+    ):
+        SyncTransport(boundary, send).handle_request(embedding_request(profile))
     journal.db.close()
     assert b"never-persist-this-key" not in path.read_bytes()
     journal = Journal(path, {}, budget)
@@ -183,13 +189,15 @@ def test_async_boundary_denies_wrong_destination_or_content(profile, budget, tmp
     journal = Journal(tmp_path / "journal", {}, budget)
     boundary = Boundary(profile, journal, "secret-placeholder")
     try:
-        with boundary.during(Phase("test", embedding_input=["approved"])):
-            with pytest.raises(SafetyError):
-                asyncio.run(
-                    AsyncTransport(boundary, lambda _: pytest.fail("egress")).handle_async_request(
-                        embedding_request(profile, destination, ["unapproved"])
-                    )
+        with (
+            boundary.during(Phase("test", embedding_input=["approved"])),
+            pytest.raises(SafetyError),
+        ):
+            asyncio.run(
+                AsyncTransport(boundary, lambda _: pytest.fail("egress")).handle_async_request(
+                    embedding_request(profile, destination, ["unapproved"])
                 )
+            )
     finally:
         journal.db.close()
 

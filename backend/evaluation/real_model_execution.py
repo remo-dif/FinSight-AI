@@ -133,10 +133,8 @@ async def ingest(bundle, http, headers, principals, engine, directory, boundary)
                 headers=headers[document.owner],
                 files={"file": (f"{document.key}.pdf", pdf, "application/pdf")},
             )
-        if response.status_code != 200 or response.json().get("file_id") != str(doc_id):
-            # The production route may legitimately use 201 for creation.
-            if response.status_code != 201 or response.json().get("file_id") != str(doc_id):
-                raise SafetyError("Synthetic ingestion failed")
+        if response.status_code not in (200, 201) or response.json().get("file_id") != str(doc_id):
+            raise SafetyError("Synthetic ingestion failed")
         ids[document.key] = doc_id
         with Session(engine) as session:
             rows = session.scalars(
@@ -240,7 +238,7 @@ async def ask(http, headers, principals, case, unit, ids, persisted, boundary):
                 response.status_code != 200 or public.get("status") == "provider_error"
             ):
                 error = boundary.failure or "application_response_error"
-        except Exception:
+        except (SafetyError, httpx.HTTPError, ValueError):
             error = boundary.failure or "evaluation_contract_error"
 
     attempts = sorted(boundary.seen)

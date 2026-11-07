@@ -155,7 +155,7 @@ def main(argv=None):
         return 0 if summary["completed"] == summary["planned"] and not summary["errors"] else 1
     except ValidationError:
         print("Invalid evaluation profile, budget, or artifact.", file=sys.stderr)
-    except Exception:
+    except Exception:  # noqa: BLE001 - redact unexpected failures at the CLI boundary
         # Exception strings may contain HTTP data, connection URLs or secret values.
         print(
             "Evaluation stopped. Check opt-in, profile, budgets, dedicated database and journal.",

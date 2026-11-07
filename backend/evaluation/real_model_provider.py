@@ -2,11 +2,11 @@
 
 import json
 import sqlite3
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Callable
 
 import httpx
 
@@ -162,7 +162,7 @@ class Boundary:
             raise SafetyError("Provider request destination, method, or phase denied")
         try:
             payload = json.loads(body)
-        except (ValueError, UnicodeError):
+        except (TypeError, ValueError, UnicodeError):
             raise SafetyError("Invalid provider request") from None
         profile = self.profile
         if endpoint == EMBEDDINGS and profile.embedding_backend == "openai":
@@ -220,7 +220,7 @@ class Boundary:
         try:
             decoded = json.loads(content)
             if not isinstance(decoded, dict):
-                raise ValueError
+                raise TypeError
             if self.credential and self.credential in canonical(decoded).decode():
                 raise ValueError
             usage = decoded.get("usage")
@@ -240,7 +240,7 @@ class Boundary:
             if tokens is not None and tokens > reserved:
                 self.failure = "usage_exceeded_reservation"
                 raise SafetyError("Provider usage exceeded the reserved token bound")
-        except (ValueError, UnicodeError):
+        except (TypeError, ValueError, UnicodeError):
             self.failure = "response_parse_failure"
             raise SafetyError("Provider response could not be safely persisted") from None
         return as_response(envelope)
