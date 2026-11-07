@@ -7,6 +7,7 @@ import logging
 import os
 import subprocess
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from hashlib import sha256
 from inspect import signature
 from pathlib import Path
@@ -17,7 +18,7 @@ from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 import httpx
 from sqlalchemy import create_engine, event, select, text
-from sqlalchemy.engine import URL, make_url
+from sqlalchemy.engine import URL, Engine, make_url
 from sqlalchemy.exc import ArgumentError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import Session
@@ -242,6 +243,30 @@ def track_for(case):
     return "diagnostic"
 
 
+async def probe_authorization(http, headers, question, scope):
+    with (
+        patch.object(
+            RagService,
+            "retrieve_chunks",
+            side_effect=AssertionError("Unexpected retrieval"),
+        ) as retrieval,
+        patch.object(
+            LLMService,
+            "synthesize_document_answer_result",
+            side_effect=AssertionError("Unexpected generation"),
+        ) as generation,
+    ):
+        response = await http.post(
+            "/api/documents/ask",
+            headers=headers,
+            json={
+                "question": question,
+                "document_ids": [str(value) for value in scope],
+            },
+        )
+    return response, retrieval.called, generation.called
+
+
 async def evaluate_cases(bundle, http, headers, users, engine, corpus, k, threshold):
     ids, passages, chunk_lookup = corpus
     results = []
@@ -251,37 +276,20 @@ async def evaluate_cases(bundle, http, headers, users, engine, corpus, k, thresh
         scope = [ids[key] for key in case.document_scope]
         try:
             if track == "authorization":
-                with (
-                    patch.object(
-                        RagService,
-                        "retrieve_chunks",
-                        side_effect=AssertionError("Unexpected retrieval"),
-                    ) as retrieval,
-                    patch.object(
-                        LLMService,
-                        "synthesize_document_answer_result",
-                        side_effect=AssertionError("Unexpected generation"),
-                    ) as generation,
-                ):
-                    response = await http.post(
-                        "/api/documents/ask",
-                        headers=headers[case.principal],
-                        json={
-                            "question": case.question,
-                            "document_ids": [str(value) for value in scope],
-                        },
-                    )
+                response, retrieval_called, generation_called = await probe_authorization(
+                    http, headers[case.principal], case.question, scope
+                )
                 passed = (
                     response.status_code == case.expected_http_status
-                    and not retrieval.called
-                    and not generation.called
+                    and not retrieval_called
+                    and not generation_called
                 )
                 row.update(
                     status="ok" if passed else "error",
                     authorization={
                         "http_status": response.status_code,
-                        "retrieval_called": retrieval.called,
-                        "generation_called": generation.called,
+                        "retrieval_called": retrieval_called,
+                        "generation_called": generation_called,
                         "passed": passed,
                     },
                     metrics=dict.fromkeys(METRICS),
@@ -328,13 +336,20 @@ def aggregates(results):
     return groups
 
 
-async def evaluate_retrieval(url, k=5, min_score=DEFAULT_MIN_SCORE):
-    """Evaluate only a validated, explicitly supplied dedicated local test URL."""
+@dataclass(frozen=True)
+class EvaluationFixture:
+    http: httpx.AsyncClient
+    headers: dict[str, dict[str, str]]
+    users: dict[str, UUID]
+    engine: Engine
+    corpus: tuple
+    pgvector_version: str
+    hnsw_present: bool
+
+
+@asynccontextmanager
+async def evaluation_fixture(bundle, url):
     url = validate_test_database_url(url)
-    if not 1 <= k <= 20 or not -1 <= min_score <= 1:
-        raise ValueError("Use k in 1ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“20 and min_score in [-1, 1]")
-    threshold = RagService.normalize_min_score(min_score)
-    bundle = load_document_dataset()
     with (
         TemporaryDirectory(prefix="finsight-retrieval-") as temporary,
         patch.multiple(
@@ -344,7 +359,6 @@ async def evaluate_retrieval(url, k=5, min_score=DEFAULT_MIN_SCORE):
             embedding_backend="local",
             rate_limit_backend="memory",
         ),
-        patch("app.services.llm.create_openai_client", return_value=None),
     ):
         async with isolated_database(url) as (engine, async_engine):
             owners = sorted(
@@ -397,9 +411,29 @@ async def evaluate_retrieval(url, k=5, min_score=DEFAULT_MIN_SCORE):
                 base_url="http://test",
             ) as http:
                 corpus = await ingest_corpus(bundle, http, headers, engine, Path(temporary))
-                results = await evaluate_cases(
-                    bundle, http, headers, users, engine, corpus, k, threshold
-                )
+                yield EvaluationFixture(http, headers, users, engine, corpus, extension, hnsw)
+
+
+async def evaluate_retrieval(url, k=5, min_score=DEFAULT_MIN_SCORE):
+    """Evaluate only a validated, explicitly supplied dedicated local test URL."""
+    url = validate_test_database_url(url)
+    if not 1 <= k <= 20 or not -1 <= min_score <= 1:
+        raise ValueError("Use k in [1, 20] and min_score in [-1, 1]")
+    threshold = RagService.normalize_min_score(min_score)
+    bundle = load_document_dataset()
+    with patch("app.services.llm.create_openai_client", return_value=None):
+        async with evaluation_fixture(bundle, url) as fixture:
+            results = await evaluate_cases(
+                bundle,
+                fixture.http,
+                fixture.headers,
+                fixture.users,
+                fixture.engine,
+                fixture.corpus,
+                k,
+                threshold,
+            )
+    extension, hnsw = fixture.pgvector_version, fixture.hnsw_present
     errors = [row["id"] for row in results if row["status"] != "ok"]
     commit = (
         await asyncio.to_thread(
