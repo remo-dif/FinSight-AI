@@ -5,6 +5,7 @@ import type { InitialCaseQueue } from "@/lib/server-data";
 import {
   Bell,
   BriefcaseBusiness,
+  Construction,
   Database,
   FileSearch,
   Gauge,
@@ -15,17 +16,19 @@ import {
   Siren
 } from "lucide-react";
 
-type WorkspaceRoute = "triage" | "cases" | "graph" | "evidence" | "data";
+type WorkspaceRoute = "triage" | "cases" | "graph" | "evidence" | "data" | "controls";
 
-const navigation: Array<{ id: WorkspaceRoute; label: string; href: `/${string}`; icon: typeof Gauge }> = [
+const navigation: Array<{ id: WorkspaceRoute; label: string; href: `/${string}`; icon: typeof Gauge; comingSoon?: boolean }> = [
   { id: "triage", label: "Triage", href: "/", icon: Gauge },
   { id: "cases", label: "Cases", href: "/cases", icon: BriefcaseBusiness },
-  { id: "graph", label: "Graph", href: "/graph", icon: Network },
+  { id: "graph", label: "Graph", href: "/graph", icon: Network, comingSoon: true },
   { id: "evidence", label: "Evidence", href: "/evidence", icon: FileSearch },
-  { id: "data", label: "Data", href: "/data", icon: Database }
+  { id: "data", label: "Data", href: "/data", icon: Database, comingSoon: true }
 ];
 
-const routeCopy: Record<WorkspaceRoute, { eyebrow: string; title: string; description: string }> = {
+const controlsNavigation = { id: "controls" as const, label: "Controls", href: "/controls" as const, icon: Settings, comingSoon: true };
+
+const routeCopy: Record<WorkspaceRoute, { eyebrow: string; title: string; description: string; comingSoon?: boolean }> = {
   triage: {
     eyebrow: "Fraud command center",
     title: "Triage live-risk alerts and document decisions",
@@ -39,7 +42,8 @@ const routeCopy: Record<WorkspaceRoute, { eyebrow: string; title: string; descri
   graph: {
     eyebrow: "Entity intelligence",
     title: "Trace connected accounts, devices, and beneficiaries",
-    description: "Use shared signals to understand how an alert relates to broader entity behavior."
+    description: "The entity graph will connect accounts, devices, beneficiaries, and shared risk signals in one investigation view.",
+    comingSoon: true
   },
   evidence: {
     eyebrow: "Evidence review",
@@ -47,9 +51,16 @@ const routeCopy: Record<WorkspaceRoute, { eyebrow: string; title: string; descri
     description: "Inspect uploaded evidence, extracted context, and reviewer-ready signal summaries."
   },
   data: {
-    eyebrow: "Data controls",
-    title: "Monitor ingestion quality and investigation data",
-    description: "Keep transaction, document, and model-grounding inputs visible to operations teams."
+    eyebrow: "Investigation data",
+    title: "Monitor investigation data and ingestion quality",
+    description: "The data workspace will surface transaction, document, and model-grounding inputs with their processing status.",
+    comingSoon: true
+  },
+  controls: {
+    eyebrow: "Workspace controls",
+    title: "Configure operational controls and policies",
+    description: "Controls will provide a dedicated place for workspace policies, thresholds, and operational settings.",
+    comingSoon: true
   }
 };
 
@@ -61,6 +72,7 @@ export function AppShell({
   initialQueue?: InitialCaseQueue;
 }) {
   const copy = routeCopy[activeRoute];
+  const isComingSoon = Boolean(copy.comingSoon);
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -98,14 +110,24 @@ export function AppShell({
                 >
                   <item.icon aria-hidden className="h-4 w-4" />
                   {item.label}
+                  {item.comingSoon ? (
+                    <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide">Soon</span>
+                  ) : null}
                 </Link>
               );
             })}
           </nav>
           <div className="border-t border-border p-3">
-            <Link className="flex h-9 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted transition hover:bg-background hover:text-foreground" href={"/data" as Route}>
+            <Link
+              className={`flex min-h-9 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition ${
+                activeRoute === "controls" ? "bg-accent/10 text-accent" : "text-muted hover:bg-background hover:text-foreground"
+              }`}
+              href={"/controls" as Route}
+              aria-current={activeRoute === "controls" ? "page" : undefined}
+            >
               <Settings aria-hidden className="h-4 w-4" />
               Controls
+              <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide">Soon</span>
             </Link>
           </div>
         </aside>
@@ -116,7 +138,7 @@ export function AppShell({
               className="flex gap-2 overflow-x-auto border-b border-border px-4 py-2 text-sm font-medium [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden"
               aria-label="Mobile navigation"
             >
-              {navigation.map((item) => {
+              {[...navigation, controlsNavigation].map((item) => {
                 const isActive = item.id === activeRoute;
                 return (
                   <Link
@@ -131,6 +153,7 @@ export function AppShell({
                   >
                     <item.icon aria-hidden className="h-4 w-4" />
                     {item.label}
+                    {item.comingSoon ? <span className="text-[10px] font-semibold uppercase tracking-wide">Soon</span> : null}
                   </Link>
                 );
               })}
@@ -143,7 +166,7 @@ export function AppShell({
                 </p>
                 <h1 className="text-xl font-semibold leading-tight sm:text-2xl">{copy.title}</h1>
               </div>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              {!isComingSoon ? <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <label className="relative block min-w-0 sm:w-[340px]" htmlFor="workspace-search">
                   <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
                   <span className="sr-only">Search cases, entities, merchants, or transaction ids</span>
@@ -158,11 +181,26 @@ export function AppShell({
                   <Bell aria-hidden className="h-4 w-4" />
                   12 open alerts
                 </button>
-              </div>
+              </div> : null}
             </div>
           </header>
 
           <div className="px-4 py-4 sm:px-6">
+            {isComingSoon ? (
+              <section id="dashboard" className="mx-auto max-w-3xl py-8 sm:py-16" aria-labelledby="coming-soon-heading">
+                <div className="rounded-lg border border-border bg-panel p-6 shadow-soft sm:p-8">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-accent/10 text-accent">
+                    <Construction aria-hidden className="h-5 w-5" />
+                  </span>
+                  <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-accent">Coming soon</p>
+                  <h2 id="coming-soon-heading" className="mt-2 text-xl font-semibold">This workspace is not available yet</h2>
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">{copy.description}</p>
+                  <Link className="mt-6 inline-flex min-h-10 items-center rounded-md border border-border bg-white px-4 text-sm font-semibold text-accent transition hover:border-accent/60" href={"/" as Route}>
+                    Return to Triage
+                  </Link>
+                </div>
+              </section>
+            ) : (
             <section id="dashboard" className="min-w-0 space-y-4" aria-labelledby="dashboard-heading">
               <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="max-w-3xl">
@@ -186,6 +224,7 @@ export function AppShell({
               </div>
               <DashboardWorkspace initialQueue={initialQueue} />
             </section>
+            )}
           </div>
         </div>
       </div>

@@ -3,9 +3,10 @@ import { expect, test } from "@playwright/test";
 const routes = [
   { path: "/", heading: "Triage live-risk alerts and document decisions" },
   { path: "/cases", heading: "Review assigned cases and escalation state" },
-  { path: "/graph", heading: "Trace connected accounts, devices, and beneficiaries" },
+  { path: "/graph", heading: "Trace connected accounts, devices, and beneficiaries", comingSoon: true },
   { path: "/evidence", heading: "Validate signals before analyst disposition" },
-  { path: "/data", heading: "Monitor ingestion quality and investigation data" }
+  { path: "/data", heading: "Monitor investigation data and ingestion quality", comingSoon: true },
+  { path: "/controls", heading: "Configure operational controls and policies", comingSoon: true }
 ];
 
 test.describe("application smoke", () => {
@@ -20,7 +21,12 @@ test.describe("application smoke", () => {
       await page.goto(route.path);
 
       await expect(page.getByRole("heading", { name: route.heading })).toBeVisible();
-      await expect(page.getByRole("heading", { name: "Investigation workspace" })).toBeVisible();
+      if (route.comingSoon) {
+        await expect(page.getByRole("heading", { name: "This workspace is not available yet" })).toBeVisible();
+        await expect(page.getByRole("link", { name: "Return to Triage" })).toBeVisible();
+      } else {
+        await expect(page.getByRole("heading", { name: "Investigation workspace" })).toBeVisible();
+      }
       expect(consoleErrors).toEqual([]);
     });
   }
@@ -36,6 +42,7 @@ test.describe("application smoke", () => {
 
     await expect(page).toHaveURL(/\/graph$/);
     await expect(page.getByRole("heading", { name: "Trace connected accounts, devices, and beneficiaries" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "This workspace is not available yet" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Workspace" }).getByRole("link", { name: "Graph" })).toHaveAttribute(
       "aria-current",
       "page"

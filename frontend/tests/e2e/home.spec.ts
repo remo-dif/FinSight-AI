@@ -27,7 +27,7 @@ test("changes route from the primary navigation", async ({ page, isMobile }) => 
 
 test("keeps upload controls constrained to supported financial files", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Upload evidence" }).click();
+  await page.getByRole("button", { name: "Upload to Document Library" }).click();
 
   const fileInput = page.locator("input[type='file']");
   await expect(fileInput).toHaveAttribute("accept", ".csv,.pdf,.png,.jpg,.jpeg");
