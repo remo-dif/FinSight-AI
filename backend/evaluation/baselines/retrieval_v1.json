@@ -1,0 +1,603 @@
+{
+  "aggregates": {
+    "conflict": {
+      "applicable_cases": 1,
+      "failed_cases": 0,
+      "measured_cases": 1,
+      "metrics": {
+        "chunk_precision": 0.2,
+        "evidence_coverage": 1.0,
+        "evidence_recall": 1.0,
+        "mrr": 1.0,
+        "novel_evidence_precision": 0.2
+      }
+    },
+    "retrieval": {
+      "applicable_cases": 8,
+      "failed_cases": 0,
+      "measured_cases": 8,
+      "metrics": {
+        "chunk_precision": 0.275,
+        "evidence_coverage": 1.0,
+        "evidence_recall": 1.0,
+        "mrr": 1.0,
+        "novel_evidence_precision": 0.275
+      }
+    }
+  },
+  "baseline_schema_version": 1,
+  "cases": [
+    {
+      "applicable": [
+        "evidence_recall",
+        "evidence_coverage",
+        "chunk_precision",
+        "novel_evidence_precision",
+        "mrr"
+      ],
+      "diagnostics": {
+        "ranking": [
+          {
+            "chunk_index": 0,
+            "chunk_sha256": "447e81207f5a4cb53eccc9e6b4a9cf91e34b63d085f460774c3c53f2ebb3356e",
+            "document": "account-january",
+            "rank": 1,
+            "score": 0.4666427969932556,
+            "span": [
+              0,
+              36
+            ]
+          }
+        ]
+      },
+      "id": "Q01",
+      "metrics": {
+        "chunk_precision": 0.2,
+        "evidence_coverage": 1.0,
+        "evidence_recall": 1.0,
+        "mrr": 1.0,
+        "novel_evidence_precision": 0.2
+      },
+      "scope": [
+        "account-january"
+      ],
+      "track": "retrieval"
+    },
+    {
+      "applicable": [
+        "evidence_recall",
+        "evidence_coverage",
+        "chunk_precision",
+        "novel_evidence_precision",
+        "mrr"
+      ],
+      "diagnostics": {
+        "ranking": [
+          {
+            "chunk_index": 0,
+            "chunk_sha256": "5d6e053e5ba5f0a811430b712b2c141de755363e37f22d60bbbb983b982297a9",
+            "document": "expenses-january",
+            "rank": 1,
+            "score": 0.4536433219909668,
+            "span": [
+              0,
+              30
+            ]
+          }
+        ]
+      },
+      "id": "Q02",
+      "metrics": {
+        "chunk_precision": 0.2,
+        "evidence_coverage": 1.0,
+        "evidence_recall": 1.0,
+        "mrr": 1.0,
+        "novel_evidence_precision": 0.2
+      },
+      "scope": [
+        "expenses-january"
+      ],
+      "track": "retrieval"
+    },
+    {
+      "applicable": [
+        "evidence_recall",
+        "evidence_coverage",
+        "chunk_precision",
+        "novel_evidence_precision",
+        "mrr"
+      ],
+      "diagnostics": {
+        "ranking": [
+          {
+            "chunk_index": 0,
+            "chunk_sha256": "447e81207f5a4cb53eccc9e6b4a9cf91e34b63d085f460774c3c53f2ebb3356e",
+            "document": "account-january",
+            "rank": 1,
+            "score": 0.14421699310642466,
+            "span": [
+              0,
+              36
+            ]
+          }
+        ]
+      },
+      "id": "Q03",
+      "metrics": {
+        "chunk_precision": 0.2,
+        "evidence_coverage": 1.0,
+        "evidence_recall": 1.0,
+        "mrr": 1.0,
+        "novel_evidence_precision": 0.2
+      },
+      "scope": [
+        "account-january"
+      ],
+      "track": "retrieval"
+    },
+    {
+      "applicable": [
+        "evidence_recall",
+        "evidence_coverage",
+        "chunk_precision",
+        "novel_evidence_precision",
+        "mrr"
+      ],
+      "diagnostics": {
+        "ranking": [
+          {
+            "chunk_index": 0,
+            "chunk_sha256": "447e81207f5a4cb53eccc9e6b4a9cf91e34b63d085f460774c3c53f2ebb3356e",
+            "document": "account-january",
+            "rank": 1,
+            "score": 0.3039729595184326,
+            "span": [
+              0,
+              36
+            ]
+          },
+          {
+            "chunk_index": 0,
+            "chunk_sha256": "5d6e053e5ba5f0a811430b712b2c141de755363e37f22d60bbbb983b982297a9",
+            "document": "expenses-january",
+            "rank": 2,
+            "score": 0.09851965308189392,
+            "span": [
+              0,
+              30
+            ]
+          }
+        ]
+      },
+      "id": "Q04",
+      "metrics": {
+        "chunk_precision": 0.4,
+        "evidence_coverage": 1.0,
+        "evidence_recall": 1.0,
+        "mrr": 1.0,
+        "novel_evidence_precision": 0.4
+      },
+      "scope": [
+        "account-january",
+        "expenses-january"
+      ],
+      "track": "retrieval"
+    },
+    {
+      "applicable": [
+        "evidence_recall",
+        "evidence_coverage",
+        "chunk_precision",
+        "novel_evidence_precision",
+        "mrr"
+      ],
+      "diagnostics": {
+        "ranking": [
+          {
+            "chunk_index": 0,
+            "chunk_sha256": "c1963a2a74e3537bac81015ac006c335dfa06263d0d95b2c4a5cebffe1b5e5b6",
+            "document": "revenue-january",
+            "rank": 1,
+            "score": 0.5123449563980103,
+            "span": [
+              0,
+              38
+            ]
+          }
+        ]
+      },
+      "id": "Q05",
+      "metrics": {
+        "chunk_precision": 0.2,
+        "evidence_coverage": 1.0,
+        "evidence_recall": 1.0,
+        "mrr": 1.0,
+        "novel_evidence_precision": 0.2
+      },
+      "scope": [
+        "revenue-january"
+      ],
+      "track": "retrieval"
+    },
+    {
+      "applicable": [],
+      "diagnostics": {
+        "ranking": [
+          {
+            "chunk_index": 0,
+            "chunk_sha256": "a7eb4c3349ebd6e06bd5aed6d4ba1f413c52a17a1cff450e0a1c013e557c1bbe",
+            "document": "budget-february",
+            "rank": 1,
+            "score": 0.2972900150591149,
+            "span": [
+              0,
+              36
+            ]
+          }
+        ]
+      },
+      "id": "Q06",
+      "metrics": {
+        "chunk_precision": null,
+        "evidence_coverage": null,
+        "evidence_recall": null,
+        "mrr": null,
+        "novel_evidence_precision": null
+      },
+      "scope": [
+        "budget-february"
+      ],
+      "track": "diagnostic"
+    },
+    {
+      "applicable": [],
+      "diagnostics": {
+        "ranking": [
+          {
+            "chunk_index": 0,
+            "chunk_sha256": "fba993e3e896b42b940fa8a7fd5a8df21f8f86da47986dc92eaa3a58955cc7a5",
+            "document": "distractor-usd",
+            "rank": 1,
+            "score": 0.23614045977592468,
+            "span": [
+              0,
+              22
+            ]
+          },
+          {
+            "chunk_index": 0,
+            "chunk_sha256": "447e81207f5a4cb53eccc9e6b4a9cf91e34b63d085f460774c3c53f2ebb3356e",
+            "document": "account-january",
+            "rank": 2,
+            "score": 0.10724079608917236,
+            "span": [
+              0,
+              36
+            ]
+          }
+        ]
+      },
+      "id": "Q07",
+      "metrics": {
+        "chunk_precision": null,
+        "evidence_coverage": null,
+        "evidence_recall": null,
+        "mrr": null,
+        "novel_evidence_precision": null
+      },
+      "scope": [
+        "account-january",
+        "distractor-usd"
+      ],
+      "track": "diagnostic"
+    },
+    {
+      "applicable": [
+        "evidence_recall",
+        "evidence_coverage",
+        "chunk_precision",
+        "novel_evidence_precision",
+        "mrr"
+      ],
+      "diagnostics": {
+        "ranking": [
+          {
+            "chunk_index": 0,
+            "chunk_sha256": "a7eb4c3349ebd6e06bd5aed6d4ba1f413c52a17a1cff450e0a1c013e557c1bbe",
+            "document": "budget-february",
+            "rank": 1,
+            "score": 0.36224669218063354,
+            "span": [
+              0,
+              36
+            ]
+          }
+        ]
+      },
+      "id": "Q08",
+      "metrics": {
+        "chunk_precision": 0.2,
+        "evidence_coverage": 1.0,
+        "evidence_recall": 1.0,
+        "mrr": 1.0,
+        "novel_evidence_precision": 0.2
+      },
+      "scope": [
+        "budget-february"
+      ],
+      "track": "conflict"
+    },
+    {
+      "applicable": [
+        "evidence_recall",
+        "evidence_coverage",
+        "chunk_precision",
+        "novel_evidence_precision",
+        "mrr"
+      ],
+      "diagnostics": {
+        "ranking": [
+          {
+            "chunk_index": 0,
+            "chunk_sha256": "447e81207f5a4cb53eccc9e6b4a9cf91e34b63d085f460774c3c53f2ebb3356e",
+            "document": "account-january",
+            "rank": 1,
+            "score": 0.523851752281189,
+            "span": [
+              0,
+              36
+            ]
+          },
+          {
+            "chunk_index": 0,
+            "chunk_sha256": "fba993e3e896b42b940fa8a7fd5a8df21f8f86da47986dc92eaa3a58955cc7a5",
+            "document": "distractor-usd",
+            "rank": 2,
+            "score": 0.16773639619350433,
+            "span": [
+              0,
+              22
+            ]
+          }
+        ]
+      },
+      "id": "Q09",
+      "metrics": {
+        "chunk_precision": 0.2,
+        "evidence_coverage": 1.0,
+        "evidence_recall": 1.0,
+        "mrr": 1.0,
+        "novel_evidence_precision": 0.2
+      },
+      "scope": [
+        "account-january",
+        "distractor-usd"
+      ],
+      "track": "retrieval"
+    },
+    {
+      "applicable": [],
+      "authorization": {
+        "generation_called": false,
+        "http_status": 404,
+        "passed": true,
+        "retrieval_called": false
+      },
+      "id": "Q10",
+      "metrics": {
+        "chunk_precision": null,
+        "evidence_coverage": null,
+        "evidence_recall": null,
+        "mrr": null,
+        "novel_evidence_precision": null
+      },
+      "scope": [
+        "private-plan"
+      ],
+      "track": "authorization"
+    },
+    {
+      "applicable": [],
+      "authorization": {
+        "generation_called": false,
+        "http_status": 404,
+        "passed": true,
+        "retrieval_called": false
+      },
+      "id": "Q11",
+      "metrics": {
+        "chunk_precision": null,
+        "evidence_coverage": null,
+        "evidence_recall": null,
+        "mrr": null,
+        "novel_evidence_precision": null
+      },
+      "scope": [
+        "account-january",
+        "private-plan"
+      ],
+      "track": "authorization"
+    },
+    {
+      "applicable": [],
+      "diagnostics": {
+        "ranking": [
+          {
+            "chunk_index": 0,
+            "chunk_sha256": "fba993e3e896b42b940fa8a7fd5a8df21f8f86da47986dc92eaa3a58955cc7a5",
+            "document": "distractor-usd",
+            "rank": 1,
+            "score": 0.4017389834445414,
+            "span": [
+              0,
+              22
+            ]
+          }
+        ]
+      },
+      "id": "Q12",
+      "metrics": {
+        "chunk_precision": null,
+        "evidence_coverage": null,
+        "evidence_recall": null,
+        "mrr": null,
+        "novel_evidence_precision": null
+      },
+      "scope": [
+        "distractor-usd"
+      ],
+      "track": "diagnostic"
+    },
+    {
+      "applicable": [
+        "evidence_recall",
+        "evidence_coverage",
+        "chunk_precision",
+        "novel_evidence_precision",
+        "mrr"
+      ],
+      "diagnostics": {
+        "ranking": [
+          {
+            "chunk_index": 0,
+            "chunk_sha256": "5d6e053e5ba5f0a811430b712b2c141de755363e37f22d60bbbb983b982297a9",
+            "document": "expenses-january",
+            "rank": 1,
+            "score": 0.23294474184513092,
+            "span": [
+              0,
+              30
+            ]
+          }
+        ]
+      },
+      "id": "Q13",
+      "metrics": {
+        "chunk_precision": 0.2,
+        "evidence_coverage": 1.0,
+        "evidence_recall": 1.0,
+        "mrr": 1.0,
+        "novel_evidence_precision": 0.2
+      },
+      "scope": [
+        "expenses-january"
+      ],
+      "track": "retrieval"
+    },
+    {
+      "applicable": [
+        "evidence_recall",
+        "evidence_coverage",
+        "chunk_precision",
+        "novel_evidence_precision",
+        "mrr"
+      ],
+      "diagnostics": {
+        "ranking": [
+          {
+            "chunk_index": 0,
+            "chunk_sha256": "447e81207f5a4cb53eccc9e6b4a9cf91e34b63d085f460774c3c53f2ebb3356e",
+            "document": "account-january",
+            "rank": 1,
+            "score": 0.2499421238899231,
+            "span": [
+              0,
+              36
+            ]
+          },
+          {
+            "chunk_index": 0,
+            "chunk_sha256": "5d6e053e5ba5f0a811430b712b2c141de755363e37f22d60bbbb983b982297a9",
+            "document": "expenses-january",
+            "rank": 2,
+            "score": 0.14059586822986603,
+            "span": [
+              0,
+              30
+            ]
+          },
+          {
+            "chunk_index": 0,
+            "chunk_sha256": "c1963a2a74e3537bac81015ac006c335dfa06263d0d95b2c4a5cebffe1b5e5b6",
+            "document": "revenue-january",
+            "rank": 3,
+            "score": 0.13401636481285095,
+            "span": [
+              0,
+              38
+            ]
+          }
+        ]
+      },
+      "id": "Q14",
+      "metrics": {
+        "chunk_precision": 0.6,
+        "evidence_coverage": 1.0,
+        "evidence_recall": 1.0,
+        "mrr": 1.0,
+        "novel_evidence_precision": 0.6
+      },
+      "scope": [
+        "account-january",
+        "expenses-january",
+        "revenue-january"
+      ],
+      "track": "retrieval"
+    }
+  ],
+  "evaluation_type": "retrieval",
+  "execution": {
+    "complete": true,
+    "errors": 0,
+    "executed": 14,
+    "planned": 14,
+    "skipped": 0
+  },
+  "identity": {
+    "chunking": {
+      "overlap": 64,
+      "size": 512,
+      "units": "whitespace"
+    },
+    "corpus_hashes": {
+      "account-january": "222aef4871ca575fb6c04ccc7b7b30e80784a70735404ae54d2aa61307c9ecac",
+      "budget-february": "f6dcae2936e896ef3d36fb8c0f50c8db87a0e8a4302bafcde9a27e2df765f317",
+      "distractor-usd": "47468a64d968ac517a46a9086b535c3191a6b8b7a7bc46e1262adc5b06df86ca",
+      "expenses-january": "991510024846c869670146d89105c3f93d8f831fb7624a8413a460e825815b38",
+      "private-plan": "8e08f28c5472edeaf081ff8f904f8676d6f6f3749c1d08e7a5083e2a0c022ebb",
+      "revenue-january": "5710a2b9d1521db2099d6e6342fb0058efe7cb0cfc17b2b4b3b53a34b4e8fb2c"
+    },
+    "corpus_version": "1.0.0",
+    "database": {
+      "backend": "postgresql",
+      "hnsw_present": false,
+      "pgvector_version": "0.8.7"
+    },
+    "dataset_schema_version": 2,
+    "dataset_sha256": "48809598e9d90412d161998242f3031f1aca4b864e76731bc5f4786c03a2e0ea",
+    "dataset_version": "1.1.0",
+    "embedding": {
+      "backend": "local",
+      "dimensions": 1536,
+      "model": "deterministic-local-hash-v2"
+    },
+    "mode": "deterministic_local",
+    "pgvector_image": "pgvector/pgvector@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a",
+    "renderer": "winansi-wrapped-v1",
+    "report_version": 1,
+    "retrieval": {
+      "k": 5,
+      "min_score": 0.05
+    }
+  },
+  "metric_contract_version": 1,
+  "normalization_version": 1,
+  "sha256": "5dba1a30e27c789e1d1726f2c90a26a7991a3d0d4763a20dc3f5e41d52eb48b9",
+  "source": {
+    "dependencies_sha256": "f02894903c1269c695107835c65b506088e44d86b4d59aac4decec36466c1286",
+    "environment": "Linux-x86_64",
+    "git_commit": "5a388bedbc66a1e6283db5ab10baa46ce1489b95",
+    "python": "3.12.16",
+    "working_tree_dirty": false
+  }
+}

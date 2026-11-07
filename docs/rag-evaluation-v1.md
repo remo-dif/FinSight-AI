@@ -82,7 +82,7 @@ PR2 evaluates the fixed corpus through production upload and pgvector retrieval 
 
 PR3 exercises document answers, citation validity and abstention using controlled SDK outputs. See the answer evaluation section below.
 
-PR4 will compare compatible run manifests, record baseline/candidate deltas and integrate deterministic checks into CI. Quality thresholds require observed baselines and review. No new metric, judge, baseline comparator or CI gate is introduced by PR1.
+PR4 compares compatible offline evaluation contracts against versioned baselines. See the regression baseline section below.
 
 ## Verification during implementation
 
@@ -245,3 +245,58 @@ Q08 and the Q06 discarded-draft diagnostic now consume the actual SDK completion
 
 The deterministic CLI completed 30 scenarios, with all 14 baselines satisfying the evaluator contract. The eight baseline answers retained means of 1.0 for factual and citation metrics. Ordinary abstention remained 3/3, with Q08 assessed separately, and authorization remained 2/2. The 16 adversarial scenarios produced 10 detected failures, 3 passes, 1 review and 2 expected error grades. PR2's stable report matched after excluding timings and Git metadata.
 - Review verification: 174 focused tests and 779 full backend tests passed with zero failures or skips using isolated PostgreSQL/pgvector and Redis. The full run emitted two existing websockets deprecation warnings. Ruff, formatting and diff checks passed.
+
+## PR4 versioned regression baselines
+
+The independently versioned retrieval_v1.json and answer_v1.json files live in backend/evaluation/baselines/. Both use schema, normalization and metric contract version 1. The files contain a canonical SHA-256 excluding the digest field, source commit and runtime provenance, a compatibility identity, normalized cases and independently checked aggregates. The financial evaluation baseline is separate.
+
+### Compatibility and comparison
+
+Both contracts bind the dataset schema/version and canonical digest, corpus version and document digests, PDF renderer, embedding backend/model/dimensions, effective k and score floor, chunk geometry, PostgreSQL backend, pgvector version and HNSW presence. Answer evaluation also binds the rubric and the controlled SDK stimuli, including selected documents, expected grade and injected faults. It records the observed generation parameters. A digest of the whole evaluator source is deliberately excluded from compatibility. Changes to evaluator code are subject to comparison.
+
+The adapter validates required fields, unique case/scenario keys, scope, execution, authorization and aggregate arithmetic. JSON duplicate keys and nonfinite values are rejected. Booleans are rejected in numeric positions. Missing, null and zero are distinct. PR2's unanswerable diagnostic cases retain null relevance metrics, and Q10/Q11 retain separate authorization contracts. PR3's expected adversarial failures and injected provider errors pass only when the observed grade matches the reviewed expectation. Q08 retains separate draft diagnostics and an unobservable public explanation on abstention. Offline mode requires zero provider calls and leaves the model-quality threshold null.
+
+Per-case decreases gate before aggregate decreases. The absolute numeric tolerance is 1e-12 for normalized metrics only. Configuration, counts, masks and contract decisions compare exactly. Improvements are informational. Changes to ranks, prompt hashes and other bounded diagnostics are warnings when the contracts and metrics are preserved. Timing and Git metadata do not affect comparisons.
+
+The comparator takes two normalized documents, including candidate artifacts written by the launcher:
+
+~~~text
+python -B -m evaluation.compare_baseline evaluation/baselines/retrieval_v1.json path/to/retrieval.report.json
+~~~
+
+Exit codes are 0 for pass with optional warnings, 1 for a regression or hard contract failure, 2 for invalid input, and 3 for incompatible configurations. Failed comparisons include categorized JSON differences.
+
+### CI, trusted base and artifacts
+
+From backend/, with the disposable test database settings documented above:
+
+~~~text
+python -B -m evaluation.baseline_suite run --base-ref <trusted-40-character-git-sha> --output <new-output-directory>
+~~~
+
+The existing backend CI job runs this after pytest. PostgreSQL uses the pgvector image digest recorded below. Retrieval and answer evaluation run sequentially in separate subprocesses. Each owns a temporary schema and upload directory. Avoid running pytest or another evaluation against the same database concurrently because the existing cleanup tests observe the set of evaluation schemas. When working locally, dedicate a database to each concurrent run. Only synthetic settings and a loopback TEST_DATABASE_URL are used. Redis serves the surrounding backend suite.
+
+On pull requests, CI passes the event's base SHA. The launcher reads approved baselines with git show from that exact commit and rejects a candidate that replaces those files. On pushes to master, the merged SHA is the trusted source. The initial bootstrap exception is confined to the verified pre-baseline commit 5a388bedbc66a1e6283db5ab10baa46ce1489b95. For that base the launcher regenerates trusted reports from a temporary detached worktree and checks the proposed bootstrap files in both comparison directions before grading the candidate. Missing baselines at any other base fail closed.
+
+The rag-evaluation artifact includes retrieval.report.json and answer.report.json, which are allowlisted normalized projections of the source reports, plus per-run execution.json and comparison JSON. Reduced failures produce bounded error categories. Raw stdout/stderr, DB URLs, prompts, answers, vectors and documents are excluded. CI uploads diagnostics with always() and any blocking result fails the backend job.
+
+### Bootstrap and intentional promotion
+
+The initial files originate from two sequential retrieval/answer pairs run at the clean merged commit 5a388bedbc66a1e6283db5ab10baa46ce1489b95. The environment was Linux x86_64 in the python:3.12 image with manifest digest sha256:cad37dd20c7cac861af9003af8796d03ea7a998ec1e3a664429740fc9d7d2691 and Python 3.12.16. Development dependencies were installed using the existing CI constraints file. The database was PostgreSQL 16.15 and pgvector 0.8.7 with no HNSW index in the evaluator schema. The PostgreSQL image is pinned in CI to pgvector/pgvector@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a. This is Linux container evidence from the clean merge, with dependency digest recorded in both baseline files. Hosted CI separately validates the proposed bootstrap.
+
+Run the unmodified retrieval and answer CLIs twice at the approved clean master commit. Keep the four source JSON reports and a dependency inventory outside the checkout. From a checkout with the same dataset, corpus, rubric and stimuli, run the explicit promotion command:
+
+~~~text
+python -B -m evaluation.baseline_suite promote --source-commit <verified-master-sha> --reports <directory-with-retrieval-1.json-retrieval-2.json-answer-1.json-answer-2.json> --python <source-python-version> --environment <source-platform> --dependencies <source-pip-freeze-file> --output <new-review-directory>
+~~~
+
+Promotion requires matching source SHA, clean source runs and reproducible normalized documents. Review the population, applicability, Q08, both authorization cases, artifact digests and environment before copying the results into a dedicated baseline update. Ordinary CI rejects changed baselines against the previously trusted ref. A future intentional dataset, rubric or stimulus change therefore requires an explicit review and promotion of a new reference. Automatic baseline updates on failure are excluded.
+
+**A passing PR4 regression check demonstrates compatibility with the reviewed offline baseline. It does not establish real GPT-4o answer quality or AWS deployment readiness.**
+
+### Implementation verification
+
+- Both baseline inputs were repeated on the clean Linux source, and explicit promotion required identical normalized documents. The standalone runner commands are documented in the PR2 and PR3 sections.
+- The CI-equivalent baseline suite passed both comparisons, including the trusted bootstrap and separate candidate execution.
+- The comparator suite passed 46 tests, including out-of-scope results in a pre-normalized candidate. The focused regression suite covers the comparator, PR1-PR3 and Document Q&A.
+- The full backend command python -B -m pytest -q -p no:cacheprovider --tb=short -rs --show-capture=no passed 824 tests before the final normalized-scope regression was added, with isolated PostgreSQL/pgvector, Redis and the real-cookie browser tests. Ruff lint, formatting, YAML placement and git diff --check passed.

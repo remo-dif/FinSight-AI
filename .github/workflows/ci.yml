@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-24.04
     services:
       postgres:
-        image: pgvector/pgvector:pg16
+        image: pgvector/pgvector@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
         env:
           POSTGRES_USER: finance
           POSTGRES_PASSWORD: finance
@@ -48,6 +48,8 @@ jobs:
       COOKIE_BROWSER_REQUIRED: "1"
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -77,6 +79,20 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Test backend
         run: pytest
+      - name: Compare offline RAG evaluation baselines
+        timeout-minutes: 12
+        env:
+          EVALUATION_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+        run: |
+          python -B -m evaluation.baseline_suite run --base-ref "$EVALUATION_BASE_SHA" \
+            --output "$RUNNER_TEMP/rag-evaluation"
+      - name: Upload offline RAG evaluation diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rag-evaluation
+          path: ${{ runner.temp }}/rag-evaluation
+          if-no-files-found: ignore
 
   frontend:
     runs-on: ubuntu-24.04
