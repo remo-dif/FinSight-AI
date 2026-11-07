@@ -76,7 +76,7 @@ export function AppShell({
   const isComingSoon = Boolean(copy.comingSoon);
 
   return (
-    <main className="min-h-screen overflow-x-clip bg-background text-foreground">
+    <main className="min-h-[100dvh] overflow-x-hidden bg-background text-foreground">
       <a
         className="sr-only rounded-md bg-panel px-3 py-2 text-sm font-semibold focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50"
         href="#dashboard"
@@ -84,7 +84,7 @@ export function AppShell({
         Skip to dashboard
       </a>
 
-      <div className="grid min-h-screen lg:grid-cols-[244px_minmax(0,1fr)]">
+      <div className="grid min-h-[100dvh] lg:grid-cols-[244px_minmax(0,1fr)]">
         <aside className="hidden border-r border-border bg-panel lg:flex lg:flex-col" aria-label="Sidebar navigation">
           <div className="flex h-16 items-center gap-3 border-b border-border px-5">
             <span className="flex h-9 w-9 items-center justify-center rounded-md bg-danger/10 text-danger">
@@ -134,9 +134,9 @@ export function AppShell({
         </aside>
 
         <div className="min-w-0">
-          <header className="sticky top-0 z-20 border-b border-border bg-panel/95 backdrop-blur">
+          <header className="sticky top-[env(safe-area-inset-top,0px)] z-20 border-b border-border bg-panel/95 backdrop-blur">
             <nav
-              className="flex gap-2 overflow-x-auto border-b border-border px-4 py-2 text-sm font-medium [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden"
+              className="flex gap-0 overflow-x-auto border-b border-border px-0 py-0 text-sm font-medium [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden"
               aria-label="Mobile navigation"
             >
               {[...navigation, controlsNavigation].map((item) => {
@@ -144,17 +144,21 @@ export function AppShell({
                 return (
                   <Link
                     key={item.label}
-                    className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-md border px-3 transition ${
+                    className={`inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 border-b border-r border-border px-3 py-2 text-center transition ${
                       isActive
-                        ? "border-accent/30 bg-accent/10 text-accent"
-                        : "border-border bg-white text-muted hover:border-accent/60 hover:text-foreground"
+                        ? "border-b-accent bg-accent/10 text-accent"
+                        : "bg-white text-muted hover:border-accent/60 hover:text-foreground"
                     }`}
                     href={item.href as Route}
                     aria-current={isActive ? "page" : undefined}
                   >
                     <item.icon aria-hidden className="h-4 w-4" />
-                    {item.label}
-                    {item.comingSoon ? <span className="text-[10px] font-semibold uppercase tracking-wide">Coming soon</span> : null}
+                    <span className="whitespace-nowrap">{item.label}</span>
+                    {item.comingSoon ? (
+                      <span className="inline-flex items-center rounded-full border border-current/20 bg-current/5 px-1 py-0.5 text-[7px] font-semibold uppercase tracking-[0.14em] leading-none">
+                        Coming soon
+                      </span>
+                    ) : null}
                   </Link>
                 );
               })}

@@ -35,11 +35,20 @@ export function EvidenceWorkspace() {
 
   return <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
     <div className="space-y-4">
-      <Panel as="section" className="p-4" aria-labelledby="document-library-heading">
-        <div className="flex items-start justify-between gap-3">
-          <div><h2 id="document-library-heading" className="text-lg font-semibold">Document Library</h2><p className="mt-1 text-sm text-muted">Documents available to your authenticated account.</p></div>
-          <button type="button" className="inline-flex min-h-9 items-center gap-2 rounded-md border border-border bg-white px-3 text-sm font-semibold text-muted hover:border-accent/60 hover:text-foreground disabled:opacity-60" onClick={() => void documents.refetch()} disabled={documents.isFetching}>
-            <RefreshCw aria-hidden className={`h-4 w-4 ${documents.isFetching ? "animate-spin" : ""}`} /> Refresh
+      <Panel as="section" className="p-3 sm:p-4" aria-labelledby="document-library-heading">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h2 id="document-library-heading" className="text-lg font-semibold">Document Library</h2>
+            <p className="mt-1 text-sm text-muted">Documents available to your authenticated account.</p>
+          </div>
+          <button
+            type="button"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border bg-white px-3 text-sm font-semibold text-muted transition hover:border-accent/60 hover:text-foreground disabled:opacity-60"
+            onClick={() => void documents.refetch()}
+            disabled={documents.isFetching}
+          >
+            <RefreshCw aria-hidden className={`h-4 w-4 ${documents.isFetching ? "animate-spin" : ""}`} />
+            Refresh
           </button>
         </div>
         {documents.isPending ? <p className="mt-6 text-sm text-muted" role="status">Loading documents...</p> : null}
@@ -47,9 +56,9 @@ export function EvidenceWorkspace() {
         {!documents.isPending && !documents.isError && items.length === 0 ? <p className="mt-6 rounded-md border border-dashed border-border p-5 text-sm text-muted">No documents have been uploaded yet.</p> : null}
         {items.length > 0 ? <ul className="mt-4 divide-y divide-border" aria-label="Documents">{items.map((document) => <li key={document.id} className="flex items-center gap-3 py-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent"><FileText aria-hidden className="h-4 w-4" /></span>
-          <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{document.filename}</p><p className="mt-1 text-xs text-muted"><span className="capitalize">{document.status}</span>{" · "}<time dateTime={document.created_at}>{new Date(document.created_at).toLocaleString()}</time></p></div>
+          <div className="min-w-0 flex-1"><p className="break-all text-sm font-semibold">{document.filename}</p><p className="mt-1 text-xs text-muted"><span className="capitalize">{document.status}</span>{" · "}<time dateTime={document.created_at}>{new Date(document.created_at).toLocaleString()}</time></p></div>
         </li>)}</ul> : null}
-        {documents.hasNextPage ? <button type="button" className="mt-4 min-h-9 rounded-md border border-border bg-white px-3 text-sm font-semibold" onClick={() => void documents.fetchNextPage()} disabled={documents.isFetchingNextPage}>{documents.isFetchingNextPage ? "Loading..." : "Load more"}</button> : null}
+        {documents.hasNextPage ? <button type="button" className="mt-4 w-full min-h-11 rounded-md border border-border bg-white px-3 text-sm font-semibold sm:w-auto" onClick={() => void documents.fetchNextPage()} disabled={documents.isFetchingNextPage}>{documents.isFetchingNextPage ? "Loading..." : "Load more"}</button> : null}
       </Panel>
       <UploadPanel />
     </div>
