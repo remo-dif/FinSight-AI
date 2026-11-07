@@ -1,0 +1,446 @@
+{
+  "rubric_version": "1.1.0",
+  "dataset_version": "1.1.0",
+  "dataset_sha256": "48809598e9d90412d161998242f3031f1aca4b864e76731bc5f4786c03a2e0ea",
+  "cases": [
+    {
+      "id": "Q01",
+      "outcome": "answerable",
+      "facts": [
+        {
+          "id": "closing-balance",
+          "kind": "money",
+          "value": "1350.00 EUR @ 2025-01",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "account-january",
+                "evidence_key": "closing"
+              }
+            ]
+          ]
+        },
+        {
+          "id": "closing-date",
+          "kind": "date",
+          "value": "2025-01-31",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "account-january",
+                "evidence_key": "closing"
+              }
+            ]
+          ]
+        }
+      ],
+      "reason": null,
+      "expected_http_status": 200
+    },
+    {
+      "id": "Q02",
+      "outcome": "answerable",
+      "facts": [
+        {
+          "id": "office-supplies",
+          "kind": "money",
+          "value": "100.00 EUR @ 2025-01",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "expenses-january",
+                "evidence_key": "breakdown"
+              }
+            ]
+          ]
+        },
+        {
+          "id": "utilities",
+          "kind": "money",
+          "value": "150.00 EUR @ 2025-01",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "expenses-january",
+                "evidence_key": "breakdown"
+              }
+            ]
+          ]
+        },
+        {
+          "id": "total-expenses",
+          "kind": "money",
+          "value": "250.00 EUR @ 2025-01",
+          "required": false,
+          "support": [
+            [
+              {
+                "document_key": "expenses-january",
+                "evidence_key": "breakdown"
+              }
+            ]
+          ]
+        }
+      ],
+      "reason": null,
+      "expected_http_status": 200
+    },
+    {
+      "id": "Q03",
+      "outcome": "answerable",
+      "facts": [
+        {
+          "id": "closing-date",
+          "kind": "date",
+          "value": "2025-01-31",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "account-january",
+                "evidence_key": "closing"
+              }
+            ]
+          ]
+        }
+      ],
+      "reason": null,
+      "expected_http_status": 200
+    },
+    {
+      "id": "Q04",
+      "outcome": "answerable",
+      "facts": [
+        {
+          "id": "payments-equal-expenses",
+          "kind": "equation",
+          "value": "250.00 = 250.00 EUR @ 2025-01",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "account-january",
+                "evidence_key": "movements"
+              },
+              {
+                "document_key": "expenses-january",
+                "evidence_key": "breakdown"
+              }
+            ]
+          ]
+        }
+      ],
+      "reason": null,
+      "expected_http_status": 200
+    },
+    {
+      "id": "Q05",
+      "outcome": "answerable",
+      "facts": [
+        {
+          "id": "recognized-revenue",
+          "kind": "money",
+          "value": "800.00 EUR @ 2025-01",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "revenue-january",
+                "evidence_key": "recognized"
+              }
+            ]
+          ]
+        },
+        {
+          "id": "uncollected-revenue",
+          "kind": "money",
+          "value": "200.00 EUR @ 2025-01",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "revenue-january",
+                "evidence_key": "recognized"
+              }
+            ]
+          ]
+        },
+        {
+          "id": "cash-receipts",
+          "kind": "money",
+          "value": "600.00 EUR @ 2025-01",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "revenue-january",
+                "evidence_key": "cash"
+              }
+            ]
+          ]
+        },
+        {
+          "id": "revenue-cash-relationship",
+          "kind": "relationship",
+          "value": "uncollected-revenue explains revenue-cash-gap",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "revenue-january",
+                "evidence_key": "recognized"
+              },
+              {
+                "document_key": "revenue-january",
+                "evidence_key": "cash"
+              },
+              {
+                "document_key": "revenue-january",
+                "evidence_key": "terminology"
+              }
+            ]
+          ]
+        }
+      ],
+      "reason": null,
+      "expected_http_status": 200
+    },
+    {
+      "id": "Q06",
+      "outcome": "abstention_required",
+      "facts": [],
+      "reason": "missing_actuals",
+      "expected_http_status": 200
+    },
+    {
+      "id": "Q07",
+      "outcome": "abstention_required",
+      "facts": [],
+      "reason": "ambiguous_account",
+      "expected_http_status": 200
+    },
+    {
+      "id": "Q08",
+      "outcome": "abstention_required",
+      "facts": [
+        {
+          "id": "plan",
+          "kind": "money",
+          "value": "300.00 EUR @ 2025-02",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "budget-february",
+                "evidence_key": "budget"
+              }
+            ]
+          ]
+        },
+        {
+          "id": "draft",
+          "kind": "money",
+          "value": "350.00 EUR @ 2025-02",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "budget-february",
+                "evidence_key": "draft"
+              }
+            ]
+          ]
+        },
+        {
+          "id": "authoritative-value-exists",
+          "kind": "boolean",
+          "value": "false",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "budget-february",
+                "evidence_key": "budget"
+              },
+              {
+                "document_key": "budget-february",
+                "evidence_key": "draft"
+              }
+            ]
+          ]
+        }
+      ],
+      "reason": "conflicting_proposals",
+      "expected_http_status": 200
+    },
+    {
+      "id": "Q09",
+      "outcome": "answerable",
+      "facts": [
+        {
+          "id": "closing-balance",
+          "kind": "money",
+          "value": "1350.00 EUR @ 2025-01",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "account-january",
+                "evidence_key": "closing"
+              }
+            ]
+          ]
+        }
+      ],
+      "reason": null,
+      "expected_http_status": 200
+    },
+    {
+      "id": "Q10",
+      "outcome": "authorization_denied",
+      "facts": [],
+      "reason": null,
+      "expected_http_status": 404
+    },
+    {
+      "id": "Q11",
+      "outcome": "authorization_denied",
+      "facts": [],
+      "reason": null,
+      "expected_http_status": 404
+    },
+    {
+      "id": "Q12",
+      "outcome": "abstention_required",
+      "facts": [],
+      "reason": "missing_fx",
+      "expected_http_status": 200
+    },
+    {
+      "id": "Q13",
+      "outcome": "answerable",
+      "facts": [
+        {
+          "id": "includes-refunds",
+          "kind": "boolean",
+          "value": "false",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "expenses-january",
+                "evidence_key": "refund-policy"
+              }
+            ]
+          ]
+        },
+        {
+          "id": "includes-transfers",
+          "kind": "boolean",
+          "value": "false",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "expenses-january",
+                "evidence_key": "refund-policy"
+              }
+            ]
+          ]
+        }
+      ],
+      "reason": null,
+      "expected_http_status": 200
+    },
+    {
+      "id": "Q14",
+      "outcome": "answerable",
+      "facts": [
+        {
+          "id": "opening-balance",
+          "kind": "money",
+          "value": "1000.00 EUR @ 2025-01",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "account-january",
+                "evidence_key": "opening"
+              }
+            ]
+          ]
+        },
+        {
+          "id": "cash-receipts",
+          "kind": "money",
+          "value": "600.00 EUR @ 2025-01",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "account-january",
+                "evidence_key": "movements"
+              }
+            ]
+          ]
+        },
+        {
+          "id": "cash-payments",
+          "kind": "money",
+          "value": "250.00 EUR @ 2025-01",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "account-january",
+                "evidence_key": "movements"
+              }
+            ]
+          ]
+        },
+        {
+          "id": "closing-balance",
+          "kind": "money",
+          "value": "1350.00 EUR @ 2025-01",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "account-january",
+                "evidence_key": "closing"
+              }
+            ]
+          ]
+        },
+        {
+          "id": "balance-reconciliation",
+          "kind": "equation",
+          "value": "1000.00 + 600.00 - 250.00 = 1350.00 EUR @ 2025-01",
+          "required": true,
+          "support": [
+            [
+              {
+                "document_key": "account-january",
+                "evidence_key": "opening"
+              },
+              {
+                "document_key": "account-january",
+                "evidence_key": "movements"
+              },
+              {
+                "document_key": "account-january",
+                "evidence_key": "closing"
+              }
+            ]
+          ]
+        }
+      ],
+      "reason": null,
+      "expected_http_status": 200
+    }
+  ]
+}
