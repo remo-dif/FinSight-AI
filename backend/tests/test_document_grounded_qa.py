@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -200,8 +200,8 @@ async def test_uploaded_document_picker_lists_only_current_users_metadata(qa_db)
     other = add_user(qa_db, "picker-other@example.invalid")
     own = add_document(qa_db, owner, "my-statement.pdf")
     own_second = add_document(qa_db, owner, "my-statement-second.pdf")
-    own.created_at = datetime(2026, 10, 1, tzinfo=timezone.utc)
-    own_second.created_at = datetime(2026, 10, 2, tzinfo=timezone.utc)
+    own.created_at = datetime(2026, 10, 1, tzinfo=UTC)
+    own_second.created_at = datetime(2026, 10, 2, tzinfo=UTC)
     add_document(qa_db, other, "foreign-private.pdf")
 
     class AsyncSessionAdapter:
