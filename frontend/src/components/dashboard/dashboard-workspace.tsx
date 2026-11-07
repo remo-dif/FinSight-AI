@@ -14,6 +14,7 @@ import { formatAmount, TransactionsTable } from "@/components/dashboard/transact
 import { CaseWorkflow } from "@/components/dashboard/case-workflow";
 import { Panel } from "@/components/ui/panel";
 import {
+  ApiError,
   caseDetailQueryKey,
   caseListQueryKey,
   demoTransactions,
@@ -104,21 +105,27 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
   const [drawer, setDrawer] = useState<ToolDrawer>(null);
   const drawerTriggerRef = useRef<HTMLElement | null>(null);
   const detailHeadingRef = useRef<HTMLHeadingElement>(null);
-  const selectedCase = useMemo(() => activeCases.find((item) => item.id === selectedId) ?? activeCases[0], [activeCases, selectedId]);
+  const queuedCase = useMemo(() => activeCases.find((item) => item.id === selectedId), [activeCases, selectedId]);
+  const requestedCase = useQuery({
+    queryKey: caseDetailQueryKey(selectedId ?? "none"),
+    queryFn: () => {
+      if (!selectedId) throw new Error("A case ID is required");
+      return fetchCaseDetail(selectedId);
+    },
+    enabled: Boolean(selectedId && !queuedCase && token),
+    retry: false
+  });
+  const selectedCase = selectedId ? queuedCase ?? requestedCase.data : activeCases[0];
 
   useEffect(() => {
     function syncFromHistory() {
       const caseId = new URL(window.location.href).searchParams.get("case");
       setSelectedId(caseId);
+      setFocusDetailRequested(Boolean(caseId));
     }
     window.addEventListener("popstate", syncFromHistory);
     return () => window.removeEventListener("popstate", syncFromHistory);
   }, []);
-
-  useEffect(() => {
-    if (selectedId || !selectedCase) return;
-    setSelectedId(selectedCase.id);
-  }, [selectedCase, selectedId]);
 
   useEffect(() => {
     if (!focusDetailRequested || !selectedId) return;
@@ -152,12 +159,22 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
           setFocusDetailRequested(true);
           window.history.pushState(null, "", `/cases?case=${encodeURIComponent(caseRecord.id)}`);
         }} />
-        <AlertDetailPanel
-          caseRecord={selectedCase}
-          canMutate={Boolean(token)}
-          onDrawerChange={changeDrawer}
-          headingRef={detailHeadingRef}
-        />
+        {selectedCase ? (
+          <AlertDetailPanel
+            caseRecord={selectedCase}
+            canMutate={Boolean(token)}
+            onDrawerChange={changeDrawer}
+            headingRef={detailHeadingRef}
+          />
+        ) : (
+          <RequestedCaseState
+            caseId={selectedId}
+            isLoading={queueStatus === "loading" || requestedCase.fetchStatus === "fetching"}
+            error={requestedCase.error}
+            onRetry={() => void requestedCase.refetch()}
+            headingRef={detailHeadingRef}
+          />
+        )}
       </div>
 
       {drawer ? (
@@ -168,6 +185,44 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
         />
       ) : null}
     </div>
+  );
+}
+
+function RequestedCaseState({
+  caseId,
+  isLoading,
+  error,
+  onRetry,
+  headingRef
+}: {
+  caseId: string | null;
+  isLoading: boolean;
+  error: Error | null;
+  onRetry: () => void;
+  headingRef: { current: HTMLHeadingElement | null };
+}) {
+  const isNotFound = error instanceof ApiError && error.status === 404;
+
+  return (
+    <Panel as="section" className="h-fit p-6" aria-labelledby="selected-alert-heading">
+      <h2 ref={headingRef} id="selected-alert-heading" tabIndex={-1} className="scroll-mt-28 text-xs font-semibold uppercase tracking-wide text-muted">
+        Requested case
+      </h2>
+      <p className="mt-2 break-all text-xl font-semibold">{caseId ?? "No case selected"}</p>
+      {isLoading ? <p className="mt-4 text-sm text-muted" role="status">Loading the requested case...</p> : null}
+      {!isLoading && isNotFound ? (
+        <p className="mt-4 text-sm text-danger" role="alert">This case was not found or is not available to your account.</p>
+      ) : null}
+      {!isLoading && error && !isNotFound ? (
+        <div className="mt-4 text-sm" role="alert">
+          <p className="text-danger">The requested case could not be loaded.</p>
+          <button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>Retry</button>
+        </div>
+      ) : null}
+      {!isLoading && !error ? (
+        <p className="mt-4 text-sm text-muted">This case is not in the current list. Sign in to check whether it is available to your account.</p>
+      ) : null}
+    </Panel>
   );
 }
 
