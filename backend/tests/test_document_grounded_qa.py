@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -199,6 +200,8 @@ async def test_uploaded_document_picker_lists_only_current_users_metadata(qa_db)
     other = add_user(qa_db, "picker-other@example.invalid")
     own = add_document(qa_db, owner, "my-statement.pdf")
     own_second = add_document(qa_db, owner, "my-statement-second.pdf")
+    own.created_at = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    own_second.created_at = datetime(2026, 10, 2, tzinfo=timezone.utc)
     add_document(qa_db, other, "foreign-private.pdf")
 
     class AsyncSessionAdapter:
@@ -220,12 +223,8 @@ async def test_uploaded_document_picker_lists_only_current_users_metadata(qa_db)
             second = await client.get("/api/uploads?limit=1&offset=1")
         assert first.status_code == second.status_code == 200
         documents = [*first.json(), *second.json()]
-        assert {document["id"] for document in documents} == {
-            str(own.id),
-            str(own_second.id),
-        }
+        assert [document["id"] for document in documents] == [str(own_second.id), str(own.id)]
         assert "foreign-private.pdf" not in str(documents)
-        assert documents[0]["filename"] in {own.filename, own_second.filename}
         assert all("storage_path" not in document for document in documents)
     finally:
         app.dependency_overrides.clear()

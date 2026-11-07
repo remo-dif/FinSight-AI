@@ -67,6 +67,50 @@ test("an authenticated unknown case has an explicit not-found state", async ({ p
   await expect(page.getByRole("region", { name: "Selected alert" })).toHaveCount(0);
 });
 
+test("a requested case stays in a loading state until its detail request completes", async ({ page }) => {
+  const requestedCase = { ...liveTransactions[0], id: "CASE-LOADING", notes: [] };
+  let release!: () => void;
+  const blocked = new Promise<void>((resolve) => { release = resolve; });
+  await mockLogin(page);
+  await mockDashboardData(page);
+  await page.route("**/api/cases/CASE-LOADING", async (route) => {
+    await blocked;
+    return json(route, 200, requestedCase);
+  });
+
+  try {
+    await page.goto("/cases?case=CASE-LOADING");
+    await signInFromCases(page);
+    await expect(page.getByRole("region", { name: "Requested case" }).getByRole("status"))
+      .toContainText("Loading the requested case");
+    await expect(page.getByRole("region", { name: "Selected alert" })).toHaveCount(0);
+    release();
+    await expect(page.getByRole("region", { name: "Selected alert" })).toContainText("CASE-LOADING");
+  } finally {
+    release();
+  }
+});
+
+test("a failed requested-case API call is not presented as not found and can be retried", async ({ page }) => {
+  let requests = 0;
+  await mockLogin(page);
+  await mockDashboardData(page);
+  await page.route("**/api/cases/CASE-FAILED", async (route) => {
+    requests += 1;
+    return json(route, 503, { detail: "Case service unavailable" });
+  });
+
+  await page.goto("/cases?case=CASE-FAILED");
+  await signInFromCases(page);
+
+  const requested = page.getByRole("region", { name: "Requested case" });
+  await expect(requested.getByRole("alert")).toContainText("could not be loaded");
+  await expect(requested).not.toContainText("not found or is not available");
+  await requested.getByRole("button", { name: "Retry" }).click();
+  await expect.poll(() => requests).toBe(2);
+  await expect(requested.getByRole("alert")).toContainText("could not be loaded");
+});
+
 test("Evidence exposes the authenticated document library, global upload, and document Q&A", async ({ page }) => {
   await mockRefreshFailure(page);
   await mockLogin(page);
@@ -97,7 +141,15 @@ test("Evidence does not present demo documents while signed out", async ({ page 
 test("a successful upload refreshes the authenticated document library and exposes processing state", async ({ page }) => {
   await mockRefreshFailure(page);
   await mockLogin(page);
-  let documents = [{ id: "document-owned", filename: "statement.pdf", status: "indexed", created_at: "2026-10-01T10:00:00Z" }];
+  let documents = [
+    { id: "document-owned", filename: "statement.pdf", status: "indexed", created_at: "2026-10-01T10:00:00Z" },
+    ...Array.from({ length: 100 }, (_, index) => ({
+      id: `archive-${index}`,
+      filename: `archive-${index}.pdf`,
+      status: "indexed",
+      created_at: new Date(Date.UTC(2026, 0, index)).toISOString()
+    }))
+  ];
   const authorizations: string[] = [];
   await page.route("**/api/uploads**", async (route) => {
     authorizations.push(route.request().headers().authorization ?? "");
@@ -105,17 +157,25 @@ test("a successful upload refreshes the authenticated document library and expos
       documents = [{ id: "new-upload", filename: "new-evidence.pdf", status: "processing", created_at: "2026-10-02T10:00:00Z" }, ...documents];
       return json(route, 200, { file_id: "new-upload", status: "processing", imported: 0, indexed: 0 });
     }
-    return json(route, 200, documents);
+    const url = new URL(route.request().url());
+    const offset = Number(url.searchParams.get("offset") ?? 0);
+    const limit = Number(url.searchParams.get("limit") ?? 100);
+    return json(route, 200, [...documents]
+      .sort((left, right) => right.created_at.localeCompare(left.created_at))
+      .slice(offset, offset + limit));
   });
 
   await page.goto("/evidence");
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
   await expect(page.getByRole("list", { name: "Documents" }).getByText("statement.pdf")).toBeVisible();
+  await page.getByRole("region", { name: "Document Library" }).getByRole("button", { name: "Load more" }).click();
+  await expect(page.getByRole("list", { name: "Documents" }).getByRole("listitem")).toHaveCount(101);
   await page.locator("input[type='file']").setInputFiles({ name: "new-evidence.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 synthetic") });
   await page.getByRole("button", { name: "Upload", exact: true }).click();
 
   await expect(page.getByRole("list", { name: "Documents" }).getByText("new-evidence.pdf")).toBeVisible();
   await expect(page.getByRole("list", { name: "Documents" }).getByText("Processing")).toBeVisible();
+  await expect(page.getByRole("list", { name: "Documents" }).getByRole("listitem")).toHaveCount(102);
   expect(authorizations.length).toBeGreaterThanOrEqual(3);
   expect(authorizations.every((value) => value === "Bearer test-access-token")).toBe(true);
 });
