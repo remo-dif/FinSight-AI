@@ -8,7 +8,12 @@ export const metadata: Metadata = {
   title: "Cases"
 };
 
-export default async function CasesPage() {
+export default async function CasesPage({
+  searchParams
+}: {
+  searchParams: Promise<{ case?: string }>;
+}) {
+  const selectedCaseId = (await searchParams).case;
   const initialQueue = await fetchInitialCaseQueue();
-  return <AppShell activeRoute="cases" initialQueue={initialQueue} />;
+  return <AppShell activeRoute="cases" initialQueue={initialQueue} selectedCaseId={selectedCaseId} />;
 }

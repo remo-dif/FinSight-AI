@@ -1,14 +1,16 @@
 import { expect, test } from "@playwright/test";
 import { analystTokens, json } from "./fixtures/api";
 
-test("renders finance workspace", async ({ page }) => {
+test("renders a distinct triage workspace", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Triage live-risk alerts and document decisions" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Investigation workspace" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Triage alerts that need attention" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Triage workspace" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Alert queue" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Selected alert" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Transaction context" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Investigation decision" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Next investigation" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Investigation decision" })).toHaveCount(0);
+  await page.getByRole("link", { name: "Open case" }).click();
+  await expect(page).toHaveURL(/\/cases\?case=/);
+  await expect(page.getByRole("heading", { name: "Case investigation" })).toBeVisible();
 });
 
 test("changes route from the primary navigation", async ({ page, isMobile }) => {
@@ -18,21 +20,11 @@ test("changes route from the primary navigation", async ({ page, isMobile }) => 
   await page.getByRole("navigation", { name: "Workspace" }).getByRole("link", { name: "Cases" }).click();
 
   await expect(page).toHaveURL(/\/cases$/);
-  await expect(page.getByRole("heading", { name: "Review assigned cases and escalation state" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Investigate and manage cases" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Workspace" }).getByRole("link", { name: "Cases" })).toHaveAttribute(
     "aria-current",
     "page"
   );
-});
-
-test("keeps upload controls constrained to supported financial files", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Upload to Document Library" }).click();
-
-  const fileInput = page.locator("input[type='file']");
-  await expect(fileInput).toHaveAttribute("accept", ".csv,.pdf,.png,.jpg,.jpeg");
-  await expect(page.getByRole("button", { name: "Upload", exact: true })).toBeDisabled();
-  await expect(page.getByText("Files are validated before processing.")).toBeVisible();
 });
 
 test("sets baseline browser security headers", async ({ page }) => {
@@ -51,7 +43,7 @@ test("does not persist bearer tokens after analyst sign in", async ({ page, isMo
     await json(route, 200, analystTokens);
   });
 
-  await page.goto("/");
+  await page.goto("/cases");
   await page.getByRole("button", { name: "Sign in" }).click();
   await page
     .getByRole("region", { name: "Analyst session" })

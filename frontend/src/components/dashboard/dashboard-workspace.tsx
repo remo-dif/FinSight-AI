@@ -2,11 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import {
   FileUp,
   MessageSquareText,
   UserCheck,
-  SlidersHorizontal,
   X
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -39,20 +39,8 @@ const UploadPanel = dynamic(
 
 type ToolDrawer = "session" | "copilot" | "upload" | null;
 
-const filters = [
-  { label: "Severity", values: ["High", "Elevated", "Review"] },
-  { label: "SLA", values: ["Due < 1h", "Due today", "Breached"] },
-  { label: "Owner", values: ["Unassigned", "Risk Ops", "Mine"] },
-  { label: "Status", values: ["Needs evidence", "Escalated", "New"] }
-];
-
-export function DashboardWorkspace({ initialQueue }: { initialQueue?: InitialCaseQueue }) {
+function useCaseQueue(initialQueue?: InitialCaseQueue) {
   const token = useSessionStore((state) => state.accessToken);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [focusDetailRequested, setFocusDetailRequested] = useState(false);
-  const [drawer, setDrawer] = useState<ToolDrawer>(null);
-  const drawerTriggerRef = useRef<HTMLElement | null>(null);
-  const detailHeadingRef = useRef<HTMLHeadingElement>(null);
   const hasServerSession = initialQueue?.status === "live" || initialQueue?.status === "unavailable";
   const hasSession = Boolean(token) || hasServerSession;
   const cases = useQuery({
@@ -63,23 +51,74 @@ export function DashboardWorkspace({ initialQueue }: { initialQueue?: InitialCas
     retry: false
   });
 
-  const queueStatus = !hasSession
+  const queueStatus: "demo" | "loading" | "live" | "error" = !hasSession
     ? "demo"
     : (!cases.data && initialQueue?.status === "unavailable") || cases.isError
       ? "error"
       : cases.isPending && !cases.data
         ? "loading"
         : "live";
-  const activeCases = useMemo(
-    () => hasSession ? cases.data ?? [] : demoTransactions,
-    [hasSession, cases.data]
-  );
+  const activeCases = useMemo(() => hasSession ? cases.data ?? [] : demoTransactions, [hasSession, cases.data]);
+  return { token, cases, queueStatus, activeCases };
+}
+
+export function TriageWorkspace({ initialQueue }: { initialQueue?: InitialCaseQueue }) {
+  const { cases, queueStatus, activeCases } = useCaseQueue(initialQueue);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [drawer, setDrawer] = useState<ToolDrawer>(null);
+  const drawerTriggerRef = useRef<HTMLElement | null>(null);
   const selectedCase = useMemo(
-    () =>
-      activeCases.find((caseRecord) => caseRecord.id === selectedId) ??
-      activeCases[0],
+    () => activeCases.find((caseRecord) => caseRecord.id === selectedId) ?? activeCases[0],
     [activeCases, selectedId]
   );
+
+  return <div className="space-y-4">
+    <QueueStatus status={queueStatus} onRetry={() => void cases.refetch()} onSession={(trigger) => { drawerTriggerRef.current = trigger; setDrawer("session"); }} />
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="min-w-0">
+        <TransactionsTable
+          transactions={activeCases}
+          selectedId={selectedCase?.id}
+          queueStatus={queueStatus === "loading" ? "loading" : queueStatus === "error" ? "error" : "ready"}
+          onSelect={(caseRecord) => setSelectedId(caseRecord.id)}
+        />
+      </div>
+      <Panel as="aside" className="h-fit p-4 xl:sticky xl:top-[96px]" aria-labelledby="triage-next-heading">
+        <h2 id="triage-next-heading" className="text-base font-semibold">Next investigation</h2>
+        {selectedCase ? <>
+          <p className="mt-3 break-all text-lg font-semibold">{selectedCase.id}</p>
+          <p className="mt-1 text-sm text-muted">{selectedCase.merchant}</p>
+          <dl className="mt-4 space-y-2 text-sm"><SummaryItem label="Status" value={statusLabel(selectedCase.status)} /><SummaryItem label="Assignment" value={selectedCase.assignee_name ?? "Unassigned"} /></dl>
+          <Link className="mt-4 inline-flex min-h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-white" href={`/cases?case=${encodeURIComponent(selectedCase.id)}`}>Open case</Link>
+        </> : <p className="mt-3 text-sm text-muted">Select an alert to choose the next investigation.</p>}
+      </Panel>
+    </div>
+    {drawer ? <ContextDrawer drawer={drawer} onClose={() => setDrawer(null)} triggerRef={drawerTriggerRef} /> : null}
+  </div>;
+}
+
+export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQueue?: InitialCaseQueue; initialSelectedId?: string }) {
+  const { token, cases, queueStatus, activeCases } = useCaseQueue(initialQueue);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? null);
+  const [focusDetailRequested, setFocusDetailRequested] = useState(Boolean(initialSelectedId));
+  const [drawer, setDrawer] = useState<ToolDrawer>(null);
+  const drawerTriggerRef = useRef<HTMLElement | null>(null);
+  const detailHeadingRef = useRef<HTMLHeadingElement>(null);
+  const selectedCase = useMemo(() => activeCases.find((item) => item.id === selectedId) ?? activeCases[0], [activeCases, selectedId]);
+
+  useEffect(() => {
+    function syncFromHistory() {
+      const caseId = new URL(window.location.href).searchParams.get("case");
+      setSelectedId(caseId);
+    }
+    window.addEventListener("popstate", syncFromHistory);
+    return () => window.removeEventListener("popstate", syncFromHistory);
+  }, []);
+
+  useEffect(() => {
+    if (selectedId || !selectedCase) return;
+    setSelectedId(selectedCase.id);
+  }, [selectedCase, selectedId]);
 
   useEffect(() => {
     if (!focusDetailRequested || !selectedId) return;
@@ -107,19 +146,12 @@ export function DashboardWorkspace({ initialQueue }: { initialQueue?: InitialCas
         onDrawerChange={changeDrawer}
       />
 
-      <div className="grid gap-4 xl:grid-cols-[190px_minmax(0,1fr)_350px]">
-        <QueueFilters caseCount={activeCases.length} />
-        <div className="min-w-0">
-          <TransactionsTable
-            transactions={activeCases}
-            selectedId={selectedCase?.id}
-            queueStatus={queueStatus === "loading" ? "loading" : queueStatus === "error" ? "error" : "ready"}
-            onSelect={(caseRecord, options) => {
-              setSelectedId(caseRecord.id);
-              setFocusDetailRequested(Boolean(options?.focusDetail));
-            }}
-          />
-        </div>
+      <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+        <CaseNavigator cases={activeCases} selectedId={selectedCase?.id} status={queueStatus} onRetry={() => void cases.refetch()} onSelect={(caseRecord) => {
+          setSelectedId(caseRecord.id);
+          setFocusDetailRequested(true);
+          window.history.pushState(null, "", `/cases?case=${encodeURIComponent(caseRecord.id)}`);
+        }} />
         <AlertDetailPanel
           caseRecord={selectedCase}
           canMutate={Boolean(token)}
@@ -137,6 +169,25 @@ export function DashboardWorkspace({ initialQueue }: { initialQueue?: InitialCas
       ) : null}
     </div>
   );
+}
+
+function QueueStatus({ status, onRetry, onSession }: { status: "demo" | "loading" | "live" | "error"; onRetry: () => void; onSession: (trigger: HTMLElement) => void }) {
+  return <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-panel px-4 py-3">
+    <p className="text-sm text-muted" role={status === "error" ? "alert" : "status"}>{status === "demo" ? "Demo queue. Sign in to load live cases." : status === "loading" ? "Loading live cases..." : status === "error" ? "Live cases are unavailable. No demo cases are shown." : "Live queue is active. Choose what needs attention next."}</p>
+    {status === "error" ? <button type="button" className="text-sm font-semibold text-accent underline-offset-4 hover:underline" onClick={onRetry}>Retry</button> : null}
+    <button type="button" className="ml-auto inline-flex min-h-9 items-center rounded-md border border-border bg-white px-3 text-sm font-semibold text-muted hover:border-accent/60 hover:text-foreground" onClick={(event) => onSession(event.currentTarget)}>{status === "demo" ? "Sign in" : "Session active"}</button>
+  </div>;
+}
+
+function CaseNavigator({ cases, selectedId, status, onRetry, onSelect }: { cases: InvestigationCase[]; selectedId?: string; status: "demo" | "loading" | "live" | "error"; onRetry: () => void; onSelect: (item: InvestigationCase) => void }) {
+  return <Panel as="nav" className="h-fit p-3 xl:sticky xl:top-[96px]" aria-label="Case navigator">
+    <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold">Cases</h2><span className="text-xs text-muted">{cases.length}</span></div>
+    {status === "loading" && cases.length === 0 ? <p className="mt-3 text-sm text-muted" role="status">Loading cases...</p> : null}
+    {status === "error" && cases.length === 0 ? <div className="mt-3 text-sm" role="alert"><p className="text-danger">Cases are unavailable.</p><button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>Retry</button></div> : null}
+    {status === "error" && cases.length > 0 ? <div className="mt-3 text-sm" role="status"><p className="font-semibold text-warning">Refresh failed. Showing the most recently loaded cases.</p><button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>Retry</button></div> : null}
+    {status !== "loading" && status !== "error" && cases.length === 0 ? <p className="mt-3 text-sm text-muted">No cases are available.</p> : null}
+    <ul className="mt-3 space-y-2">{cases.map((item) => <li key={item.id}><button type="button" className={`w-full rounded-md border p-3 text-left transition ${item.id === selectedId ? "border-accent bg-accent/10" : "border-border bg-white hover:border-accent/60"}`} aria-current={item.id === selectedId ? "true" : undefined} onClick={() => onSelect(item)}><span className="block break-all text-sm font-semibold">{item.id}</span><span className="mt-1 block truncate text-xs text-muted">{item.merchant} · {statusLabel(item.status)}</span></button></li>)}</ul>
+  </Panel>;
 }
 
 function WorkspaceToolbar({
@@ -197,52 +248,6 @@ function WorkspaceToolbar({
         })}
       </div>
     </div>
-  );
-}
-
-function QueueFilters({ caseCount }: { caseCount: number }) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <aside className="rounded-lg border border-border bg-panel p-4" aria-label="Alert queue filters">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <SlidersHorizontal aria-hidden className="h-4 w-4 text-muted xl:hidden" />
-          <h2 className="text-sm font-semibold">Queue filters</h2>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="rounded-md bg-background px-2 py-1 text-xs font-semibold text-muted">{caseCount} cases</span>
-          <button
-            type="button"
-            className="h-8 rounded-md border border-border bg-white px-3 text-xs font-semibold text-muted hover:border-accent/60 hover:text-foreground xl:hidden"
-            aria-expanded={isOpen}
-            aria-controls="queue-filter-groups"
-            onClick={() => setIsOpen((current) => !current)}
-          >
-            {isOpen ? "Hide" : "Filter"}
-          </button>
-        </div>
-      </div>
-      <div id="queue-filter-groups" className={`${isOpen ? "block" : "hidden"} mt-4 space-y-4 xl:block`}>
-        {filters.map((group) => (
-          <fieldset key={group.label}>
-            <legend className="text-xs font-semibold uppercase tracking-wide text-muted">{group.label}</legend>
-            <div className="mt-2 space-y-1">
-              {group.values.map((value, index) => (
-                <label key={value} className="flex min-h-8 items-center gap-2 rounded-md px-2 text-sm text-muted hover:bg-background hover:text-foreground">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
-                    defaultChecked={group.label === "Severity" && index === 0}
-                  />
-                  {value}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        ))}
-      </div>
-    </aside>
   );
 }
 

@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
 
 const routes = [
-  { path: "/", heading: "Triage live-risk alerts and document decisions" },
-  { path: "/cases", heading: "Review assigned cases and escalation state" },
+  { path: "/", heading: "Triage alerts that need attention", workspace: "Triage workspace" },
+  { path: "/cases", heading: "Investigate and manage cases", workspace: "Case investigation" },
   { path: "/graph", heading: "Trace connected accounts, devices, and beneficiaries", comingSoon: true },
-  { path: "/evidence", heading: "Validate signals before analyst disposition" },
+  { path: "/evidence", heading: "Examine your document library", workspace: "Document workspace" },
   { path: "/data", heading: "Monitor investigation data and ingestion quality", comingSoon: true },
   { path: "/controls", heading: "Configure operational controls and policies", comingSoon: true }
 ];
@@ -25,7 +25,7 @@ test.describe("application smoke", () => {
         await expect(page.getByRole("heading", { name: "This workspace is not available yet" })).toBeVisible();
         await expect(page.getByRole("link", { name: "Return to Triage" })).toBeVisible();
       } else {
-        await expect(page.getByRole("heading", { name: "Investigation workspace" })).toBeVisible();
+        await expect(page.getByRole("heading", { name: route.workspace })).toBeVisible();
       }
       expect(consoleErrors).toEqual([]);
     });

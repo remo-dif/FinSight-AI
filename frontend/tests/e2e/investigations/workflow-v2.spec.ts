@@ -28,7 +28,7 @@ for (const decision of ["escalate", "request_verification"] as const) {
       record.revision = 3;
       await json(route, 200, record);
     });
-    await page.goto("/");
+    await page.goto("/cases");
     await page.getByRole("button", { name: "Sign in" }).click();
     await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
     await expect(page.getByText("Live investigation data is active.")).toBeVisible();
@@ -64,7 +64,7 @@ test("follow-up conflicts remain visible and refresh the case", async ({ page, i
   await page.route("**/api/cases?limit=50", (route) => json(route, 200, [record]));
   await page.route(`**/api/cases/${record.id}`, (route) => { reads += 1; return json(route, 200, { ...record, notes: [], follow_ups: [] }); });
   await page.route(`**/api/cases/${record.id}/follow-ups`, (route) => json(route, 409, { detail: "Case changed while saving. Refresh the case and retry" }));
-  await page.goto("/");
+  await page.goto("/cases");
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
   await expect(page.getByText("Live investigation data is active.")).toBeVisible();

@@ -22,7 +22,7 @@ async function openDocumentAssistant(page: import("@playwright/test").Page) {
       }
     ]);
   });
-  await page.goto("/");
+  await page.goto("/cases");
   await page.getByRole("button", { name: "Sign in" }).click();
   await page
     .getByRole("region", { name: "Analyst session" })
@@ -122,7 +122,7 @@ test("document picker loads bounded pages without losing the selected scope", as
         }];
     await json(route, 200, documents);
   });
-  await page.goto("/");
+  await page.goto("/cases");
   await page.getByRole("button", { name: "Sign in" }).click();
   await page
     .getByRole("region", { name: "Analyst session" })

@@ -8,7 +8,7 @@ test("analyst can update case state, record a decision and note, then use the co
   await mockDashboardData(page);
   await mockChatSuccess(page);
 
-  await page.goto("/");
+  await page.goto("/cases");
   await page.getByRole("button", { name: "Sign in" }).click();
   await page
     .getByRole("region", { name: "Analyst session" })

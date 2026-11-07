@@ -19,11 +19,11 @@ test("primary workspace controls are reachable by keyboard", async ({ page, isMo
 
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/cases$/);
-  await expect(page.getByRole("heading", { name: "Review assigned cases and escalation state" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Investigate and manage cases" })).toBeVisible();
 });
 
 test("forms, status regions, and alert queue expose stable accessible names", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/cases");
 
   const sessionTrigger = page.getByRole("button", { name: "Sign in" });
   await sessionTrigger.click();
@@ -45,17 +45,11 @@ test("forms, status regions, and alert queue expose stable accessible names", as
   await expect(page.getByRole("list", { name: "Upload processing steps" })).toBeVisible();
   await page.getByRole("button", { name: "Close panel" }).click();
 
-  if ((page.viewportSize()?.width ?? 1280) < 768) {
-    await expect(page.getByRole("list", { name: "Fraud cases" })).toBeVisible();
-  } else {
-    await expect(
-      page.getByRole("table", { name: "Fraud cases with case, assignee, merchant, signal, amount, and status" })
-    ).toBeVisible();
-  }
+  await expect(page.getByRole("navigation", { name: "Case navigator" })).toBeVisible();
 });
 
 test("session drawer contains and restores keyboard focus", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/cases");
   const trigger = page.getByRole("button", { name: "Sign in", exact: true });
   await trigger.focus();
   await page.keyboard.press("Enter");
@@ -93,31 +87,22 @@ test("keyboard focus has a visible indicator", async ({ page }) => {
   expect(outline.color).not.toBe("rgba(0, 0, 0, 0)");
 });
 
-test("each desktop case has one native selection control", async ({ page }) => {
-  test.skip((page.viewportSize()?.width ?? 1280) < 768, "table semantics apply at the md breakpoint and above");
-
-  await page.goto("/");
-  const table = page.getByRole("table", { name: "Fraud cases with case, assignee, merchant, signal, amount, and status" });
-  const rows = table.locator("tbody tr");
-  await expect(rows).toHaveCount(3);
-
-  for (const row of await rows.all()) {
-    await expect(row).not.toHaveAttribute("tabindex");
-    await expect(row.getByRole("button")).toHaveCount(1);
-  }
-
-  const caseButton = rows.nth(1).getByRole("button", { name: "CASE-1038" });
+test("each case has one native navigator control", async ({ page }) => {
+  await page.goto("/cases");
+  const navigator = page.getByRole("navigation", { name: "Case navigator" });
+  const caseButton = navigator.getByRole("button").filter({ hasText: "CASE-1038" });
   await caseButton.focus();
   await page.keyboard.press("Enter");
-  await expect(caseButton).toHaveAttribute("aria-pressed", "true");
+  await expect(caseButton).toHaveAttribute("aria-current", "true");
+  await expect(page).toHaveURL(/case=CASE-1038/);
   await expect(page.getByRole("region", { name: "Selected alert" })).toContainText("CASE-1038");
 });
 
 test("mobile case selection moves focus directly to the detail", async ({ page }) => {
   test.skip((page.viewportSize()?.width ?? 1280) >= 768, "the mobile case list is rendered below the md breakpoint");
 
-  await page.goto("/");
-  const caseButton = page.getByRole("list", { name: "Fraud cases" }).getByRole("button").filter({ hasText: "CASE-1038" });
+  await page.goto("/cases");
+  const caseButton = page.getByRole("navigation", { name: "Case navigator" }).getByRole("button").filter({ hasText: "CASE-1038" });
   await caseButton.click();
 
   const detailHeading = page.getByRole("heading", { name: "Selected alert" });
