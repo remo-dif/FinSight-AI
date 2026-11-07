@@ -58,13 +58,17 @@ export function TransactionsTable({
   queueStatus = "ready",
   onSelect
 }: TransactionsTableProps) {
-  const queueMessage = queueStatus === "loading"
+  const hasUsableCases = transactions.length > 0;
+  const queueMessage = queueStatus === "loading" && !hasUsableCases
     ? "Loading cases…"
-    : queueStatus === "error"
+    : queueStatus === "error" && !hasUsableCases
       ? "The case queue is unavailable. Retry to load live cases."
       : transactions.length === 0
         ? "No cases are available in the current queue."
         : null;
+  const cachedDataWarning = queueStatus === "error" && hasUsableCases
+    ? "Refresh failed. Showing the most recently loaded cases."
+    : null;
   const queueGuidance = queueStatus === "loading"
     ? "The queue will appear when loading finishes."
     : queueStatus === "error"
@@ -80,8 +84,18 @@ export function TransactionsTable({
         </div>
         <p className="text-xs font-semibold uppercase tracking-wide text-muted">{transactions.length} cases</p>
       </div>
+      {cachedDataWarning ? (
+        <div className="border-b border-warning/30 bg-warning/10 px-4 py-3 text-sm">
+          <p className="font-semibold text-warning">{cachedDataWarning}</p>
+          <p className="mt-1 text-muted">You can continue reviewing these cases or retry the refresh.</p>
+        </div>
+      ) : null}
       {queueMessage ? (
-        <div className="p-6 text-center" role="status" aria-live="polite">
+        <div
+          className="p-6 text-center"
+          role={queueStatus === "error" ? undefined : "status"}
+          aria-live={queueStatus === "error" ? undefined : "polite"}
+        >
           <p className="font-semibold">{queueMessage}</p>
           <p className="mt-1 text-sm text-muted">
             {queueGuidance}

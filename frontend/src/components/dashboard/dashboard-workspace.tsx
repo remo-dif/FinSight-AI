@@ -83,8 +83,13 @@ export function DashboardWorkspace({ initialQueue }: { initialQueue?: InitialCas
 
   useEffect(() => {
     if (!focusDetailRequested || !selectedId) return;
-    detailHeadingRef.current?.focus();
-    detailHeadingRef.current?.scrollIntoView({ block: "start" });
+    const heading = detailHeadingRef.current;
+    if (heading) {
+      heading.focus({ preventScroll: true });
+      const headerBottom = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+      const headingTop = heading.getBoundingClientRect().top;
+      window.scrollBy({ top: headingTop - headerBottom - 16 });
+    }
     setFocusDetailRequested(false);
   }, [focusDetailRequested, selectedId]);
 

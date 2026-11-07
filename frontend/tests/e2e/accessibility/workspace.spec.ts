@@ -93,8 +93,8 @@ test("keyboard focus has a visible indicator", async ({ page }) => {
   expect(outline.color).not.toBe("rgba(0, 0, 0, 0)");
 });
 
-test("each desktop case has one native selection control", async ({ page, isMobile }) => {
-  test.skip(isMobile, "desktop table semantics are covered on desktop");
+test("each desktop case has one native selection control", async ({ page }) => {
+  test.skip((page.viewportSize()?.width ?? 1280) < 768, "table semantics apply at the md breakpoint and above");
 
   await page.goto("/");
   const table = page.getByRole("table", { name: "Fraud cases with case, assignee, merchant, signal, amount, and status" });
@@ -113,8 +113,8 @@ test("each desktop case has one native selection control", async ({ page, isMobi
   await expect(page.getByRole("region", { name: "Selected alert" })).toContainText("CASE-1038");
 });
 
-test("mobile case selection moves focus directly to the detail", async ({ page, isMobile }) => {
-  test.skip(!isMobile, "mobile focus transition is covered by mobile projects");
+test("mobile case selection moves focus directly to the detail", async ({ page }) => {
+  test.skip((page.viewportSize()?.width ?? 1280) >= 768, "the mobile case list is rendered below the md breakpoint");
 
   await page.goto("/");
   const caseButton = page.getByRole("list", { name: "Fraud cases" }).getByRole("button").filter({ hasText: "CASE-1038" });
@@ -123,4 +123,9 @@ test("mobile case selection moves focus directly to the detail", async ({ page, 
   const detailHeading = page.getByRole("heading", { name: "Selected alert" });
   await expect(detailHeading).toBeFocused();
   await expect(page.getByRole("region", { name: "Selected alert" })).toContainText("CASE-1038");
+  const geometry = await page.evaluate(() => ({
+    headerBottom: document.querySelector("header")?.getBoundingClientRect().bottom ?? 0,
+    headingTop: document.getElementById("selected-alert-heading")?.getBoundingClientRect().top ?? 0
+  }));
+  expect(geometry.headingTop).toBeGreaterThanOrEqual(geometry.headerBottom + 8);
 });

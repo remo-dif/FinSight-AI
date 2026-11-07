@@ -86,6 +86,67 @@ test("case queue distinguishes loading and empty live states", async ({ page, is
   await expect(page.getByRole("list", { name: "Fraud cases" })).toHaveCount(0);
 });
 
+test("failed refresh keeps previously loaded cases available", async ({ page, isMobile }) => {
+  test.skip(isMobile, "cached refresh behavior is viewport-independent and covered on desktop");
+
+  await mockLogin(page);
+  let requestCount = 0;
+  await page.route("**/api/cases?limit=50", async (route) => {
+    requestCount += 1;
+    if (requestCount === 1) {
+      await json(route, 200, [
+        {
+          id: "CASE-CACHED",
+          posted_at: "2026-11-07",
+          merchant: "Cached case",
+          description: "Previously loaded investigation case",
+          amount: "-10.00",
+          currency: "USD",
+          category: "Review",
+          source: "rules",
+          status: "new",
+          assignee_name: null,
+          assigned_to_me: false,
+          decision: null,
+          decision_reason: null,
+          updated_at: null
+        }
+      ]);
+      return;
+    }
+    await json(route, 503, { detail: "Temporary refresh failure" });
+  });
+  await page.route("**/api/cases/CASE-CACHED", async (route) => {
+    await json(route, 200, {
+      id: "CASE-CACHED",
+      posted_at: "2026-11-07",
+      merchant: "Cached case",
+      description: "Previously loaded investigation case",
+      amount: "-10.00",
+      currency: "USD",
+      category: "Review",
+      source: "rules",
+      status: "new",
+      assignee_name: route.request().method() === "PATCH" ? "Test Analyst" : null,
+      assigned_to_me: route.request().method() === "PATCH",
+      decision: null,
+      decision_reason: null,
+      updated_at: null,
+      notes: []
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
+  await expect(page.getByRole("button", { name: "CASE-CACHED" })).toBeVisible();
+  await page.getByRole("button", { name: "Close panel" }).click();
+
+  await page.getByRole("button", { name: "Assign to me" }).click();
+  await expect(page.getByText("Refresh failed. Showing the most recently loaded cases.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "CASE-CACHED" })).toBeVisible();
+});
+
 test("cases page renders an authenticated data failure without demo records", async ({ page, isMobile }) => {
   test.skip(isMobile, "server-rendered case queue behavior is viewport-independent and covered on desktop");
 
