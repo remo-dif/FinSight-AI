@@ -283,7 +283,7 @@ function AlertDetailPanel({
               className="text-sm font-semibold text-accent underline-offset-4 hover:underline"
               onClick={(event) => onDrawerChange("upload", event.currentTarget)}
             >
-              Add evidence
+              Upload to Document Library
             </button>
           </div>
           <p className="mt-3 rounded-md border border-border bg-background p-3 text-sm leading-5">
