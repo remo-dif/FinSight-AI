@@ -27,7 +27,7 @@ async def list_uploads(
     result = await db.scalars(
         select(UploadedFile)
         .where(UploadedFile.user_id == user.id)
-        .order_by(UploadedFile.created_at, UploadedFile.id)
+        .order_by(UploadedFile.created_at.desc(), UploadedFile.id.desc())
         .limit(limit)
         .offset(offset)
     )

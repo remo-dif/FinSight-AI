@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { json, liveTransactions, mockDashboardData, mockLogin } from "../fixtures/api";
 
 async function openLiveCase(page: Page) {
-  await page.goto("/");
+  await page.goto("/cases");
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
   await expect(page.getByText("Live investigation data is active.")).toBeVisible();

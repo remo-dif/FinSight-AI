@@ -18,22 +18,21 @@ test("display preserves decimal strings, signs, precision and currency units", a
     const record = records.find(item => route.request().url().endsWith(item.id));
     return json(route, 200, { ...record, notes: [] });
   });
-  await page.goto("/");
+  await page.goto("/cases");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type=submit]").click();
   await expect(page.getByText("Live investigation data is active.")).toBeVisible();
   await page.getByRole("button", { name: "Close panel" }).click();
   const selected = page.getByRole("region", { name: "Selected alert" });
   for (const record of records) {
-    const exact = page.getByRole("button", { name: record.id, exact: true });
-    const button = await exact.count() ? exact : page.getByRole("list", { name: "Fraud cases" }).getByRole("button").filter({ hasText: record.id });
+    const button = page.getByRole("navigation", { name: "Case navigator" }).getByRole("button").filter({ hasText: record.id });
     await button.click();
     await expect(selected.locator("dd").first()).toHaveText(record.expected);
   }
 });
 
 test("the contained desktop table can be scrolled by keyboard", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.setViewportSize({ width: 768, height: 1000 });
   await page.goto("/");
   const queue = page.getByRole("region", { name: "Scrollable alert queue" });
   await queue.focus();

@@ -40,7 +40,8 @@ test("workspace ARIA references resolve to actual elements", async ({ page }) =>
 
 test("placeholder and essential input borders meet composited contrast thresholds", async ({ page }) => {
   await page.goto("/");
-  const values = await page.getByPlaceholder("Search cases, entities, merchants...").evaluate(input => {
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  const values = await page.getByLabel("Email").evaluate(input => {
     const parse = (value: string) => (value.match(/[\d.]+/g) || []).map(Number);
     const composite = (fg: number[], bg: number[]) => fg.slice(0, 3).map((v, i) => v * (fg[3] ?? 1) + bg[i] * (1 - (fg[3] ?? 1)));
     const luminance = (rgb: number[]) => rgb.map(v => v / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4).reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);

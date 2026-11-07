@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { json, mockDashboardData, mockLogin } from "../fixtures/api";
+import { json, mockDashboardData, mockLogin, mockRefreshFailure } from "../fixtures/api";
 
 async function openDocumentAssistant(page: import("@playwright/test").Page) {
   await mockLogin(page);
@@ -22,7 +22,7 @@ async function openDocumentAssistant(page: import("@playwright/test").Page) {
       }
     ]);
   });
-  await page.goto("/");
+  await page.goto("/cases");
   await page.getByRole("button", { name: "Sign in" }).click();
   await page
     .getByRole("region", { name: "Analyst session" })
@@ -122,7 +122,7 @@ test("document picker loads bounded pages without losing the selected scope", as
         }];
     await json(route, 200, documents);
   });
-  await page.goto("/");
+  await page.goto("/cases");
   await page.getByRole("button", { name: "Sign in" }).click();
   await page
     .getByRole("region", { name: "Analyst session" })
@@ -138,6 +138,59 @@ test("document picker loads bounded pages without losing the selected scope", as
   await expect(page.getByRole("option", { name: "final-statement.pdf" })).toBeVisible();
   expect(await selector.inputValue()).toBe("document-0");
   expect(offsets).toEqual(["0", "100"]);
+});
+
+test("a newly uploaded indexed document becomes selectable in Document Q&A", async ({ page, isMobile }) => {
+  test.skip(isMobile, "document upload and assistant interaction are covered in the desktop project");
+  await mockRefreshFailure(page);
+  await mockLogin(page);
+  let documents: Array<{ id: string; filename: string; status: string; created_at: string }> = [];
+  let submittedDocumentIds: unknown;
+  await page.route("**/api/uploads**", async (route) => {
+    if (route.request().method() === "POST") {
+      documents = [{
+        id: "new-indexed-document",
+        filename: "new-evidence.pdf",
+        status: "indexed",
+        created_at: "2026-10-03T10:00:00Z"
+      }];
+      return json(route, 200, { file_id: "new-indexed-document", status: "indexed", imported: 0, indexed: 1 });
+    }
+    return json(route, 200, documents);
+  });
+  await page.route("**/api/chat", async (route) => {
+    submittedDocumentIds = route.request().postDataJSON().document_ids;
+    return json(route, 200, {
+      session_id: null,
+      answer: "No sufficiently relevant evidence was found.",
+      review: "",
+      tool_results: {},
+      citations: [],
+      sources: [],
+      grounded: false,
+      abstained: true,
+      status: "insufficient_evidence",
+      grounding_note: "Claim-level support is not verified."
+    });
+  });
+
+  await page.goto("/evidence");
+  await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
+  await page.locator("input[type='file']").setInputFiles({
+    name: "new-evidence.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4 synthetic")
+  });
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
+
+  await expect(page.getByRole("list", { name: "Documents" }).getByText("new-evidence.pdf")).toBeVisible();
+  const selector = page.getByLabel("Select indexed documents");
+  await expect(page.getByRole("option", { name: "new-evidence.pdf" })).toBeVisible();
+  await selector.selectOption("new-indexed-document");
+  await page.getByLabel("Ask about selected documents").fill("What does this document contain?");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByText("No sufficiently relevant document evidence was found.")).toBeVisible();
+  expect(submittedDocumentIds).toEqual(["new-indexed-document"]);
 });
 
 test("document Q&A exposes abstention and provider failure statuses", async ({ page, isMobile }) => {

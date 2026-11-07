@@ -16,7 +16,7 @@ for (const status of [401, 200]) {
       await json(route, status, status === 200 ? { ...analystTokens, access_token: "older-bootstrap-token" } : { detail: "Old session expired" });
     });
     try {
-      await page.goto("/");
+      await page.goto("/cases");
       await refreshStarted;
       await activateControl(page.getByRole("button", { name: "Sign in", exact: true }), isMobile);
       const auth = page.getByRole("region", { name: "Analyst session" });
@@ -30,8 +30,7 @@ for (const status of [401, 200]) {
       await expect(page.getByText("Live investigation data is active.")).toBeVisible();
       await activateControl(page.getByRole("button", { name: "Close panel" }), isMobile);
       const detailRequest = page.waitForRequest(r => new URL(r.url()).pathname === `/api/cases/${liveTransactions[1].id}`);
-      const exact = page.getByRole("button", { name: liveTransactions[1].id, exact: true });
-      const select = await exact.count() ? exact : page.getByRole("list", { name: "Fraud cases" }).getByRole("button").filter({ hasText: liveTransactions[1].id });
+      const select = page.getByRole("navigation", { name: "Case navigator" }).getByRole("button").filter({ hasText: liveTransactions[1].id });
       await activateControl(select, isMobile);
       expect((await detailRequest).headers().authorization).toBe(`Bearer ${newToken}`);
     } finally { release(); }

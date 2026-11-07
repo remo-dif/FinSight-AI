@@ -7,7 +7,7 @@ test("script CSP uses fresh nonces and blocks unauthorized inline execution", as
     const html = (await upstream.text()).replace("</head>", '<script data-security-probe>window.__untrustedInlineExecuted = true</script></head>');
     await route.fulfill({ response: upstream, body: html });
   });
-  const response = await page.goto("/");
+  const response = await page.goto("/cases");
   const policy = response?.headers()["content-security-policy"] ?? "";
   const scriptPolicy = policy.split(";").find((part) => part.trim().startsWith("script-src ")) ?? "";
   expect(scriptPolicy).not.toContain("'unsafe-inline'");

@@ -9,7 +9,7 @@ for (const width of [1440, 768, 375, 320]) {
     const record = { ...liveTransactions[0], id: "12345678-abcd-4321-abcd-123456789abc", amount: "-9999999999999999.99" };
     await page.route("**/api/cases?limit=50", r => json(r, 200, [record]));
     await page.route(`**/api/cases/${record.id}`, r => json(r, 200, { ...record, notes: [] }));
-    await page.goto("/");
+    await page.goto("/cases");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await page.getByRole("region", { name: "Analyst session" }).locator("form button[type=submit]").click();
     await expect(page.getByText("Live investigation data is active.")).toBeVisible();

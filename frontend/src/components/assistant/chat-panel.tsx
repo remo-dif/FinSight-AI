@@ -35,14 +35,14 @@ const statusLabels: Record<NonNullable<Message["status"]>, string> = {
 const DOCUMENT_PAGE_SIZE = 100;
 const MAX_DOCUMENT_SELECTION = 100;
 
-export function ChatPanel() {
+export function ChatPanel({ initialMode = "finance" }: { initialMode?: "finance" | "document_qa" } = {}) {
   const statusId = useId();
   const documentsId = useId();
   const chatSessionId = useSessionStore((state) => state.chatSessionId);
   const token = useSessionStore((state) => state.accessToken);
   const setChatSessionId = useSessionStore((state) => state.setChatSessionId);
-  const [input, setInput] = useState("Show my monthly summary");
-  const [mode, setMode] = useState<"finance" | "document_qa">("finance");
+  const [input, setInput] = useState(initialMode === "document_qa" ? "" : "Show my monthly summary");
+  const [mode, setMode] = useState<"finance" | "document_qa">(initialMode);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [selectionError, setSelectionError] = useState("");
   const [messages, setMessages] = useState<Message[]>([

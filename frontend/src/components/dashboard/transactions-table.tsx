@@ -114,7 +114,6 @@ export function TransactionsTable({
                 className={`grid w-full gap-3 p-4 text-left transition hover:bg-accent/5 ${isSelected ? "bg-accent/10" : "bg-panel"}`}
                 onClick={() => onSelect?.(caseRecord, { focusDetail: true })}
                 aria-pressed={isSelected}
-                aria-controls="selected-alert-panel"
               >
                 <span className="flex items-start justify-between gap-3">
                   <span>
@@ -138,7 +137,7 @@ export function TransactionsTable({
         })}
       </ul>
       <div className="hidden overflow-x-auto md:block" tabIndex={0} role="region" aria-label="Scrollable alert queue">
-        <table className="w-full min-w-[720px] table-fixed border-collapse text-sm">
+        <table className="w-full min-w-[800px] table-fixed border-collapse text-sm">
           <caption className="sr-only">Fraud cases with case, assignee, merchant, signal, amount, and status</caption>
           <thead>
             <tr className="border-y border-border bg-background text-left text-xs uppercase tracking-wide text-muted">
@@ -163,7 +162,6 @@ export function TransactionsTable({
                       className="min-h-8 break-all text-left font-semibold text-accent underline-offset-4 hover:underline"
                       onClick={() => onSelect?.(caseRecord)}
                       aria-pressed={isSelected}
-                      aria-controls="selected-alert-panel"
                     >
                       {caseRecord.id}
                     </button>

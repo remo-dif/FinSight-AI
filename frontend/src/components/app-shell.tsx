@@ -1,16 +1,15 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { DashboardWorkspace } from "@/components/dashboard/dashboard-workspace";
+import { CasesWorkspace, TriageWorkspace } from "@/components/dashboard/dashboard-workspace";
+import { EvidenceWorkspace } from "@/components/evidence/evidence-workspace";
 import type { InitialCaseQueue } from "@/lib/server-data";
 import {
-  Bell,
   BriefcaseBusiness,
   Construction,
   Database,
   FileSearch,
   Gauge,
   Network,
-  Search,
   Settings,
   ShieldAlert,
   Siren
@@ -31,13 +30,13 @@ const controlsNavigation = { id: "controls" as const, label: "Controls", href: "
 const routeCopy: Record<WorkspaceRoute, { eyebrow: string; title: string; description: string; comingSoon?: boolean }> = {
   triage: {
     eyebrow: "Fraud command center",
-    title: "Triage live-risk alerts and document decisions",
-    description: "Select an alert, inspect supporting evidence, and commit an auditable disposition."
+    title: "Triage alerts that need attention",
+    description: "Review the available queue and open the next case for investigation."
   },
   cases: {
     eyebrow: "Case operations",
-    title: "Review assigned cases and escalation state",
-    description: "Track ownership, SLA pressure, and disposition readiness for active investigations."
+    title: "Investigate and manage cases",
+    description: "Review transaction context, ownership, notes, decisions, and follow-up actions."
   },
   graph: {
     eyebrow: "Entity intelligence",
@@ -47,8 +46,8 @@ const routeCopy: Record<WorkspaceRoute, { eyebrow: string; title: string; descri
   },
   evidence: {
     eyebrow: "Evidence review",
-    title: "Validate signals before analyst disposition",
-    description: "Inspect uploaded evidence, extracted context, and reviewer-ready signal summaries."
+    title: "Examine your document library",
+    description: "Upload documents, monitor processing status, and ask questions about indexed files."
   },
   data: {
     eyebrow: "Investigation data",
@@ -66,16 +65,18 @@ const routeCopy: Record<WorkspaceRoute, { eyebrow: string; title: string; descri
 
 export function AppShell({
   activeRoute,
-  initialQueue
+  initialQueue,
+  selectedCaseId
 }: {
   activeRoute: WorkspaceRoute;
   initialQueue?: InitialCaseQueue;
+  selectedCaseId?: string;
 }) {
   const copy = routeCopy[activeRoute];
   const isComingSoon = Boolean(copy.comingSoon);
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="min-h-screen overflow-x-clip bg-background text-foreground">
       <a
         className="sr-only rounded-md bg-panel px-3 py-2 text-sm font-semibold focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50"
         href="#dashboard"
@@ -166,22 +167,6 @@ export function AppShell({
                 </p>
                 <h1 className="text-xl font-semibold leading-tight sm:text-2xl">{copy.title}</h1>
               </div>
-              {!isComingSoon ? <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <label className="relative block min-w-0 sm:w-[340px]" htmlFor="workspace-search">
-                  <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-                  <span className="sr-only">Search cases, entities, merchants, or transaction ids</span>
-                  <input
-                    id="workspace-search"
-                    type="search"
-                    className="h-10 w-full rounded-md border border-border bg-white pl-9 pr-3 text-sm outline-none transition placeholder:text-muted hover:border-accent/70 focus:border-accent focus:ring-2 focus:ring-accent/20"
-                    placeholder="Search cases, entities, merchants..."
-                  />
-                </label>
-                <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-danger/30 bg-danger/10 px-3 text-sm font-semibold text-danger transition hover:border-danger/50">
-                  <Bell aria-hidden className="h-4 w-4" />
-                  12 open alerts
-                </button>
-              </div> : null}
             </div>
           </header>
 
@@ -202,27 +187,15 @@ export function AppShell({
               </section>
             ) : (
             <section id="dashboard" className="min-w-0 space-y-4" aria-labelledby="dashboard-heading">
-              <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="border-b border-border pb-4">
                 <div className="max-w-3xl">
-                  <h2 id="dashboard-heading" className="text-base font-semibold">Investigation workspace</h2>
+                  <h2 id="dashboard-heading" className="text-base font-semibold">{activeRoute === "triage" ? "Triage workspace" : activeRoute === "cases" ? "Case investigation" : "Document workspace"}</h2>
                   <p className="mt-1 text-sm text-muted">{copy.description}</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {["Unassigned", "High risk", "SLA breach"].map((filter, index) => (
-                    <span
-                      key={filter}
-                      className={`inline-flex h-8 items-center rounded-md border px-3 text-xs font-semibold ${
-                        index === 1
-                          ? "border-danger/40 bg-danger/10 text-danger"
-                          : "border-border bg-white text-muted"
-                      }`}
-                    >
-                      {filter}
-                    </span>
-                  ))}
-                </div>
               </div>
-              <DashboardWorkspace initialQueue={initialQueue} />
+              {activeRoute === "triage" ? <TriageWorkspace initialQueue={initialQueue} /> : null}
+              {activeRoute === "cases" ? <CasesWorkspace initialQueue={initialQueue} initialSelectedId={selectedCaseId} /> : null}
+              {activeRoute === "evidence" ? <EvidenceWorkspace /> : null}
             </section>
             )}
           </div>

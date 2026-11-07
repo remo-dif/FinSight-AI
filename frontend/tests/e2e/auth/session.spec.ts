@@ -22,7 +22,7 @@ test("valid login enables live dashboard data and logout clears the session", as
   await mockDashboardData(page);
   await mockLogout(page);
 
-  await page.goto("/");
+  await page.goto("/cases");
   await submitLogin(page);
 
   await expect(page.getByText("Live investigation data is active.")).toBeVisible();
@@ -52,7 +52,7 @@ test("failed logout keeps the session and does not claim that it was revoked", a
     json(route, 503, { detail: "Logout temporarily unavailable" })
   );
 
-  await page.goto("/");
+  await page.goto("/cases");
   await submitLogin(page);
   const logoutResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" && new URL(response.url()).pathname === "/api/auth/logout"
@@ -73,7 +73,7 @@ test("network failure leaves logout outcome uncertain and offers local-only clea
   await mockDashboardData(page);
   await page.route("**/api/auth/logout", async (route) => route.abort("failed"));
 
-  await page.goto("/");
+  await page.goto("/cases");
   await submitLogin(page);
   await activateControl(page.getByRole("button", { name: "Sign out" }), isMobile);
 
@@ -91,7 +91,7 @@ test("logout timeout is reported as an unknown server outcome", async ({ page, i
   await mockRefreshFailure(page);
   await mockDashboardData(page);
 
-  await page.goto("/");
+  await page.goto("/cases");
   await submitLogin(page);
 
   const authPanel = page.getByRole("region", { name: "Analyst session" });
@@ -151,7 +151,7 @@ test("logout can be retried after a server failure", async ({ page, isMobile }) 
     await json(route, 204, null);
   });
 
-  await page.goto("/");
+  await page.goto("/cases");
   await submitLogin(page);
   const authPanel = page.getByRole("region", { name: "Analyst session" });
   await authPanel.getByRole("button", { name: "Sign out" }).click();
@@ -187,7 +187,7 @@ test("reload restores the server session when failed logout leaves its cookie va
   );
   await mockDashboardData(page);
 
-  await page.goto("/");
+  await page.goto("/cases");
   await submitLogin(page);
   await page.context().addCookies([{
     name: "finsight_session", value: "11111111111111111111111111111111",
@@ -233,7 +233,7 @@ test("expired refresh session during logout is reported without claiming revocat
     json(route, 401, { detail: "Invalid refresh token" })
   );
 
-  await page.goto("/");
+  await page.goto("/cases");
   await submitLogin(page);
   await page.getByRole("button", { name: "Sign out" }).click();
 
@@ -249,7 +249,7 @@ test("invalid login reports the API error and keeps demo mode", async ({ page, i
 
   await mockLogin(page, 401, { detail: "Invalid email or password" });
 
-  await page.goto("/");
+  await page.goto("/cases");
   await submitLogin(page);
 
   await expect(page.getByText("Invalid email or password")).toBeVisible();
@@ -279,7 +279,7 @@ test("secure refresh cookie restores the session after a page reload", async ({ 
   });
   await mockDashboardData(page);
 
-  await page.goto("/");
+  await page.goto("/cases");
   await expect.poll(() => refreshCount).toBe(1);
   await submitLogin(page);
   await expect(page.getByText("Live investigation data is active.")).toBeVisible();
@@ -338,7 +338,7 @@ test("expired access token refreshes once and retries live-data requests", async
     ]);
   });
 
-  await page.goto("/");
+  await page.goto("/cases");
   await expect.poll(() => refreshCount).toBe(1);
   await submitLogin(page);
 

@@ -8,7 +8,7 @@ async function openCase(page: Page) {
   const refreshResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" && new URL(response.url()).pathname === "/api/auth/refresh"
   );
-  await page.goto("/");
+  await page.goto("/cases");
   expect((await refreshResponse).status()).toBe(401);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type=submit]").click();
@@ -21,8 +21,7 @@ async function openCase(page: Page) {
 }
 
 async function selectCase(page: Page, id: string) {
-  const exact = page.getByRole("button", { name: id, exact: true });
-  const button = await exact.count() ? exact : page.getByRole("list", { name: "Fraud cases" }).getByRole("button").filter({ hasText: id });
+  const button = page.getByRole("navigation", { name: "Case navigator" }).getByRole("button").filter({ hasText: id });
   await button.focus();
   await page.keyboard.press("Enter");
 }
@@ -135,7 +134,7 @@ test("follow-up drafts and captured revisions stay with their intended case", as
   const refreshResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" && new URL(response.url()).pathname === "/api/auth/refresh"
   );
-  await page.goto("/");
+  await page.goto("/cases");
   expect((await refreshResponse).status()).toBe(401);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type=submit]").click();
@@ -157,6 +156,7 @@ test("follow-up drafts and captured revisions stay with their intended case", as
     return json(r, 409, { detail: "Concurrent change; review refreshed case" });
   });
   await selected.getByLabel("Escalation investigation outcome").fill("A outcome");
+  await expect(selected.getByRole("button", { name: "Record follow-up outcome" })).toBeEnabled();
   await selected.getByRole("button", { name: "Record follow-up outcome" }).click();
   await expect(selected.getByRole("alert")).toContainText("Concurrent change");
   await expect(selected.getByLabel("Escalation investigation outcome")).toHaveValue("A outcome");

@@ -185,6 +185,7 @@ test("axe-core WCAG scans cover the reported workspace states", async ({ page, i
   await activateControl(auth.locator("form button[type='submit']"), isMobile);
   await expect(page.getByText("Live investigation data is active.")).toBeVisible();
   await activateControl(page.getByRole("button", { name: "Close panel" }), isMobile);
+  await activateControl(page.getByRole("link", { name: "Cases", exact: true }), isMobile);
   await expect(page.getByRole("region", { name: "Selected alert" })).toContainText("CASE-9001");
   await scan(page, "live case immediate", false);
   await scan(page, "live case settled", true, browserName === "chromium" && !isMobile);

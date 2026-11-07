@@ -46,8 +46,8 @@ export function UploadPanel() {
     <Panel as="section" className="p-4" aria-labelledby="uploads-heading">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 id="uploads-heading" className="text-base font-semibold">Evidence ingestion</h2>
-          <p className="mt-1 text-sm text-muted">Statements, screenshots, receipts, CSV exports</p>
+          <h2 id="uploads-heading" className="text-base font-semibold">Upload to Document Library</h2>
+          <p className="mt-1 text-sm text-muted">Uploads are stored in your document library, not attached to a case.</p>
         </div>
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-success/10 text-success">
           <Lock aria-hidden className="h-5 w-5" />
@@ -58,7 +58,7 @@ export function UploadPanel() {
         htmlFor={inputId}
       >
         <UploadCloud aria-hidden className="h-8 w-8 text-accent" />
-        <span className="mt-3 text-sm font-semibold">Attach evidence file</span>
+        <span className="mt-3 text-sm font-semibold">Choose a document</span>
         <span className="mt-1 max-w-full truncate text-xs text-muted" aria-live="polite">{filename}</span>
         <input
           id={inputId}

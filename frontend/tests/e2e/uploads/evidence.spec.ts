@@ -21,7 +21,7 @@ test("CSV currency selection is explicit, actionable and reset for each file", a
     }
     return json(route, 200, { file_id: "synthetic-upload", status: "processed", imported: 1, indexed: 0 });
   });
-  await page.goto("/");
+  await page.goto("/cases");
   await signIn(page);
   await page.getByRole("button", { name: "Upload evidence" }).click();
   const input = page.locator("input[type='file']");
@@ -31,7 +31,7 @@ test("CSV currency selection is explicit, actionable and reset for each file", a
   await expect(selector.locator("option:checked")).toHaveText("Use currency column");
   await expect(page.getByText(/If your CSV has no currency column/)).toBeVisible();
   await page.getByRole("button", { name: "Upload", exact: true }).click();
-  await expect(page.getByRole("region", { name: "Evidence ingestion" }).getByRole("alert")).toContainText("select the statement currency");
+  await expect(page.getByRole("region", { name: "Upload to Document Library" }).getByRole("alert")).toContainText("select the statement currency");
   expect(requests[0]).not.toContain('name="import_currency"');
   await selector.selectOption("EUR");
   await page.getByRole("button", { name: "Upload", exact: true }).click();
@@ -57,7 +57,7 @@ test("uploads accepted evidence files and reports processing counts", async ({ p
     })
   );
 
-  await page.goto("/");
+  await page.goto("/cases");
   await signIn(page);
   await page.getByRole("button", { name: "Upload evidence" }).click();
 
@@ -82,7 +82,7 @@ test("rejected evidence files surface backend validation messages", async ({ pag
     json(route, 400, { detail: "Unsupported file type" })
   );
 
-  await page.goto("/");
+  await page.goto("/cases");
   await signIn(page);
   await page.getByRole("button", { name: "Upload evidence" }).click();
 
