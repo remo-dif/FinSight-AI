@@ -23,6 +23,8 @@ from evaluation.baseline_contract import (
     validate_baseline,
 )
 from evaluation.compare_baseline import compare, failure
+from evaluation.evidence_mapping import map_evidence
+from evaluation.schemas import DATA_DIRECTORY
 
 ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP_BASE = "5a388bedbc66a1e6283db5ab10baa46ce1489b95"
@@ -57,10 +59,27 @@ def context_for_checkout(*, python=None, environment=None, dependencies_sha256=N
     from evaluation.schemas import load_document_dataset
 
     bundle = load_document_dataset()
+    # verify_pdf requires the extracted text to equal the corpus after whitespace
+    # normalization, so the validated source supplies the same token coordinates.
+    spans = {
+        doc.key: map_evidence(
+            (DATA_DIRECTORY / "corpus" / doc.path).read_text(encoding="utf-8"),
+            {passage.key: passage.text for passage in doc.evidence},
+        )
+        for doc in bundle.corpus.documents
+    }
     retrieval = {}
     answers = {}
     for case in bundle.dataset.cases:
-        retrieval[case.id, ""] = {"track": track_for(case), "scope": case.document_scope}
+        references = sorted((ref.document_key, ref.evidence_key) for ref in case.relevant_evidence)
+        retrieval[case.id, ""] = {
+            "track": track_for(case),
+            "scope": case.document_scope,
+            "evidence": [
+                {"document": doc, "evidence_key": key, "span": list(spans[doc][key])}
+                for doc, key in references
+            ],
+        }
         answers[case.id, "baseline"] = {"outcome": case.expected_outcome, "grade": "pass"}
         for scenario in ADVERSARIAL.get(case.id, ()):
             answers[case.id, scenario.id] = {

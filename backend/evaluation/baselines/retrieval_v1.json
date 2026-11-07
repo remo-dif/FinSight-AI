@@ -48,8 +48,19 @@
               36
             ]
           }
-        ]
+        ],
+        "retrieved_count": 1
       },
+      "evidence": [
+        {
+          "document": "account-january",
+          "evidence_key": "closing",
+          "span": [
+            26,
+            36
+          ]
+        }
+      ],
       "id": "Q01",
       "metrics": {
         "chunk_precision": 0.2,
@@ -84,8 +95,19 @@
               30
             ]
           }
-        ]
+        ],
+        "retrieved_count": 1
       },
+      "evidence": [
+        {
+          "document": "expenses-january",
+          "evidence_key": "breakdown",
+          "span": [
+            3,
+            19
+          ]
+        }
+      ],
       "id": "Q02",
       "metrics": {
         "chunk_precision": 0.2,
@@ -120,8 +142,19 @@
               36
             ]
           }
-        ]
+        ],
+        "retrieved_count": 1
       },
+      "evidence": [
+        {
+          "document": "account-january",
+          "evidence_key": "closing",
+          "span": [
+            26,
+            36
+          ]
+        }
+      ],
       "id": "Q03",
       "metrics": {
         "chunk_precision": 0.2,
@@ -167,8 +200,27 @@
               30
             ]
           }
-        ]
+        ],
+        "retrieved_count": 2
       },
+      "evidence": [
+        {
+          "document": "account-january",
+          "evidence_key": "movements",
+          "span": [
+            12,
+            26
+          ]
+        },
+        {
+          "document": "expenses-january",
+          "evidence_key": "breakdown",
+          "span": [
+            3,
+            19
+          ]
+        }
+      ],
       "id": "Q04",
       "metrics": {
         "chunk_precision": 0.4,
@@ -204,8 +256,35 @@
               38
             ]
           }
-        ]
+        ],
+        "retrieved_count": 1
       },
+      "evidence": [
+        {
+          "document": "revenue-january",
+          "evidence_key": "cash",
+          "span": [
+            16,
+            24
+          ]
+        },
+        {
+          "document": "revenue-january",
+          "evidence_key": "recognized",
+          "span": [
+            3,
+            16
+          ]
+        },
+        {
+          "document": "revenue-january",
+          "evidence_key": "terminology",
+          "span": [
+            24,
+            38
+          ]
+        }
+      ],
       "id": "Q05",
       "metrics": {
         "chunk_precision": 0.2,
@@ -234,8 +313,10 @@
               36
             ]
           }
-        ]
+        ],
+        "retrieved_count": 1
       },
+      "evidence": [],
       "id": "Q06",
       "metrics": {
         "chunk_precision": null,
@@ -275,8 +356,10 @@
               36
             ]
           }
-        ]
+        ],
+        "retrieved_count": 2
       },
+      "evidence": [],
       "id": "Q07",
       "metrics": {
         "chunk_precision": null,
@@ -312,8 +395,27 @@
               36
             ]
           }
-        ]
+        ],
+        "retrieved_count": 1
       },
+      "evidence": [
+        {
+          "document": "budget-february",
+          "evidence_key": "budget",
+          "span": [
+            3,
+            18
+          ]
+        },
+        {
+          "document": "budget-february",
+          "evidence_key": "draft",
+          "span": [
+            18,
+            36
+          ]
+        }
+      ],
       "id": "Q08",
       "metrics": {
         "chunk_precision": 0.2,
@@ -359,8 +461,19 @@
               22
             ]
           }
-        ]
+        ],
+        "retrieved_count": 2
       },
+      "evidence": [
+        {
+          "document": "account-january",
+          "evidence_key": "closing",
+          "span": [
+            26,
+            36
+          ]
+        }
+      ],
       "id": "Q09",
       "metrics": {
         "chunk_precision": 0.2,
@@ -383,6 +496,7 @@
         "passed": true,
         "retrieval_called": false
       },
+      "evidence": [],
       "id": "Q10",
       "metrics": {
         "chunk_precision": null,
@@ -404,6 +518,7 @@
         "passed": true,
         "retrieval_called": false
       },
+      "evidence": [],
       "id": "Q11",
       "metrics": {
         "chunk_precision": null,
@@ -433,8 +548,10 @@
               22
             ]
           }
-        ]
+        ],
+        "retrieved_count": 1
       },
+      "evidence": [],
       "id": "Q12",
       "metrics": {
         "chunk_precision": null,
@@ -469,8 +586,19 @@
               30
             ]
           }
-        ]
+        ],
+        "retrieved_count": 1
       },
+      "evidence": [
+        {
+          "document": "expenses-january",
+          "evidence_key": "refund-policy",
+          "span": [
+            19,
+            30
+          ]
+        }
+      ],
       "id": "Q13",
       "metrics": {
         "chunk_precision": 0.2,
@@ -527,8 +655,51 @@
               38
             ]
           }
-        ]
+        ],
+        "retrieved_count": 3
       },
+      "evidence": [
+        {
+          "document": "account-january",
+          "evidence_key": "closing",
+          "span": [
+            26,
+            36
+          ]
+        },
+        {
+          "document": "account-january",
+          "evidence_key": "movements",
+          "span": [
+            12,
+            26
+          ]
+        },
+        {
+          "document": "account-january",
+          "evidence_key": "opening",
+          "span": [
+            3,
+            12
+          ]
+        },
+        {
+          "document": "expenses-january",
+          "evidence_key": "breakdown",
+          "span": [
+            3,
+            19
+          ]
+        },
+        {
+          "document": "revenue-january",
+          "evidence_key": "cash",
+          "span": [
+            16,
+            24
+          ]
+        }
+      ],
       "id": "Q14",
       "metrics": {
         "chunk_precision": 0.6,
@@ -591,8 +762,8 @@
     }
   },
   "metric_contract_version": 1,
-  "normalization_version": 1,
-  "sha256": "5dba1a30e27c789e1d1726f2c90a26a7991a3d0d4763a20dc3f5e41d52eb48b9",
+  "normalization_version": 2,
+  "sha256": "e29f56d93d11b9a9cb376a7bbf669e5b28296547d9fb22ad8ef30fab3299307b",
   "source": {
     "dependencies_sha256": "f02894903c1269c695107835c65b506088e44d86b4d59aac4decec36466c1286",
     "environment": "Linux-x86_64",

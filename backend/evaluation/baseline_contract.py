@@ -8,6 +8,7 @@ from pathlib import Path
 
 from evaluation.answer_metrics import METRICS as ANSWER_METRICS
 from evaluation.retrieval_metrics import METRICS as RETRIEVAL_METRICS
+from evaluation.retrieval_metrics import score_at_k
 
 TOLERANCE = 1e-12
 TYPES = ("retrieval", "answer")
@@ -20,7 +21,7 @@ API_STATES = {
     "provider_error",
     "extractive_preview",
 }
-VERSIONS = {"baseline_schema_version": 1, "normalization_version": 1, "metric_contract_version": 1}
+VERSIONS = {"baseline_schema_version": 1, "normalization_version": 2, "metric_contract_version": 1}
 
 
 class ContractError(ValueError):
@@ -149,6 +150,32 @@ def verify_authorization(data, status):
     return {"http_status": status, **flags}
 
 
+def read_span(span):
+    require(isinstance(span, list) and len(span) == 2, "span")
+    start, end = span
+    require(count(start, "span_start") < count(end, "span_end"), "span")
+    return start, end
+
+
+def verify_retrieval_metrics(row, k):
+    entries = row["evidence"]
+    require(isinstance(entries, list), "evidence_geometry")
+    evidence = {}
+    for entry in entries:
+        exact_fields(entry, "document", "evidence_key", "span")
+        document = token(entry["document"], "evidence_document")
+        key = document, token(entry["evidence_key"], "evidence_key")
+        require(document in row["scope"] and key not in evidence, "evidence_geometry")
+        evidence[key] = read_span(entry["span"])
+    require(list(evidence) == sorted(evidence), "evidence_order")
+    require(bool(evidence) == bool(row["applicable"]), "evidence_applicability", "hard_failure")
+    ranking = row.get("diagnostics", {}).get("ranking", [])
+    ranked_spans = [(item["document"], tuple(item["span"])) for item in ranking]
+    verify_summary(
+        row["metrics"], score_at_k(ranked_spans, evidence, k), "retrieval_metric_consistency"
+    )
+
+
 def normalize_ranking(row, identity, documents):
     result = row.get("results")
     require(isinstance(result, list), "ranked_results")
@@ -169,9 +196,7 @@ def normalize_ranking(row, identity, documents):
         )
         count(item["chunk_index"], "chunk_index")
         hash_value(item["chunk_sha256"], "chunk_sha256")
-        span = item["span"]
-        require(isinstance(span, list) and len(span) == 2, "span")
-        require(count(span[0], "span_start") < count(span[1], "span_end"), "span")
+        read_span(item["span"])
         numeric(item["score"], "score", -1, 1)
         ranking.append(item)
     return ranking
@@ -184,8 +209,8 @@ def normalize_retrieval(row, identity, expected):
         "track",
     )
     require(row.get("status") == "ok", "retrieval_case_status", "hard_failure")
-    if expected:
-        require(track == expected["track"], "track", "hard_failure")
+    require(expected is not None, "case_population", "hard_failure")
+    require(track == expected["track"], "track", "hard_failure")
     metrics = metric_map(row.get("metrics"), RETRIEVAL_METRICS)
     applicable = list(RETRIEVAL_METRICS) if track in {"retrieval", "conflict"} else []
     require(
@@ -193,13 +218,14 @@ def normalize_retrieval(row, identity, expected):
         "retrieval_applicability",
         "hard_failure",
     )
-    scope = sorted(expected["scope"]) if expected else []
+    scope = sorted(expected["scope"])
     normalized = {
         "id": row["id"],
         "track": track,
         "applicable": applicable,
         "metrics": metrics,
         "scope": scope,
+        "evidence": expected["evidence"],
     }
     if track == "authorization":
         require("results" not in row, "authorization_results", "hard_failure")
@@ -207,8 +233,11 @@ def normalize_retrieval(row, identity, expected):
         status = fields(auth, "http_status")["http_status"]
         normalized["authorization"] = verify_authorization(auth, status)
     else:
-        documents = scope
-        normalized["diagnostics"] = {"ranking": normalize_ranking(row, identity, documents)}
+        normalized["diagnostics"] = {
+            "ranking": normalize_ranking(row, identity, scope),
+            "retrieved_count": row["retrieved_count"],
+        }
+    verify_retrieval_metrics(normalized, identity["retrieval"]["k"])
     return normalized
 
 
@@ -680,7 +709,12 @@ def _validate_normalized_case(kind, row, identity):
         )
         require((track == "authorization") == authorization, "authorization_track", "hard_failure")
         exact_fields(
-            row, *common, "track", "scope", "authorization" if authorization else "diagnostics"
+            row,
+            *common,
+            "track",
+            "scope",
+            "evidence",
+            "authorization" if authorization else "diagnostics",
         )
         scope = row["scope"]
         require(isinstance(scope, list) and bool(scope), "document_scope")
@@ -697,18 +731,19 @@ def _validate_normalized_case(kind, row, identity):
             "hard_failure",
         )
         if not authorization:
-            exact_fields(row["diagnostics"], "ranking")
+            exact_fields(row["diagnostics"], "ranking", "retrieved_count")
             ranking = row["diagnostics"]["ranking"]
             require(isinstance(ranking, list), "ranking")
             require(
                 normalize_ranking(
-                    {"results": ranking, "retrieved_count": len(ranking)},
+                    {"results": ranking, "retrieved_count": row["diagnostics"]["retrieved_count"]},
                     identity,
                     scope,
                 )
                 == ranking,
                 "ranking_fields",
             )
+        verify_retrieval_metrics(row, identity["retrieval"]["k"])
     else:
         fields(row, "scenario", "outcome", "http_status", "api_status", "grade")
         token(row["scenario"], "scenario")

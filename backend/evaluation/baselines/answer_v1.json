@@ -1095,8 +1095,8 @@
     "stimulus_sha256": "20048a3d620e707181d66eb7f745e25462bf22d3229e8187f458db1e19fd5bf5"
   },
   "metric_contract_version": 1,
-  "normalization_version": 1,
-  "sha256": "a829540e68c17e5e34544b9e3c7e1f8ea95ad5cd239b399eab2e42ddee31d4be",
+  "normalization_version": 2,
+  "sha256": "283d5cc989fc5243ad5f8b731bc44bb7b8562cb5819bcadcf770c9e4145b8362",
   "source": {
     "dependencies_sha256": "f02894903c1269c695107835c65b506088e44d86b4d59aac4decec36466c1286",
     "environment": "Linux-x86_64",
