@@ -92,3 +92,40 @@ test("keyboard focus has a visible indicator", async ({ page }) => {
   expect(Number.parseFloat(outline.width)).toBeGreaterThan(0);
   expect(outline.color).not.toBe("rgba(0, 0, 0, 0)");
 });
+
+test("each desktop case has one native selection control", async ({ page }) => {
+  test.skip((page.viewportSize()?.width ?? 1280) < 768, "table semantics apply at the md breakpoint and above");
+
+  await page.goto("/");
+  const table = page.getByRole("table", { name: "Fraud cases with case, assignee, merchant, signal, amount, and status" });
+  const rows = table.locator("tbody tr");
+  await expect(rows).toHaveCount(3);
+
+  for (const row of await rows.all()) {
+    await expect(row).not.toHaveAttribute("tabindex");
+    await expect(row.getByRole("button")).toHaveCount(1);
+  }
+
+  const caseButton = rows.nth(1).getByRole("button", { name: "CASE-1038" });
+  await caseButton.focus();
+  await page.keyboard.press("Enter");
+  await expect(caseButton).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("region", { name: "Selected alert" })).toContainText("CASE-1038");
+});
+
+test("mobile case selection moves focus directly to the detail", async ({ page }) => {
+  test.skip((page.viewportSize()?.width ?? 1280) >= 768, "the mobile case list is rendered below the md breakpoint");
+
+  await page.goto("/");
+  const caseButton = page.getByRole("list", { name: "Fraud cases" }).getByRole("button").filter({ hasText: "CASE-1038" });
+  await caseButton.click();
+
+  const detailHeading = page.getByRole("heading", { name: "Selected alert" });
+  await expect(detailHeading).toBeFocused();
+  await expect(page.getByRole("region", { name: "Selected alert" })).toContainText("CASE-1038");
+  const geometry = await page.evaluate(() => ({
+    headerBottom: document.querySelector("header")?.getBoundingClientRect().bottom ?? 0,
+    headingTop: document.getElementById("selected-alert-heading")?.getBoundingClientRect().top ?? 0
+  }));
+  expect(geometry.headingTop).toBeGreaterThanOrEqual(geometry.headerBottom + 8);
+});
