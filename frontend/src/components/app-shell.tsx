@@ -111,7 +111,7 @@ export function AppShell({
                   <item.icon aria-hidden className="h-4 w-4" />
                   {item.label}
                   {item.comingSoon ? (
-                    <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide">Soon</span>
+                    <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide">Coming soon</span>
                   ) : null}
                 </Link>
               );
@@ -127,7 +127,7 @@ export function AppShell({
             >
               <Settings aria-hidden className="h-4 w-4" />
               Controls
-              <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide">Soon</span>
+              <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide">Coming soon</span>
             </Link>
           </div>
         </aside>
@@ -153,7 +153,7 @@ export function AppShell({
                   >
                     <item.icon aria-hidden className="h-4 w-4" />
                     {item.label}
-                    {item.comingSoon ? <span className="text-[10px] font-semibold uppercase tracking-wide">Soon</span> : null}
+                    {item.comingSoon ? <span className="text-[10px] font-semibold uppercase tracking-wide">Coming soon</span> : null}
                   </Link>
                 );
               })}
