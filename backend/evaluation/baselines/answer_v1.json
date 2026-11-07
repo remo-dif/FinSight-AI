@@ -1,0 +1,1107 @@
+{
+  "aggregates": {
+    "executed": 14,
+    "execution_error": 0,
+    "fail": 0,
+    "metrics": {
+      "abstention_correctness": {
+        "applicable": 3,
+        "evaluated": 3,
+        "mean": 1.0
+      },
+      "answer_correctness": {
+        "applicable": 8,
+        "evaluated": 8,
+        "mean": 1.0
+      },
+      "citation_completeness": {
+        "applicable": 8,
+        "evaluated": 8,
+        "mean": 1.0
+      },
+      "citation_precision": {
+        "applicable": 8,
+        "evaluated": 8,
+        "mean": 1.0
+      },
+      "citation_presence": {
+        "applicable": 8,
+        "evaluated": 8,
+        "mean": 1.0
+      },
+      "citation_validity": {
+        "applicable": 8,
+        "evaluated": 8,
+        "mean": 1.0
+      },
+      "claim_support": {
+        "applicable": 8,
+        "evaluated": 8,
+        "mean": 1.0
+      },
+      "required_fact_completeness": {
+        "applicable": 8,
+        "evaluated": 8,
+        "mean": 1.0
+      }
+    },
+    "needs_review": 0,
+    "not_applicable": 0,
+    "pass": 14,
+    "planned": 14,
+    "skipped": 0
+  },
+  "baseline_schema_version": 1,
+  "cases": [
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 1,
+        "prompt_hash": "355e91e90283e74fdde1fc9237c7968c6b16bd94f5354c9177132b385015d26a",
+        "public_citation_count": 1,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "pass",
+      "grade": "pass",
+      "http_status": 200,
+      "id": "Q01",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 1.0,
+        "citation_completeness": 1.0,
+        "citation_precision": 1.0,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": 1.0,
+        "required_fact_completeness": 1.0
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "baseline"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 1,
+        "prompt_hash": "bb673ba6fe8f6f311ded6afb28ae01df93bb0ff2b15c41dd151aa5c71e31157e",
+        "public_citation_count": 1,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "pass",
+      "grade": "pass",
+      "http_status": 200,
+      "id": "Q02",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 1.0,
+        "citation_completeness": 1.0,
+        "citation_precision": 1.0,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": 1.0,
+        "required_fact_completeness": 1.0
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "baseline"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 1,
+        "prompt_hash": "c2e405020108946e0d1d64ab38d9146f261c98a71647e0f0f536460a8a39adb4",
+        "public_citation_count": 1,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "pass",
+      "grade": "pass",
+      "http_status": 200,
+      "id": "Q03",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 1.0,
+        "citation_completeness": 1.0,
+        "citation_precision": 1.0,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": 1.0,
+        "required_fact_completeness": 1.0
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "baseline"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 2,
+        "prompt_hash": "1c1ed9df651278f674e764b6c1b1435e0b00dbc70ba674fd0acc42f845473dea",
+        "public_citation_count": 2,
+        "raw_reference_count": 2
+      },
+      "draft_warning": null,
+      "expected_grade": "pass",
+      "grade": "pass",
+      "http_status": 200,
+      "id": "Q04",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 1.0,
+        "citation_completeness": 1.0,
+        "citation_precision": 1.0,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": 1.0,
+        "required_fact_completeness": 1.0
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "baseline"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 2,
+        "prompt_hash": "1c1ed9df651278f674e764b6c1b1435e0b00dbc70ba674fd0acc42f845473dea",
+        "public_citation_count": 1,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "fail",
+      "grade": "fail",
+      "http_status": 200,
+      "id": "Q04",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 1.0,
+        "citation_completeness": 0.0,
+        "citation_precision": 0.0,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": 0.0,
+        "required_fact_completeness": 1.0
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "incomplete_citations"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 1,
+        "prompt_hash": "0dd4b61fd5b9f905c5e0cc380661a75d82c813c860eea4525d96a027b82791bb",
+        "public_citation_count": 1,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "pass",
+      "grade": "pass",
+      "http_status": 200,
+      "id": "Q05",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 1.0,
+        "citation_completeness": 1.0,
+        "citation_precision": 1.0,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": 1.0,
+        "required_fact_completeness": 1.0
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "baseline"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 1,
+        "prompt_hash": "0dd4b61fd5b9f905c5e0cc380661a75d82c813c860eea4525d96a027b82791bb",
+        "public_citation_count": 1,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "fail",
+      "grade": "fail",
+      "http_status": 200,
+      "id": "Q05",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 0.0,
+        "citation_completeness": 0.75,
+        "citation_precision": 1.0,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": 0.75,
+        "required_fact_completeness": 0.75
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "incorrect_causality"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 1,
+        "prompt_hash": "0dd4b61fd5b9f905c5e0cc380661a75d82c813c860eea4525d96a027b82791bb",
+        "public_citation_count": 1,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "fail",
+      "grade": "fail",
+      "http_status": 200,
+      "id": "Q05",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 0.0,
+        "citation_completeness": 0.75,
+        "citation_precision": 1.0,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": 1.0,
+        "required_fact_completeness": 0.75
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "missing_causality"
+    },
+    {
+      "api_status": "abstained",
+      "applicable": [
+        "abstention_correctness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 1,
+        "prompt_hash": "8a626be68c3e82dc1d6dc77a29fc9900a73302c10504585b01f80631ac3875d4",
+        "public_citation_count": 0,
+        "raw_reference_count": 0
+      },
+      "draft_warning": null,
+      "expected_grade": "pass",
+      "grade": "pass",
+      "http_status": 200,
+      "id": "Q06",
+      "metrics": {
+        "abstention_correctness": 1.0,
+        "answer_correctness": null,
+        "citation_completeness": null,
+        "citation_precision": null,
+        "citation_presence": null,
+        "citation_validity": null,
+        "claim_support": null,
+        "required_fact_completeness": null
+      },
+      "outcome": "abstention_required",
+      "parsed_status": "abstained",
+      "scenario": "baseline"
+    },
+    {
+      "api_status": "abstained",
+      "applicable": [
+        "abstention_correctness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 1,
+        "prompt_hash": "8a626be68c3e82dc1d6dc77a29fc9900a73302c10504585b01f80631ac3875d4",
+        "public_citation_count": 0,
+        "raw_reference_count": 0
+      },
+      "draft_warning": "discarded_unexpected_claim",
+      "expected_grade": "pass",
+      "grade": "pass",
+      "http_status": 200,
+      "id": "Q06",
+      "metrics": {
+        "abstention_correctness": 1.0,
+        "answer_correctness": null,
+        "citation_completeness": null,
+        "citation_precision": null,
+        "citation_presence": null,
+        "citation_validity": null,
+        "claim_support": null,
+        "required_fact_completeness": null
+      },
+      "outcome": "abstention_required",
+      "parsed_status": "abstained",
+      "scenario": "discarded_fabrication"
+    },
+    {
+      "api_status": "provider_error",
+      "applicable": [
+        "abstention_correctness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 1,
+        "prompt_hash": "8a626be68c3e82dc1d6dc77a29fc9900a73302c10504585b01f80631ac3875d4",
+        "public_citation_count": 0,
+        "raw_reference_count": 0
+      },
+      "draft_warning": null,
+      "expected_grade": "execution_error",
+      "grade": "execution_error",
+      "http_status": 200,
+      "id": "Q06",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": null,
+        "citation_completeness": null,
+        "citation_precision": null,
+        "citation_presence": null,
+        "citation_validity": null,
+        "claim_support": null,
+        "required_fact_completeness": null
+      },
+      "outcome": "abstention_required",
+      "parsed_status": "provider_error",
+      "scenario": "malformed_json"
+    },
+    {
+      "api_status": "provider_error",
+      "applicable": [
+        "abstention_correctness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 1,
+        "prompt_hash": "8a626be68c3e82dc1d6dc77a29fc9900a73302c10504585b01f80631ac3875d4",
+        "public_citation_count": 0,
+        "raw_reference_count": 0
+      },
+      "draft_warning": null,
+      "expected_grade": "execution_error",
+      "grade": "execution_error",
+      "http_status": 200,
+      "id": "Q06",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": null,
+        "citation_completeness": null,
+        "citation_precision": null,
+        "citation_presence": null,
+        "citation_validity": null,
+        "claim_support": null,
+        "required_fact_completeness": null
+      },
+      "outcome": "abstention_required",
+      "parsed_status": "provider_error",
+      "scenario": "provider_failure"
+    },
+    {
+      "api_status": "abstained",
+      "applicable": [
+        "abstention_correctness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 2,
+        "prompt_hash": "03cc8a725500a9f47aca236b5c5095dfc08c0795d3080083d6e44e96e769bbc2",
+        "public_citation_count": 0,
+        "raw_reference_count": 0
+      },
+      "draft_warning": null,
+      "expected_grade": "pass",
+      "grade": "pass",
+      "http_status": 200,
+      "id": "Q07",
+      "metrics": {
+        "abstention_correctness": 1.0,
+        "answer_correctness": null,
+        "citation_completeness": null,
+        "citation_precision": null,
+        "citation_presence": null,
+        "citation_validity": null,
+        "claim_support": null,
+        "required_fact_completeness": null
+      },
+      "outcome": "abstention_required",
+      "parsed_status": "abstained",
+      "scenario": "baseline"
+    },
+    {
+      "api_status": "abstained",
+      "applicable": [],
+      "conflict_draft": "pass",
+      "diagnostics": {
+        "prompt_chunks": 1,
+        "prompt_hash": "288c03d2ab014c900e4d88c8d71e1c165443363f041c055dc62561ed1104c4a1",
+        "public_citation_count": 0,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "pass",
+      "grade": "pass",
+      "http_status": 200,
+      "id": "Q08",
+      "metrics": {
+        "abstention_correctness": 1.0,
+        "answer_correctness": null,
+        "citation_completeness": null,
+        "citation_precision": null,
+        "citation_presence": null,
+        "citation_validity": null,
+        "claim_support": null,
+        "required_fact_completeness": null
+      },
+      "outcome": "abstention_required",
+      "parsed_status": "abstained",
+      "public_conflict_explanation": "unobservable",
+      "scenario": "baseline"
+    },
+    {
+      "api_status": "abstained",
+      "applicable": [],
+      "conflict_draft": "fail",
+      "diagnostics": {
+        "prompt_chunks": 1,
+        "prompt_hash": "288c03d2ab014c900e4d88c8d71e1c165443363f041c055dc62561ed1104c4a1",
+        "public_citation_count": 0,
+        "raw_reference_count": 0
+      },
+      "draft_warning": null,
+      "expected_grade": "pass",
+      "grade": "pass",
+      "http_status": 200,
+      "id": "Q08",
+      "metrics": {
+        "abstention_correctness": 1.0,
+        "answer_correctness": null,
+        "citation_completeness": null,
+        "citation_precision": null,
+        "citation_presence": null,
+        "citation_validity": null,
+        "claim_support": null,
+        "required_fact_completeness": null
+      },
+      "outcome": "abstention_required",
+      "parsed_status": "abstained",
+      "public_conflict_explanation": "unobservable",
+      "scenario": "discarded_reconciliation"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [],
+      "conflict_draft": "fail",
+      "diagnostics": {
+        "prompt_chunks": 1,
+        "prompt_hash": "288c03d2ab014c900e4d88c8d71e1c165443363f041c055dc62561ed1104c4a1",
+        "public_citation_count": 1,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "fail",
+      "grade": "fail",
+      "http_status": 200,
+      "id": "Q08",
+      "metrics": {
+        "abstention_correctness": 0.0,
+        "answer_correctness": null,
+        "citation_completeness": null,
+        "citation_precision": null,
+        "citation_presence": null,
+        "citation_validity": null,
+        "claim_support": null,
+        "required_fact_completeness": null
+      },
+      "outcome": "abstention_required",
+      "parsed_status": "ok",
+      "public_conflict_explanation": "delivered",
+      "scenario": "unilateral_choice"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 2,
+        "prompt_hash": "64bb933072b4e37860312425c6107e18b430662fbee824b33cfb7243387fa31c",
+        "public_citation_count": 1,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "needs_review",
+      "grade": "needs_review",
+      "http_status": 200,
+      "id": "Q09",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": null,
+        "citation_completeness": null,
+        "citation_precision": null,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": null,
+        "required_fact_completeness": null
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "ambiguous_prose"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 2,
+        "prompt_hash": "64bb933072b4e37860312425c6107e18b430662fbee824b33cfb7243387fa31c",
+        "public_citation_count": 1,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "pass",
+      "grade": "pass",
+      "http_status": 200,
+      "id": "Q09",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 1.0,
+        "citation_completeness": 1.0,
+        "citation_precision": 1.0,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": 1.0,
+        "required_fact_completeness": 1.0
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "baseline"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 2,
+        "prompt_hash": "64bb933072b4e37860312425c6107e18b430662fbee824b33cfb7243387fa31c",
+        "public_citation_count": 1,
+        "raw_reference_count": 2
+      },
+      "draft_warning": null,
+      "expected_grade": "pass",
+      "grade": "pass",
+      "http_status": 200,
+      "id": "Q09",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 1.0,
+        "citation_completeness": 1.0,
+        "citation_precision": 1.0,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": 1.0,
+        "required_fact_completeness": 1.0
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "duplicate_reference"
+    },
+    {
+      "api_status": "abstained",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 2,
+        "prompt_hash": "64bb933072b4e37860312425c6107e18b430662fbee824b33cfb7243387fa31c",
+        "public_citation_count": 0,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "fail",
+      "grade": "fail",
+      "http_status": 200,
+      "id": "Q09",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 0.0,
+        "citation_completeness": 0.0,
+        "citation_precision": null,
+        "citation_presence": 0.0,
+        "citation_validity": null,
+        "claim_support": null,
+        "required_fact_completeness": 0.0
+      },
+      "outcome": "answerable",
+      "parsed_status": "abstained",
+      "scenario": "foreign_reference"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 2,
+        "prompt_hash": "64bb933072b4e37860312425c6107e18b430662fbee824b33cfb7243387fa31c",
+        "public_citation_count": 1,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "fail",
+      "grade": "fail",
+      "http_status": 200,
+      "id": "Q09",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 0.0,
+        "citation_completeness": 1.0,
+        "citation_precision": 1.0,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": 0.5,
+        "required_fact_completeness": 1.0
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "invented_detail"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 2,
+        "prompt_hash": "64bb933072b4e37860312425c6107e18b430662fbee824b33cfb7243387fa31c",
+        "public_citation_count": 1,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "fail",
+      "grade": "fail",
+      "http_status": 200,
+      "id": "Q09",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 1.0,
+        "citation_completeness": 0.0,
+        "citation_precision": 0.0,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": 0.0,
+        "required_fact_completeness": 1.0
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "irrelevant_citation"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 2,
+        "prompt_hash": "64bb933072b4e37860312425c6107e18b430662fbee824b33cfb7243387fa31c",
+        "public_citation_count": 1,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "fail",
+      "grade": "fail",
+      "http_status": 200,
+      "id": "Q09",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 0.0,
+        "citation_completeness": 0.0,
+        "citation_precision": 0.0,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": 0.0,
+        "required_fact_completeness": 0.0
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "negated_amount"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 2,
+        "prompt_hash": "64bb933072b4e37860312425c6107e18b430662fbee824b33cfb7243387fa31c",
+        "public_citation_count": 1,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "fail",
+      "grade": "fail",
+      "http_status": 200,
+      "id": "Q09",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 0.0,
+        "citation_completeness": 0.0,
+        "citation_precision": 0.0,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": 0.0,
+        "required_fact_completeness": 0.0
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "wrong_currency"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 2,
+        "prompt_hash": "64bb933072b4e37860312425c6107e18b430662fbee824b33cfb7243387fa31c",
+        "public_citation_count": 1,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "fail",
+      "grade": "fail",
+      "http_status": 200,
+      "id": "Q09",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 0.0,
+        "citation_completeness": 0.0,
+        "citation_precision": 0.0,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": 0.0,
+        "required_fact_completeness": 0.0
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "wrong_period"
+    },
+    {
+      "api_status": null,
+      "applicable": [],
+      "authorization": {
+        "generation_called": false,
+        "http_status": 404,
+        "passed": true,
+        "retrieval_called": false
+      },
+      "grade": "pass",
+      "http_status": 404,
+      "id": "Q10",
+      "metrics": {},
+      "outcome": "authorization_denied",
+      "scenario": "baseline"
+    },
+    {
+      "api_status": null,
+      "applicable": [],
+      "authorization": {
+        "generation_called": false,
+        "http_status": 404,
+        "passed": true,
+        "retrieval_called": false
+      },
+      "grade": "pass",
+      "http_status": 404,
+      "id": "Q11",
+      "metrics": {},
+      "outcome": "authorization_denied",
+      "scenario": "baseline"
+    },
+    {
+      "api_status": "abstained",
+      "applicable": [
+        "abstention_correctness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 1,
+        "prompt_hash": "70aee22d4bf8c3a2c16199a4a36c4ad587672dafc7bad74e52fc7f7568bed703",
+        "public_citation_count": 0,
+        "raw_reference_count": 0
+      },
+      "draft_warning": null,
+      "expected_grade": "pass",
+      "grade": "pass",
+      "http_status": 200,
+      "id": "Q12",
+      "metrics": {
+        "abstention_correctness": 1.0,
+        "answer_correctness": null,
+        "citation_completeness": null,
+        "citation_precision": null,
+        "citation_presence": null,
+        "citation_validity": null,
+        "claim_support": null,
+        "required_fact_completeness": null
+      },
+      "outcome": "abstention_required",
+      "parsed_status": "abstained",
+      "scenario": "baseline"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 1,
+        "prompt_hash": "0750674501aa02087d1cf08b1f5f3fcb77d593655b7bf7f65b48d19009ed9b68",
+        "public_citation_count": 1,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "pass",
+      "grade": "pass",
+      "http_status": 200,
+      "id": "Q13",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 1.0,
+        "citation_completeness": 1.0,
+        "citation_precision": 1.0,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": 1.0,
+        "required_fact_completeness": 1.0
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "baseline"
+    },
+    {
+      "api_status": "ok",
+      "applicable": [
+        "answer_correctness",
+        "citation_completeness",
+        "citation_precision",
+        "citation_presence",
+        "citation_validity",
+        "claim_support",
+        "required_fact_completeness"
+      ],
+      "diagnostics": {
+        "prompt_chunks": 3,
+        "prompt_hash": "b776138f4d478798e826dee8c1eb820da080b92efa506f3e58af3a798c09830c",
+        "public_citation_count": 1,
+        "raw_reference_count": 1
+      },
+      "draft_warning": null,
+      "expected_grade": "pass",
+      "grade": "pass",
+      "http_status": 200,
+      "id": "Q14",
+      "metrics": {
+        "abstention_correctness": null,
+        "answer_correctness": 1.0,
+        "citation_completeness": 1.0,
+        "citation_precision": 1.0,
+        "citation_presence": 1.0,
+        "citation_validity": 1.0,
+        "claim_support": 1.0,
+        "required_fact_completeness": 1.0
+      },
+      "outcome": "answerable",
+      "parsed_status": "ok",
+      "scenario": "baseline"
+    }
+  ],
+  "evaluation_type": "answer",
+  "execution": {
+    "complete": true,
+    "errors": 0,
+    "executed": 30,
+    "planned": 30,
+    "skipped": 0
+  },
+  "identity": {
+    "chunking": {
+      "overlap": 64,
+      "size": 512,
+      "units": "whitespace"
+    },
+    "corpus_hashes": {
+      "account-january": "222aef4871ca575fb6c04ccc7b7b30e80784a70735404ae54d2aa61307c9ecac",
+      "budget-february": "f6dcae2936e896ef3d36fb8c0f50c8db87a0e8a4302bafcde9a27e2df765f317",
+      "distractor-usd": "47468a64d968ac517a46a9086b535c3191a6b8b7a7bc46e1262adc5b06df86ca",
+      "expenses-january": "991510024846c869670146d89105c3f93d8f831fb7624a8413a460e825815b38",
+      "private-plan": "8e08f28c5472edeaf081ff8f904f8676d6f6f3749c1d08e7a5083e2a0c022ebb",
+      "revenue-january": "5710a2b9d1521db2099d6e6342fb0058efe7cb0cfc17b2b4b3b53a34b4e8fb2c"
+    },
+    "corpus_version": "1.0.0",
+    "database": {
+      "backend": "postgresql",
+      "hnsw_present": false,
+      "pgvector_version": "0.8.7"
+    },
+    "dataset_schema_version": 2,
+    "dataset_sha256": "48809598e9d90412d161998242f3031f1aca4b864e76731bc5f4786c03a2e0ea",
+    "dataset_version": "1.1.0",
+    "embedding": {
+      "backend": "local",
+      "dimensions": 1536,
+      "model": "deterministic-local-hash-v2"
+    },
+    "generation_parameters": {
+      "format": "json_object",
+      "max_tokens": 450,
+      "model": "gpt-4o",
+      "temperature": 0.0
+    },
+    "mode": "deterministic_fake",
+    "pgvector_image": "pgvector/pgvector@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a",
+    "renderer": "winansi-wrapped-v1",
+    "report_version": 1,
+    "retrieval": {
+      "k": 5,
+      "min_score": 0.05
+    },
+    "rubric_sha256": "8889a0fa137100a9a188376b51f0f581afbd404d4d8aeeb8564de30c1132f7d0",
+    "rubric_version": "1.1.0",
+    "stimulus_sha256": "20048a3d620e707181d66eb7f745e25462bf22d3229e8187f458db1e19fd5bf5"
+  },
+  "metric_contract_version": 1,
+  "normalization_version": 2,
+  "sha256": "283d5cc989fc5243ad5f8b731bc44bb7b8562cb5819bcadcf770c9e4145b8362",
+  "source": {
+    "dependencies_sha256": "f02894903c1269c695107835c65b506088e44d86b4d59aac4decec36466c1286",
+    "environment": "Linux-x86_64",
+    "git_commit": "5a388bedbc66a1e6283db5ab10baa46ce1489b95",
+    "python": "3.12.16",
+    "working_tree_dirty": false
+  }
+}
