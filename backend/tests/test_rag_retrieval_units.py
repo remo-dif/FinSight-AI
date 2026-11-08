@@ -116,3 +116,31 @@ def test_manual_metric_example():
     }
     assert set(score_at_k([], evidence, 5).values()) == {0}
     assert set(score_at_k(ranking, {}, 5).values()) == {None}
+
+
+def test_q14_complete_account_evidence_is_sufficient():
+    bundle = load_document_dataset()
+    case = next(case for case in bundle.dataset.cases if case.id == "Q14")
+    spans = {}
+    for document in bundle.corpus.documents:
+        source = (DATA_DIRECTORY / "corpus" / document.path).read_text(encoding="utf-8")
+        spans.update(
+            ((document.key, key), span)
+            for key, span in map_evidence(
+                source, {anchor.key: anchor.text for anchor in document.evidence}
+            ).items()
+        )
+    account = next(doc for doc in bundle.corpus.documents if doc.key == "account-january")
+    source = (DATA_DIRECTORY / "corpus" / account.path).read_text(encoding="utf-8")
+    gold = {
+        (ref.document_key, ref.evidence_key): spans[ref.document_key, ref.evidence_key]
+        for ref in case.relevant_evidence
+    }
+
+    scores = score_at_k([(account.key, (0, len(source.split())))], gold, 5)
+
+    assert scores["evidence_recall"] == scores["evidence_coverage"] == 1.0
+    assert set(gold) == {(account.key, key) for key in ("opening", "movements", "closing")}
+    assert case.expected_sources == [account.key]
+    assert set(case.document_scope) == {account.key, "revenue-january", "expenses-january"}
+    assert case.category == "distractor"

@@ -201,7 +201,7 @@ revenue-cash-relationship: uncollected-revenue explains revenue-cash-gap
 
 The numeric grammar accepts an optional sign, comma thousands grouping and dot decimals. Supported negation is an explicit not prefix before a typed value. The grader treats recognizable wrong values, polarity, currency, period and additional structured claims as failures. Prose or attribution outside the grammar requires review. Clearly detected contradictions still fail if the answer also contains unclassified text. Semantic metrics whose numerator may depend on unclassified text remain null. This grammar is for fixtures and leaves the application prompt and public API intact.
 
-Q02 requires the two requested categories and records the total as optional corroboration. Q04 requires both documents for the equality. Q05 requires the three amounts and the explanation that uncollected recognized revenue accounts for the difference. The relationship's sufficient evidence group includes the recognized revenue, cash receipts and terminology passages. Q09 excludes the USD distractor from sufficient evidence. Q13 records two separate negatives. Q14 requires the four amounts and the reconciliation using account evidence. Other corroborating documents are optional for its citations.
+Q02 requires the two requested categories and records the total as optional corroboration. Q04 requires both documents for the equality. Q05 requires the three amounts and the explanation that uncollected recognized revenue accounts for the difference. The relationship's sufficient evidence group includes the recognized revenue, cash receipts and terminology passages. Q09 excludes the USD distractor from sufficient evidence. Q13 records two separate negatives. Q14 requires the four amounts and the reconciliation using account evidence. The other authorized documents remain in scope as distractors. The schema has one scored evidence list and no separate optional-evidence field, so the revenue and expense passages do not enter the retrieval gold.
 
 ### Metrics and report interpretation
 
@@ -308,3 +308,30 @@ Promotion requires matching source SHA, clean source runs and reproducible norma
 The review reproduced an empty Q01 ranking with an unchanged positive metric report. Regression tests reject that mutation both before normalization and after normalization with a recomputed digest. The suite also checks wrong counts, distractor-only results, partial evidence, first relevant rank, conventional precision and novel evidence precision. A valid reorder that preserves all metric values remains diagnostic.
 
 Both baselines were regenerated through the explicit promotion command from the two verified clean-master source pairs used for PR4. The source commit, metrics, aggregates and ranking outcomes are unchanged. Normalization version 2 and the retained retrieval geometry change the canonical digests.
+
+
+### Phase 3A ground-truth correction
+
+Q05 now states the causal relationship in the dataset annotation as well as in the
+typed rubric. Its three supporting passages and the existing deterministic grading
+rules are unchanged. For Q14, the account's opening, movements and closing passages
+alone establish the reconciliation. The question, numerical answer and document
+scope are unchanged. Complete ALPHA evidence alone now gives recall and coverage
+of 1.0, up from 0.6 under the previous annotations.
+
+The dataset digest changed from
+`48809598e9d90412d161998242f3031f1aca4b864e76731bc5f4786c03a2e0ea` to
+`694958d93f195011317268445372bf849286405b13ed41d294feb50ab18e3610`.
+The rubric's dataset binding follows the corrected digest. Its fact and support
+definitions are unchanged.
+
+Both deterministic runners completed against local PostgreSQL/pgvector.
+The comparison against the existing trusted retrieval and answer baselines
+returned exit 3 for incompatible identities. The retrieval baseline disagrees on
+the dataset digest. The answer baseline disagrees on the dataset and rubric
+digests. For Q14's three-result ranking, chunk and novel evidence precision at 5
+both move from 0.6 to 0.2 because only one chunk covers required evidence.
+Recall, coverage and MRR remain 1.0 for that ranking. Across the eight retrieval
+cases, both precision means move from 0.275 to 0.225. These differences reflect
+the corrected gold. Both baseline files require a separate, reviewed promotion
+before the gate can pass. This correction leaves all tracked baselines intact.

@@ -191,6 +191,24 @@
               "evidence_key": "cash"
             }
           ]
+        },
+        {
+          "text": "The EUR 200.00 of recognized revenue not yet collected explains the difference between EUR 800.00 recognized revenue and EUR 600.00 cash receipts.",
+          "rationale": "Recognition and cash collection are different measures; the uncollected amount equals the January 2025 gap.",
+          "evidence": [
+            {
+              "document_key": "revenue-january",
+              "evidence_key": "recognized"
+            },
+            {
+              "document_key": "revenue-january",
+              "evidence_key": "cash"
+            },
+            {
+              "document_key": "revenue-january",
+              "evidence_key": "terminology"
+            }
+          ]
         }
       ],
       "forbidden_assertions": [],
@@ -446,7 +464,7 @@
     {
       "id": "Q14",
       "question": "Reconcile the ALPHA opening balance, receipts, payments and closing balance.",
-      "category": "multiple_documents",
+      "category": "distractor",
       "answerability": "answerable",
       "principal": "user-a",
       "document_scope": [
@@ -466,14 +484,6 @@
         {
           "document_key": "account-january",
           "evidence_key": "closing"
-        },
-        {
-          "document_key": "revenue-january",
-          "evidence_key": "cash"
-        },
-        {
-          "document_key": "expenses-january",
-          "evidence_key": "breakdown"
         }
       ],
       "required_assertions": [
@@ -499,9 +509,7 @@
       "forbidden_assertions": [],
       "expected_http_status": 200,
       "expected_sources": [
-        "account-january",
-        "expenses-january",
-        "revenue-january"
+        "account-january"
       ],
       "expected_outcome": "answerable",
       "expected_api_status": "ok"

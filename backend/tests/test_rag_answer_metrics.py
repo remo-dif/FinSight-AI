@@ -213,3 +213,19 @@ def test_q05_requires_causality_and_complete_evidence(
     assert result.metrics["required_fact_completeness"] == completeness
     assert result.metrics["claim_support"] == support
     assert result.metrics["citation_validity"] == 1
+
+
+def test_q05_dataset_annotation_requires_the_same_causal_evidence_as_rubric():
+    dataset = load_document_dataset().dataset
+    case = next(case for case in dataset.cases if case.id == "Q05")
+    relationship = next(fact for fact in RUBRICS["Q05"].facts if fact.kind == "relationship")
+    causal = [
+        assertion
+        for assertion in case.required_assertions
+        if "explains the difference" in assertion.text
+    ]
+
+    assert relationship.required
+    assert len(causal) == 1
+    assert "not yet collected" in causal[0].text
+    assert causal[0].evidence in relationship.support
