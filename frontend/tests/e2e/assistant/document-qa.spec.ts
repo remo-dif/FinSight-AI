@@ -31,7 +31,7 @@ async function openDocumentAssistant(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: "Close panel" }).click();
   await page.getByRole("button", { name: "Ask copilot" }).click();
   await page.getByRole("button", { name: "Document Q&A" }).click();
-  await expect(page.getByRole("option", { name: "statement.pdf" })).toBeVisible();
+  await expect(page.getByRole("option", { name: /statement\.pdf · uploaded 2026-10-01 · ID document/ })).toBeVisible();
   await expect(page.getByRole("option", { name: "not-indexed.csv" })).toHaveCount(0);
   return uploadsAuthorization;
 }
@@ -72,6 +72,16 @@ test("document Q&A sends authenticated selected scope and renders citations as t
           page: null,
           excerpt: "Revenue was 50.",
           reference: "doc:document-owned:chunk:0"
+        },
+        {
+          id: "doc:document-owned:chunk:1",
+          document_id: "document-owned",
+          document_name: "appendix.pdf",
+          chunk_id: "document-owned:1",
+          chunk_index: 1,
+          page: 2,
+          excerpt: "Additional context.",
+          reference: "doc:document-owned:chunk:1"
         }
       ],
       grounded: false,
@@ -85,8 +95,12 @@ test("document Q&A sends authenticated selected scope and renders citations as t
   await page.getByRole("button", { name: "Send message" }).click();
 
   await expect(page.getByText("References validated; claim-level support is not verified.")).toBeVisible();
+  await expect(page.getByText("Question scope")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Question scope" }).getByText(/statement\.pdf · uploaded 2026-10-01 · ID document/)).toBeVisible();
   await expect(page.getByText("Cited references")).toBeVisible();
-  await expect(page.getByText("statement.pdf · chunk 0")).toHaveCount(2);
+  await expect(page.getByText("Additional retrieved sources (not cited)")).toBeVisible();
+  await expect(page.getByText("statement.pdf · chunk 0")).toHaveCount(1);
+  await expect(page.getByText("appendix.pdf · chunk 1")).toBeVisible();
   await expect(page.getByText("Revenue was 50. <script>window.injected = true</script>")).toBeVisible();
   expect(requestBody).toMatchObject({
     message: "What is the revenue?",
@@ -96,6 +110,57 @@ test("document Q&A sends authenticated selected scope and renders citations as t
   expect(authorization).toBe("Bearer test-access-token");
   expect(uploadsAuthorization).toContain("Bearer test-access-token");
   expect(await page.evaluate(() => (window as Window & { injected?: boolean }).injected)).toBeUndefined();
+});
+
+test("document picker distinguishes duplicate filenames and response scope stays fixed", async ({ page, isMobile }) => {
+  test.skip(isMobile, "document assistant interaction is covered in the desktop project");
+  await mockLogin(page);
+  await mockDashboardData(page);
+  let releaseResponse!: () => void;
+  const responseBlocked = new Promise<void>((resolve) => { releaseResponse = resolve; });
+  await page.route("**/api/uploads**", async (route) => json(route, 200, [
+    { id: "11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa", filename: "statement.pdf", status: "indexed", created_at: "2026-10-01T10:00:00Z" },
+    { id: "22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb", filename: "statement.pdf", status: "indexed", created_at: "2026-10-02T10:00:00Z" }
+  ]));
+  await page.route("**/api/chat", async (route) => {
+    await responseBlocked;
+    return json(route, 200, {
+      session_id: null,
+      answer: "Scoped answer.",
+      review: "",
+      tool_results: {},
+      citations: [],
+      sources: [],
+      grounded: false,
+      abstained: true,
+      status: "insufficient_evidence",
+      grounding_note: "Claim-level support is not verified."
+    });
+  });
+
+  await page.goto("/cases");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
+  await page.getByRole("button", { name: "Close panel" }).click();
+  await page.getByRole("button", { name: "Ask copilot" }).click();
+  await page.getByRole("button", { name: "Document Q&A" }).click();
+
+  const selector = page.getByLabel("Select indexed documents");
+  await expect(selector.getByRole("option", { name: "statement.pdf · uploaded 2026-10-01 · ID 11111111" })).toBeVisible();
+  await expect(selector.getByRole("option", { name: "statement.pdf · uploaded 2026-10-02 · ID 22222222" })).toBeVisible();
+  await selector.selectOption("11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+  await page.getByLabel("Ask about selected documents").fill("Use the first statement");
+  const request = page.waitForRequest("**/api/chat");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await request;
+  await selector.selectOption("22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+  releaseResponse();
+
+  const scope = page.getByRole("group", { name: "Question scope" });
+  await expect(scope).toContainText("2026-10-01");
+  await expect(scope).toContainText("11111111");
+  await expect(scope).not.toContainText("2026-10-02");
+  await expect(scope).not.toContainText("22222222");
 });
 
 test("document picker loads bounded pages without losing the selected scope", async ({ page, isMobile }) => {
@@ -223,4 +288,43 @@ test("document Q&A exposes abstention and provider failure statuses", async ({ p
   await page.getByLabel("Ask about selected documents").fill("Question two");
   await page.getByRole("button", { name: "Send message" }).click();
   await expect(page.getByText("Document Q&A provider error.")).toBeVisible();
+});
+
+test("document Q&A keeps scope and long provenance readable on mobile", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "mobile provenance behavior is covered in mobile projects");
+  await openDocumentAssistant(page);
+  const longDocumentName = `statement-${"x".repeat(120)}.pdf`;
+  const longExcerpt = `Evidence-${"y".repeat(240)}`;
+  await page.route("**/api/chat", async (route) => json(route, 200, {
+    session_id: null,
+    answer: "Mobile scoped answer.",
+    review: "",
+    tool_results: {},
+    citations: [{
+      id: "long-source",
+      document_id: "document-owned",
+      document_name: longDocumentName,
+      chunk_id: "document-owned:0",
+      chunk_index: 0,
+      page: 1,
+      excerpt: longExcerpt,
+      reference: "doc:document-owned:chunk:0"
+    }],
+    sources: [],
+    grounded: false,
+    abstained: false,
+    status: "ok",
+    grounding_note: "References identify retrieved chunks; claim support is not verified."
+  }));
+
+  await page.getByLabel("Select indexed documents").selectOption("document-owned");
+  await page.getByLabel("Ask about selected documents").fill("Summarize this statement");
+  await page.getByRole("button", { name: "Send message" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Investigation copilot" });
+  await expect(dialog.getByRole("group", { name: "Question scope" })).toBeVisible();
+  await expect(dialog.getByText(longDocumentName)).toBeVisible();
+  await expect(dialog.getByText(longExcerpt)).toBeVisible();
+  expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });

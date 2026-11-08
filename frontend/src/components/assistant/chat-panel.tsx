@@ -6,9 +6,11 @@ import { FormEvent, useEffect, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import {
+  ChatRequest,
   DocumentCitation,
   fetchUploadedDocuments,
   sendChatMessage,
+  UploadedDocument,
   uploadedDocumentsQueryKey
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -23,7 +25,11 @@ type Message = {
   status?: "ok" | "abstained" | "provider_error" | "insufficient_evidence" | "extractive_preview";
   citations?: DocumentCitation[];
   sources?: DocumentCitation[];
+  documentScope?: ScopeDocument[];
 };
+
+type ScopeDocument = { id: string; label: string };
+type ScopedChatRequest = ChatRequest & { documentScope: ScopeDocument[] };
 
 const statusLabels: Record<NonNullable<Message["status"]>, string> = {
   ok: "References validated; claim-level support is not verified.",
@@ -67,7 +73,7 @@ export function ChatPanel({ initialMode = "finance" }: { initialMode?: "finance"
   }, [token]);
 
   const chat = useMutation({
-    mutationFn: sendChatMessage,
+    mutationFn: (request: ScopedChatRequest) => sendChatMessage(request),
     onSuccess: (data, variables) => {
       if (variables.mode === "finance") setChatSessionId(data.session_id);
       setMessages((current) => [
@@ -79,11 +85,12 @@ export function ChatPanel({ initialMode = "finance" }: { initialMode?: "finance"
           reviewLabel: variables.mode === "finance" ? "Reviewer: " : undefined,
           status: variables.mode === "document_qa" ? data.status : undefined,
           citations: data.citations,
-          sources: data.sources
+          sources: data.sources,
+          documentScope: variables.mode === "document_qa" ? variables.documentScope : undefined
         }
       ]);
     },
-    onError: (error) => {
+    onError: (error, variables) => {
       setMessages((current) => [
         ...current,
         {
@@ -92,7 +99,8 @@ export function ChatPanel({ initialMode = "finance" }: { initialMode?: "finance"
             error instanceof Error
               ? error.message
               : "The assistant could not complete that request. Please try again.",
-          tone: "error"
+          tone: "error",
+          documentScope: variables.mode === "document_qa" ? variables.documentScope : undefined
         }
       ]);
     }
@@ -107,7 +115,13 @@ export function ChatPanel({ initialMode = "finance" }: { initialMode?: "finance"
       message: text,
       sessionId: mode === "finance" ? chatSessionId : null,
       mode,
-      ...(mode === "document_qa" ? { documentIds: selectedDocumentIds } : {})
+      ...(mode === "document_qa" ? {
+        documentIds: selectedDocumentIds,
+        documentScope: selectedDocumentIds.flatMap((id) => {
+          const document = indexedDocuments.find((item) => item.id === id);
+          return document ? [{ id, label: documentLabel(document) }] : [];
+        })
+      } : { documentScope: [] })
     });
     setInput("");
   }
@@ -183,7 +197,7 @@ export function ChatPanel({ initialMode = "finance" }: { initialMode?: "finance"
               aria-describedby={`${documentsId}-hint`}
             >
               {indexedDocuments.map((document) => (
-                <option key={document.id} value={document.id}>{document.filename}</option>
+                <option key={document.id} value={document.id}>{documentLabel(document)}</option>
               ))}
             </select>
           )}
@@ -222,7 +236,7 @@ export function ChatPanel({ initialMode = "finance" }: { initialMode?: "finance"
             key={`${message.role}-${index}`}
             role={message.tone === "error" ? "alert" : undefined}
             className={cn(
-              "max-w-[85%] rounded-lg p-3 text-sm leading-6",
+              "max-w-[85%] break-words rounded-lg p-3 text-sm leading-6 [overflow-wrap:anywhere]",
               message.role === "user"
                 ? "ml-auto bg-accent text-white shadow-sm"
                 : "border border-border bg-background",
@@ -230,6 +244,7 @@ export function ChatPanel({ initialMode = "finance" }: { initialMode?: "finance"
             )}
           >
             <p className="whitespace-pre-wrap">{message.content}</p>
+            {message.documentScope?.length ? <DocumentScope documents={message.documentScope} /> : null}
             {message.status ? (
               <p className="mt-2 text-xs font-medium text-muted" role="status">
                 {statusLabels[message.status]}
@@ -243,8 +258,8 @@ export function ChatPanel({ initialMode = "finance" }: { initialMode?: "finance"
             {message.citations?.length ? (
               <CitationList title="Cited references" citations={message.citations} />
             ) : null}
-            {message.sources?.length ? (
-              <CitationList title="Retrieved sources (not all necessarily cited)" citations={message.sources} />
+            {additionalSources(message).length ? (
+              <CitationList title="Additional retrieved sources (not cited)" citations={additionalSources(message)} />
             ) : null}
           </div>
         ))}
@@ -288,6 +303,27 @@ export function ChatPanel({ initialMode = "finance" }: { initialMode?: "finance"
   );
 }
 
+function DocumentScope({ documents }: { documents: ScopeDocument[] }) {
+  return (
+    <section className="mt-2 border-t border-border pt-2" role="group" aria-label="Question scope">
+      <h3 className="text-xs font-semibold">Question scope</h3>
+      <ul className="mt-1 space-y-1 text-xs text-muted">
+        {documents.map((document) => <li key={document.id} className="break-words [overflow-wrap:anywhere]">{document.label}</li>)}
+      </ul>
+    </section>
+  );
+}
+
+function additionalSources(message: Message) {
+  const citedReferences = new Set(message.citations?.map((citation) => citation.reference) ?? []);
+  return message.sources?.filter((source) => !citedReferences.has(source.reference)) ?? [];
+}
+
+function documentLabel(document: UploadedDocument) {
+  const uploadedDate = document.created_at.slice(0, 10);
+  return `${document.filename} · uploaded ${uploadedDate} · ID ${document.id.slice(0, 8)}`;
+}
+
 function CitationList({ title, citations }: { title: string; citations: DocumentCitation[] }) {
   return (
     <section className="mt-2 border-t border-border pt-2">
@@ -295,8 +331,8 @@ function CitationList({ title, citations }: { title: string; citations: Document
       <ul className="mt-1 space-y-2">
         {citations.map((citation) => (
           <li key={citation.reference} className="rounded border border-border bg-white p-2 text-xs leading-5">
-            <p className="font-medium">{citation.document_name} · chunk {citation.chunk_index ?? "unknown"}</p>
-            <p className="mt-1 whitespace-pre-wrap text-muted">{citation.excerpt}</p>
+            <p className="break-words font-medium [overflow-wrap:anywhere]">{citation.document_name} · chunk {citation.chunk_index ?? "unknown"}</p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-muted [overflow-wrap:anywhere]">{citation.excerpt}</p>
           </li>
         ))}
       </ul>
