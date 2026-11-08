@@ -76,7 +76,7 @@ export function AppShell({
   const isComingSoon = Boolean(copy.comingSoon);
 
   return (
-    <main className="min-h-[100dvh] overflow-x-hidden bg-background text-foreground">
+    <main className="min-h-[100dvh] overflow-x-clip bg-background text-foreground">
       <a
         className="sr-only rounded-md bg-panel px-3 py-2 text-sm font-semibold focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50"
         href="#dashboard"
