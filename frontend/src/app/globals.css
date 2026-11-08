@@ -68,3 +68,13 @@ textarea[aria-invalid="true"],
 select[aria-invalid="true"] {
   border-color: hsl(var(--danger));
 }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}

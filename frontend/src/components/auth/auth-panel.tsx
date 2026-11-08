@@ -3,7 +3,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { LogIn, LogOut, UserPlus } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { ApiError, login, logout, register, uploadedDocumentsQueryKey } from "@/lib/api";
@@ -31,13 +31,14 @@ export function AuthPanel() {
   const setAccessToken = useSessionStore((state) => state.setAccessToken);
   const clearSession = useSessionStore((state) => state.clearSession);
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [email, setEmail] = useState("demo@example.com");
-  const [password, setPassword] = useState("correct horse battery staple");
-  const [fullName, setFullName] = useState("Demo User");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [messageRole, setMessageRole] = useState<"status" | "alert">("status");
   const [logoutFailed, setLogoutFailed] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const authenticationInFlight = useRef(false);
 
   function authenticationFailure(error: unknown, fallback: string, submittedPassword: string) {
     const redact = (text: string) => submittedPassword ? text.split(submittedPassword).join("[redacted]") : text;
@@ -85,7 +86,10 @@ export function AuthPanel() {
       setAccessToken(data.access_token);
       announce("Signed in. Live finance tools are enabled.");
     },
-    onError: (error, credentials) => authenticationFailure(error, "Sign in failed.", credentials.password)
+    onError: (error, credentials) => authenticationFailure(error, "Sign in failed.", credentials.password),
+    onSettled: () => {
+      authenticationInFlight.current = false;
+    }
   });
 
   const registerMutation = useMutation({
@@ -96,7 +100,10 @@ export function AuthPanel() {
       setPassword("");
       announce(data.message);
     },
-    onError: (error, credentials) => authenticationFailure(error, "Registration failed.", credentials.password)
+    onError: (error, credentials) => authenticationFailure(error, "Registration failed.", credentials.password),
+    onSettled: () => {
+      authenticationInFlight.current = false;
+    }
   });
 
   const logoutMutation = useMutation({
@@ -118,6 +125,8 @@ export function AuthPanel() {
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (authenticationInFlight.current || loginMutation.isPending || registerMutation.isPending) return;
+    authenticationInFlight.current = true;
     announce(null);
     setFieldErrors({});
     if (mode === "login") {
@@ -198,6 +207,7 @@ export function AuthPanel() {
               <label className="block text-sm font-medium" htmlFor={`auth-${field}`}>{label}</label>
               <input
                 id={`auth-${field}`} name={field} type={type} autoComplete={purpose}
+                placeholder={field === "email" ? "name@example.com" : undefined}
                 className="mt-1 min-h-10 w-full rounded-md border border-border px-3 py-2 text-sm"
                 value={value} onChange={(event) => change(event.target.value)}
                 aria-invalid={fieldErrors[field] ? true : undefined}
@@ -206,9 +216,20 @@ export function AuthPanel() {
               {fieldErrors[field] ? <p id={`auth-${field}-error`} className="mt-1 text-sm text-danger">{fieldErrors[field]}</p> : null}
             </div>
           ))}
-          <Button type="submit" disabled={loginMutation.isPending || registerMutation.isPending}>
+          <Button
+            type="submit"
+            disabled={loginMutation.isPending || registerMutation.isPending}
+            aria-busy={loginMutation.isPending || registerMutation.isPending}
+            aria-live="polite"
+          >
             {mode === "login" ? <LogIn aria-hidden className="h-4 w-4" /> : <UserPlus aria-hidden className="h-4 w-4" />}
-            {mode === "login" ? "Sign in" : "Create account"}
+            {loginMutation.isPending
+              ? "Signing in..."
+              : registerMutation.isPending
+                ? "Creating account..."
+                : mode === "login"
+                  ? "Sign in"
+                  : "Create account"}
           </Button>
         </form>
       ) : null}
