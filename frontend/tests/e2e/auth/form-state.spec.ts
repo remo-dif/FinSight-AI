@@ -28,7 +28,11 @@ test("authentication announces pending state and ignores duplicate form submissi
   await mockRefreshFailure(page);
   await page.route("**/api/auth/login", async (route) => {
     attempts += 1;
-    await blocked;
+    if (attempts === 1) {
+      await blocked;
+      await json(route, 401, { detail: "Invalid credentials" });
+      return;
+    }
     await json(route, 200, { access_token: "test-access-token" });
   });
   await page.goto("/");
@@ -40,7 +44,11 @@ test("authentication announces pending state and ignores duplicate form submissi
   const submit = auth.locator("form button[type='submit']");
   try {
     const request = page.waitForRequest("**/api/auth/login");
-    await submit.click();
+    await auth.locator("form").evaluate((form) => {
+      if (!(form instanceof HTMLFormElement)) throw new Error("Expected authentication form");
+      form.requestSubmit();
+      form.requestSubmit();
+    });
     await request;
 
     await expect(submit).toBeDisabled();
@@ -48,12 +56,16 @@ test("authentication announces pending state and ignores duplicate form submissi
     await expect(submit).toHaveAttribute("aria-live", "polite");
     await expect(submit).toHaveAccessibleName("Signing in...");
     await expect(auth.getByRole("status")).toHaveCount(0);
-    await auth.locator("form").evaluate((form) =>
-      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))
-    );
     await expect.poll(() => attempts).toBe(1);
   } finally {
     release();
   }
+
+  await expect(auth.getByRole("alert")).toBeVisible();
+  await auth.getByLabel("Password", { exact: true }).fill("Synthetic-password-43");
+  const retry = page.waitForRequest("**/api/auth/login");
+  await submit.click();
+  await retry;
+  await expect.poll(() => attempts).toBe(2);
   await expect(auth.getByRole("status")).toContainText("Signed in");
 });
