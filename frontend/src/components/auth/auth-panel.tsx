@@ -1,12 +1,11 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { useQueryClient } from "@tanstack/react-query";
 import { LogIn, LogOut, UserPlus } from "lucide-react";
 import { FormEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
-import { ApiError, login, logout, register, uploadedDocumentsQueryKey } from "@/lib/api";
+import { ApiError, login, logout, register } from "@/lib/api";
 import { useSessionStore } from "@/store/session";
 
 function logoutFailureMessage(error: unknown) {
@@ -26,10 +25,10 @@ function logoutFailureMessage(error: unknown) {
 }
 
 export function AuthPanel() {
-  const queryClient = useQueryClient();
   const accessToken = useSessionStore((state) => state.accessToken);
   const setAccessToken = useSessionStore((state) => state.setAccessToken);
   const clearSession = useSessionStore((state) => state.clearSession);
+  const userDataEpoch = useSessionStore((state) => state.userDataEpoch);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -70,19 +69,9 @@ export function AuthPanel() {
     setMessageRole(role);
   }
 
-  function clearUserData() {
-    queryClient.removeQueries({ queryKey: ["cases"] });
-    queryClient.removeQueries({ queryKey: ["case"] });
-    queryClient.removeQueries({ queryKey: uploadedDocumentsQueryKey });
-    clearSession();
-  }
-
   const loginMutation = useMutation({
     mutationFn: (credentials: { email: string; password: string }) => login(credentials.email, credentials.password),
     onSuccess: (data) => {
-      queryClient.removeQueries({ queryKey: ["cases"] });
-      queryClient.removeQueries({ queryKey: ["case"] });
-      queryClient.removeQueries({ queryKey: uploadedDocumentsQueryKey });
       setAccessToken(data.access_token);
       announce("Signed in. Live finance tools are enabled.");
     },
@@ -107,17 +96,19 @@ export function AuthPanel() {
   });
 
   const logoutMutation = useMutation({
-    mutationFn: logout,
+    mutationFn: (expectedUserDataEpoch: number) => logout(expectedUserDataEpoch),
     onMutate: () => {
       setLogoutFailed(false);
       announce(null);
     },
-    onSuccess: () => {
-      clearUserData();
+    onSuccess: (_data, expectedUserDataEpoch) => {
+      if (useSessionStore.getState().userDataEpoch !== expectedUserDataEpoch) return;
+      clearSession();
       setLogoutFailed(false);
       announce("Signed out. The server confirmed your session was revoked. Demo alerts are visible.");
     },
-    onError: (error) => {
+    onError: (error, expectedUserDataEpoch) => {
+      if (useSessionStore.getState().userDataEpoch !== expectedUserDataEpoch) return;
       setLogoutFailed(true);
       announce(logoutFailureMessage(error), "alert");
     }
@@ -149,7 +140,7 @@ export function AuthPanel() {
           <Button
             type="button"
             className="h-9 px-3"
-            onClick={() => logoutMutation.mutate()}
+            onClick={() => logoutMutation.mutate(userDataEpoch)}
             disabled={logoutMutation.isPending}
           >
             <LogOut aria-hidden className="h-4 w-4" />
@@ -164,7 +155,7 @@ export function AuthPanel() {
           className="mt-3 h-9 px-3"
           disabled={logoutMutation.isPending}
           onClick={() => {
-            clearUserData();
+            clearSession();
             setLogoutFailed(false);
             announce(
               "Signed out on this device only. Server-side revocation was not confirmed; reloading may restore the server session.",

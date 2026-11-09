@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { FormEvent, useState } from "react";
+import { useSessionStore } from "@/store/session";
 import {
   ApiError,
   addCaseNote,
@@ -47,6 +48,7 @@ export function CaseWorkflow({
   onRetryDetail: () => void;
 }) {
   const queryClient = useQueryClient();
+  const userDataEpoch = useSessionStore((state) => state.userDataEpoch);
   const [decision, setDecision] = useState<CaseDecision | "">("");
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
@@ -54,9 +56,10 @@ export function CaseWorkflow({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Capture identity/revision as mutation variables, never from a later selection.
-  type Snapshot = { caseId: string; revision: number | undefined };
+  type Snapshot = { caseId: string; revision: number | undefined; userDataEpoch: number };
   const snapshot = (): Snapshot => ({
     caseId: caseRecord.id,
+    userDataEpoch,
     revision: detail?.id === caseRecord.id ? detail.revision : caseRecord.revision
   });
   async function refreshCase(caseId: string) {
@@ -66,32 +69,36 @@ export function CaseWorkflow({
     ]);
   }
   const updateMutation = useMutation({
-    mutationFn: ({ caseId, update }: Snapshot & { update: CaseUpdatePayload }) => updateCase(caseId, update),
+    mutationFn: ({ caseId, update, userDataEpoch }: Snapshot & { update: CaseUpdatePayload }) => updateCase(caseId, update, userDataEpoch),
     retry: false,
     onMutate: () => setErrorMessage(null),
-    onSuccess: async (updatedCase, { caseId }) => {
+    onSuccess: async (updatedCase, { caseId, userDataEpoch }) => {
+      if (useSessionStore.getState().userDataEpoch !== userDataEpoch) return;
       queryClient.setQueryData<CaseDetail>(caseDetailQueryKey(caseId), current =>
         current && updatedCase.id === caseId ? { ...current, ...updatedCase } : current
       );
       await refreshCase(caseId);
     },
-    onError: async (error, { caseId }) => {
+    onError: async (error, { caseId, userDataEpoch }) => {
+      if (useSessionStore.getState().userDataEpoch !== userDataEpoch) return;
       setErrorMessage(error instanceof Error ? error.message : "The case update was not saved. Refresh the case and try again.");
       if (error instanceof ApiError && error.status === 409) await refreshCase(caseId);
     }
   });
   const noteMutation = useMutation({
-    mutationFn: ({ caseId, content }: Snapshot & { content: string }) => addCaseNote(caseId, content),
+    mutationFn: ({ caseId, content, userDataEpoch }: Snapshot & { content: string }) => addCaseNote(caseId, content, userDataEpoch),
     retry: false,
     onMutate: () => setErrorMessage(null),
-    onSuccess: async (savedNote, { caseId }) => {
+    onSuccess: async (savedNote, { caseId, userDataEpoch }) => {
+      if (useSessionStore.getState().userDataEpoch !== userDataEpoch) return;
       queryClient.setQueryData<CaseDetail>(caseDetailQueryKey(caseId), current =>
         current ? { ...current, notes: [...current.notes, savedNote] } : current
       );
       setNote("");
       await refreshCase(caseId);
     },
-    onError: async (error, { caseId }) => {
+    onError: async (error, { caseId, userDataEpoch }) => {
+      if (useSessionStore.getState().userDataEpoch !== userDataEpoch) return;
       setErrorMessage(error instanceof Error ? error.message : "The note was not saved. Please try again.");
       if (error instanceof ApiError && error.status === 409) await refreshCase(caseId);
     }
@@ -351,24 +358,26 @@ function CaseFollowUpSection({ caseRecord, detail, canMutate, blocked }: {
   blocked: boolean;
 }) {
   const queryClient = useQueryClient();
+  const userDataEpoch = useSessionStore((state) => state.userDataEpoch);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const closed = caseRecord.status === "resolved";
   const hasOutcome = Boolean(detail?.follow_ups?.length);
   const mutation = useMutation({
-    mutationFn: async ({ caseId, revision, content, close, decision }: {
-      caseId: string; revision: number; content: string; close: boolean; decision: CaseDecision | null;
+    mutationFn: async ({ caseId, revision, content, close, decision, userDataEpoch }: {
+      caseId: string; revision: number; content: string; close: boolean; decision: CaseDecision | null; userDataEpoch: number;
     }) => {
       const payload = { reason: content, expected_revision: revision };
-      if (close) return closeCase(caseId, payload);
+      if (close) return closeCase(caseId, payload, userDataEpoch);
       const action = decision === "escalate" ? "escalation_outcome" : "verification_outcome";
-      return recordCaseFollowUp(caseId, { ...payload, action });
+      return recordCaseFollowUp(caseId, { ...payload, action }, userDataEpoch);
     },
     retry: false,
     onMutate: () => setError(null),
     onSuccess: () => setReason(""),
     onError: (failure) => setError(failure instanceof Error ? failure.message : "The case action was not saved."),
-    onSettled: async (_data, _error, { caseId }) => {
+    onSettled: async (_data, _error, { caseId, userDataEpoch }) => {
+      if (useSessionStore.getState().userDataEpoch !== userDataEpoch) return;
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: caseListQueryKey() }),
         queryClient.invalidateQueries({ queryKey: caseDetailQueryKey(caseId), refetchType: "all" })
@@ -395,7 +404,7 @@ function CaseFollowUpSection({ caseRecord, detail, canMutate, blocked }: {
         <form className="space-y-2" onSubmit={(event) => {
           event.preventDefault();
           if (reason.trim() && !disabled && detail?.revision !== undefined) mutation.mutate({
-            caseId: caseRecord.id, revision: detail.revision, content: reason.trim(), close: hasOutcome, decision: caseRecord.decision
+            caseId: caseRecord.id, userDataEpoch, revision: detail.revision, content: reason.trim(), close: hasOutcome, decision: caseRecord.decision
           });
         }}>
           <label className="block text-sm" htmlFor="case-follow-up-reason">

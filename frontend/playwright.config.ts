@@ -20,10 +20,17 @@ export default defineConfig({
     { name: "iphone", use: { ...devices["iPhone 15"] } },
     { name: "tablet", use: { ...devices["iPad Pro 11"] } }
   ],
-  webServer: {
-    env: { FINSIGHT_LOCAL_HTTP_COOKIES: "true" },
+  webServer: [{
+    command: "node tests/e2e/fixtures/ssr-api.mjs",
+    url: "http://127.0.0.1:3102",
+    reuseExistingServer: false
+  }, {
+    env: {
+      FINSIGHT_LOCAL_HTTP_COOKIES: "true",
+      API_INTERNAL_URL: "http://127.0.0.1:3102"
+    },
     command: process.env.PLAYWRIGHT_WEB_SERVER_COMMAND ?? "npm run test:e2e:server",
     url: "http://127.0.0.1:3101",
     reuseExistingServer: false
-  }
+  }]
 });

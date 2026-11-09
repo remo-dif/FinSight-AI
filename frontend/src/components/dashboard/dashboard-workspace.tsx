@@ -42,13 +42,19 @@ type ToolDrawer = "session" | "copilot" | "upload" | null;
 
 function useCaseQueue(initialQueue?: InitialCaseQueue) {
   const token = useSessionStore((state) => state.accessToken);
-  const hasServerSession = initialQueue?.status === "live" || initialQueue?.status === "unavailable";
+  const userDataEpoch = useSessionStore((state) => state.userDataEpoch);
+  const sessionGeneration = useSessionStore((state) => state.sessionGeneration);
+  // SSR data belongs only to the session that rendered this page.
+  const serverCases = sessionGeneration === 0 && initialQueue?.status === "live"
+    ? initialQueue.cases ?? undefined
+    : undefined;
+  const hasServerSession = Boolean(serverCases) || initialQueue?.status === "unavailable";
   const hasSession = Boolean(token) || hasServerSession;
   const cases = useQuery({
     queryKey: caseListQueryKey(),
     queryFn: () => fetchCases(50),
     enabled: Boolean(token),
-    initialData: initialQueue?.status === "live" ? initialQueue.cases ?? undefined : undefined,
+    initialData: serverCases,
     retry: false
   });
 
@@ -59,8 +65,11 @@ function useCaseQueue(initialQueue?: InitialCaseQueue) {
       : cases.isPending && !cases.data
         ? "loading"
         : "live";
-  const activeCases = useMemo(() => hasSession ? cases.data ?? [] : demoTransactions, [hasSession, cases.data]);
-  return { token, cases, queueStatus, activeCases };
+  const activeCases = useMemo(
+    () => hasSession ? (token ? cases.data : serverCases) ?? [] : demoTransactions,
+    [hasSession, token, cases.data, serverCases]
+  );
+  return { token, cases, queueStatus, activeCases, userDataEpoch };
 }
 
 export function TriageWorkspace({ initialQueue }: { initialQueue?: InitialCaseQueue }) {
@@ -99,8 +108,14 @@ export function TriageWorkspace({ initialQueue }: { initialQueue?: InitialCaseQu
 }
 
 export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQueue?: InitialCaseQueue; initialSelectedId?: string }) {
-  const { token, cases, queueStatus, activeCases } = useCaseQueue(initialQueue);
-  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? null);
+  const { token, cases, queueStatus, activeCases, userDataEpoch } = useCaseQueue(initialQueue);
+  // Explicit navigation is a request to resolve an ID under the current session.
+  // A case selected from the loaded queue belongs to that queue's session.
+  const [selection, setSelection] = useState<{ id: string | null; epoch: number | null }>({
+    id: initialSelectedId ?? null,
+    epoch: null
+  });
+  const selectedId = selection.epoch === null || selection.epoch === userDataEpoch ? selection.id : null;
   const [focusDetailRequested, setFocusDetailRequested] = useState(Boolean(initialSelectedId));
   const [drawer, setDrawer] = useState<ToolDrawer>(null);
   const drawerTriggerRef = useRef<HTMLElement | null>(null);
@@ -120,7 +135,7 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
   useEffect(() => {
     function syncFromHistory() {
       const caseId = new URL(window.location.href).searchParams.get("case");
-      setSelectedId(caseId);
+      setSelection({ id: caseId, epoch: null });
       setFocusDetailRequested(Boolean(caseId));
     }
     window.addEventListener("popstate", syncFromHistory);
@@ -155,7 +170,7 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
 
       <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
         <CaseNavigator cases={activeCases} selectedId={selectedCase?.id} status={queueStatus} onRetry={() => void cases.refetch()} onSelect={(caseRecord) => {
-          setSelectedId(caseRecord.id);
+          setSelection({ id: caseRecord.id, epoch: userDataEpoch });
           setFocusDetailRequested(true);
           window.history.pushState(null, "", `/cases?case=${encodeURIComponent(caseRecord.id)}`);
         }} />
@@ -317,6 +332,7 @@ function AlertDetailPanel({
   onDrawerChange: (drawer: ToolDrawer, trigger?: HTMLElement) => void;
   headingRef: { current: HTMLHeadingElement | null };
 }) {
+  const userDataEpoch = useSessionStore((state) => state.userDataEpoch);
   const caseDetail = useQuery({
     queryKey: caseDetailQueryKey(caseRecord?.id ?? "none"),
     queryFn: () => {
@@ -376,7 +392,7 @@ function AlertDetailPanel({
 
         {caseRecord ? (
           <CaseWorkflow
-            key={`${caseRecord.id}:${canMutate}`}
+            key={`${caseRecord.id}:${canMutate}:${userDataEpoch}`}
             caseRecord={caseRecord}
             detail={caseDetail.data}
             canMutate={canMutate}
