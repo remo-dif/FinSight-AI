@@ -2,7 +2,7 @@
 
 import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { LoaderCircle, Send, ShieldCheck } from "lucide-react";
-import { FormEvent, useEffect, useId, useState } from "react";
+import { FormEvent, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import {
@@ -29,7 +29,7 @@ type Message = {
 };
 
 type ScopeDocument = { id: string; label: string };
-type ScopedChatRequest = ChatRequest & { documentScope: ScopeDocument[] };
+type ScopedChatRequest = ChatRequest & { documentScope: ScopeDocument[]; userDataEpoch: number };
 
 const statusLabels: Record<NonNullable<Message["status"]>, string> = {
   ok: "References validated; claim-level support is not verified.",
@@ -41,14 +41,21 @@ const statusLabels: Record<NonNullable<Message["status"]>, string> = {
 const DOCUMENT_PAGE_SIZE = 100;
 const MAX_DOCUMENT_SELECTION = 100;
 
-export function ChatPanel({ initialMode = "finance" }: { initialMode?: "finance" | "document_qa" } = {}) {
+type ChatMode = "finance" | "document_qa";
+
+export function ChatPanel({ initialMode = "finance" }: { initialMode?: ChatMode } = {}) {
+  const userDataEpoch = useSessionStore((state) => state.userDataEpoch);
+  const [mode, setMode] = useState<ChatMode>(initialMode);
+  return <ChatSession key={userDataEpoch} userDataEpoch={userDataEpoch} mode={mode} setMode={setMode} />;
+}
+
+function ChatSession({ mode, setMode, userDataEpoch }: { mode: ChatMode; setMode: (mode: ChatMode) => void; userDataEpoch: number }) {
   const statusId = useId();
   const documentsId = useId();
   const chatSessionId = useSessionStore((state) => state.chatSessionId);
   const token = useSessionStore((state) => state.accessToken);
   const setChatSessionId = useSessionStore((state) => state.setChatSessionId);
-  const [input, setInput] = useState(initialMode === "document_qa" ? "" : "Show my monthly summary");
-  const [mode, setMode] = useState<"finance" | "document_qa">(initialMode);
+  const [input, setInput] = useState(mode === "document_qa" ? "" : "Show my monthly summary");
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [selectionError, setSelectionError] = useState("");
   const [messages, setMessages] = useState<Message[]>([
@@ -67,14 +74,11 @@ export function ChatPanel({ initialMode = "finance" }: { initialMode?: "finance"
     enabled: mode === "document_qa" && Boolean(token),
     retry: false
   });
-  useEffect(() => {
-    setSelectedDocumentIds([]);
-    setSelectionError("");
-  }, [token]);
 
   const chat = useMutation({
-    mutationFn: (request: ScopedChatRequest) => sendChatMessage(request),
+    mutationFn: (request: ScopedChatRequest) => sendChatMessage(request, request.userDataEpoch),
     onSuccess: (data, variables) => {
+      if (useSessionStore.getState().userDataEpoch !== variables.userDataEpoch) return;
       if (variables.mode === "finance") setChatSessionId(data.session_id);
       setMessages((current) => [
         ...current,
@@ -91,6 +95,7 @@ export function ChatPanel({ initialMode = "finance" }: { initialMode?: "finance"
       ]);
     },
     onError: (error, variables) => {
+      if (useSessionStore.getState().userDataEpoch !== variables.userDataEpoch) return;
       setMessages((current) => [
         ...current,
         {
@@ -113,6 +118,7 @@ export function ChatPanel({ initialMode = "finance" }: { initialMode?: "finance"
     setMessages((current) => [...current, { role: "user", content: text }]);
     chat.mutate({
       message: text,
+      userDataEpoch,
       sessionId: mode === "finance" ? chatSessionId : null,
       mode,
       ...(mode === "document_qa" ? {

@@ -140,6 +140,7 @@ export type UserResponse = {
 
 type ApiFetchInit = RequestInit & {
   requireAuth?: boolean;
+  expectedUserDataEpoch?: number;
   refreshOnUnauthorized?: boolean;
   expectedStatus?: number;
 };
@@ -263,6 +264,7 @@ export async function restoreSession(): Promise<boolean> {
 async function requestWithToken(path: string, init: ApiFetchInit | undefined, token: string | null) {
   const requestInit = { ...(init ?? {}) };
   delete requestInit.requireAuth;
+  delete requestInit.expectedUserDataEpoch;
   delete requestInit.refreshOnUnauthorized;
   delete requestInit.expectedStatus;
   const isFormData = requestInit.body instanceof FormData;
@@ -278,13 +280,21 @@ async function requestWithToken(path: string, init: ApiFetchInit | undefined, to
   });
 }
 
+function assertUserDataEpoch(expectedUserDataEpoch: number | undefined) {
+  if (expectedUserDataEpoch !== undefined && useSessionStore.getState().userDataEpoch !== expectedUserDataEpoch) {
+    throw new ApiError("The session changed while this request was running. Please try again.", 401);
+  }
+}
+
 export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
   const generation = useSessionStore.getState().sessionGeneration;
   function assertSameSession() {
+    assertUserDataEpoch(init?.expectedUserDataEpoch);
     if (init?.requireAuth && useSessionStore.getState().sessionGeneration !== generation) {
       throw new ApiError("The session changed while this request was running. Please try again.", 401);
     }
   }
+  assertSameSession();
   let token = useSessionStore.getState().accessToken;
   if (init?.requireAuth && !token) {
     token = await refreshAccessToken();
@@ -361,7 +371,7 @@ export function sendChatMessage({
   sessionId,
   mode = "finance",
   documentIds
-}: ChatRequest): Promise<ChatResponse> {
+}: ChatRequest, expectedUserDataEpoch: number): Promise<ChatResponse> {
   return apiFetch<ChatResponse>("/api/chat", {
     method: "POST",
     body: JSON.stringify({
@@ -370,7 +380,8 @@ export function sendChatMessage({
       mode,
       ...(mode === "document_qa" ? { document_ids: documentIds ?? null } : {})
     }),
-    requireAuth: true
+    requireAuth: true,
+    expectedUserDataEpoch
   });
 }
 
@@ -417,7 +428,8 @@ export function refreshSession(refreshToken: string): Promise<TokenResponse> {
   });
 }
 
-export async function logout(): Promise<void> {
+export async function logout(expectedUserDataEpoch = useSessionStore.getState().userDataEpoch): Promise<void> {
+  assertUserDataEpoch(expectedUserDataEpoch);
   // Fence earlier refreshes at logout initiation, without claiming revocation.
   // Failed/uncertain logout retains the current token; only the UI's 204 path clears it.
   useSessionStore.getState().invalidateRefreshes();
@@ -425,7 +437,8 @@ export async function logout(): Promise<void> {
     method: "POST",
     body: JSON.stringify({}),
     refreshOnUnauthorized: false,
-    expectedStatus: 204
+    expectedStatus: 204,
+    expectedUserDataEpoch
   });
 }
 
@@ -445,19 +458,21 @@ export function fetchCaseDetail(caseId: string): Promise<CaseDetail> {
   return apiFetch<CaseDetail>(`/api/cases/${caseId}`, { requireAuth: true });
 }
 
-export function updateCase(caseId: string, update: CaseUpdate): Promise<InvestigationCase> {
+export function updateCase(caseId: string, update: CaseUpdate, expectedUserDataEpoch: number): Promise<InvestigationCase> {
   return apiFetch<InvestigationCase>(`/api/cases/${caseId}`, {
     method: "PATCH",
     body: JSON.stringify(update),
-    requireAuth: true
+    requireAuth: true,
+    expectedUserDataEpoch
   });
 }
 
-export function addCaseNote(caseId: string, content: string): Promise<CaseNote> {
+export function addCaseNote(caseId: string, content: string, expectedUserDataEpoch: number): Promise<CaseNote> {
   return apiFetch<CaseNote>(`/api/cases/${caseId}/notes`, {
     method: "POST",
     body: JSON.stringify({ content }),
-    requireAuth: true
+    requireAuth: true,
+    expectedUserDataEpoch
   });
 }
 
@@ -468,14 +483,15 @@ export type UploadResponse = {
   indexed: number;
 };
 
-export function uploadFinancialFile(file: File, importCurrency?: string): Promise<UploadResponse> {
+export function uploadFinancialFile(file: File, importCurrency: string | undefined, expectedUserDataEpoch: number): Promise<UploadResponse> {
   const body = new FormData();
   body.append("file", file);
   if (importCurrency) body.append("import_currency", importCurrency);
   return apiFetch<UploadResponse>("/api/uploads", {
     method: "POST",
     body,
-    requireAuth: true
+    requireAuth: true,
+    expectedUserDataEpoch
   });
 }
 
@@ -531,10 +547,10 @@ export const demoTransactions: InvestigationCase[] = [
 ];
 
 
-export function recordCaseFollowUp(caseId: string, payload: { action: "escalation_outcome" | "verification_outcome"; reason: string; expected_revision: number }): Promise<CaseFollowUp> {
-  return apiFetch<CaseFollowUp>(`/api/cases/${caseId}/follow-ups`, { method: "POST", body: JSON.stringify(payload), requireAuth: true });
+export function recordCaseFollowUp(caseId: string, payload: { action: "escalation_outcome" | "verification_outcome"; reason: string; expected_revision: number }, expectedUserDataEpoch: number): Promise<CaseFollowUp> {
+  return apiFetch<CaseFollowUp>(`/api/cases/${caseId}/follow-ups`, { method: "POST", body: JSON.stringify(payload), requireAuth: true, expectedUserDataEpoch });
 }
 
-export function closeCase(caseId: string, payload: { reason: string; expected_revision: number }): Promise<InvestigationCase> {
-  return apiFetch<InvestigationCase>(`/api/cases/${caseId}/close`, { method: "POST", body: JSON.stringify(payload), requireAuth: true });
+export function closeCase(caseId: string, payload: { reason: string; expected_revision: number }, expectedUserDataEpoch: number): Promise<InvestigationCase> {
+  return apiFetch<InvestigationCase>(`/api/cases/${caseId}/close`, { method: "POST", body: JSON.stringify(payload), requireAuth: true, expectedUserDataEpoch });
 }

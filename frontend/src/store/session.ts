@@ -4,6 +4,7 @@ import { persist } from "zustand/middleware";
 type SessionState = {
   accessToken: string | null;
   sessionGeneration: number;
+  userDataEpoch: number;
   chatSessionId: string | null;
   setAccessToken: (accessToken: string | null) => void;
   clearSession: () => void;
@@ -17,10 +18,21 @@ export const useSessionStore = create<SessionState>()(
     (set) => ({
       accessToken: null,
       sessionGeneration: 0,
+      userDataEpoch: 0,
       chatSessionId: null,
-      // Explicit login/replacement and clearing are fences, even null -> null.
-      setAccessToken: (accessToken) => set(state => ({ accessToken, sessionGeneration: state.sessionGeneration + 1 })),
-      clearSession: () => set(state => ({ accessToken: null, chatSessionId: null, sessionGeneration: state.sessionGeneration + 1 })),
+      // A login or clear changes ownership. A refresh fence alone does not.
+      setAccessToken: (accessToken) => set(state => ({
+        accessToken,
+        chatSessionId: null,
+        sessionGeneration: state.sessionGeneration + 1,
+        userDataEpoch: state.userDataEpoch + 1
+      })),
+      clearSession: () => set(state => ({
+        accessToken: null,
+        chatSessionId: null,
+        sessionGeneration: state.sessionGeneration + 1,
+        userDataEpoch: state.userDataEpoch + (state.accessToken ? 1 : 0)
+      })),
       invalidateRefreshes: () => set(state => ({ sessionGeneration: state.sessionGeneration + 1 })),
       rotateAccessToken: (accessToken, generation) => {
         let applied = false;

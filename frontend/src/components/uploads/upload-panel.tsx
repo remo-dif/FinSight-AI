@@ -7,8 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { caseListQueryKey, uploadedDocumentsQueryKey, uploadFinancialFile } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useSessionStore } from "@/store/session";
 
 export function UploadPanel() {
+  const userDataEpoch = useSessionStore((state) => state.userDataEpoch);
+  return <UploadSession key={userDataEpoch} userDataEpoch={userDataEpoch} />;
+}
+
+function UploadSession({ userDataEpoch }: { userDataEpoch: number }) {
   const queryClient = useQueryClient();
   const inputId = useId();
   const statusId = useId();
@@ -17,8 +23,10 @@ export function UploadPanel() {
   const [importCurrency, setImportCurrency] = useState("");
   const isCsv = file?.name.toLowerCase().endsWith(".csv") ?? false;
   const upload = useMutation({
-    mutationFn: (selected: File) => uploadFinancialFile(selected, isCsv ? importCurrency : undefined),
-    onSuccess: async () => {
+    mutationFn: (request: { file: File; currency?: string; userDataEpoch: number }) =>
+      uploadFinancialFile(request.file, request.currency, request.userDataEpoch),
+    onSuccess: async (_data, request) => {
+      if (useSessionStore.getState().userDataEpoch !== request.userDataEpoch) return;
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: caseListQueryKey() }),
         queryClient.invalidateQueries({ queryKey: uploadedDocumentsQueryKey })
@@ -106,7 +114,7 @@ export function UploadPanel() {
         <Button
           type="button"
           disabled={!file || upload.isPending}
-          onClick={() => file && upload.mutate(file)}
+          onClick={() => file && upload.mutate({ file, currency: isCsv ? importCurrency : undefined, userDataEpoch })}
           aria-busy={upload.isPending}
         >
           {upload.isPending ? (
