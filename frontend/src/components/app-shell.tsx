@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { CasesWorkspace, TriageWorkspace } from "@/components/dashboard/dashboard-workspace";
 import { EvidenceWorkspace } from "@/components/evidence/evidence-workspace";
+import { MobileNavigation, type MobileNavigationItem } from "@/components/mobile-navigation";
 import type { InitialCaseQueue } from "@/lib/server-data";
 import {
   BriefcaseBusiness,
@@ -26,6 +27,12 @@ const navigation: Array<{ id: WorkspaceRoute; label: string; href: `/${string}`;
 ];
 
 const controlsNavigation = { id: "controls" as const, label: "Controls", href: "/controls" as const, icon: Settings, comingSoon: true };
+
+const mobileNavigation: MobileNavigationItem[] = [
+  ...navigation.filter((item) => !item.comingSoon),
+  ...navigation.filter((item) => item.comingSoon),
+  controlsNavigation
+].map(({ id, label, href, comingSoon }) => ({ id, label, href, comingSoon }));
 
 const routeCopy: Record<WorkspaceRoute, { eyebrow: string; title: string; description: string; comingSoon?: boolean }> = {
   triage: {
@@ -135,34 +142,7 @@ export function AppShell({
 
         <div className="min-w-0">
           <header className="sticky top-[env(safe-area-inset-top,0px)] z-20 border-b border-border bg-panel/95 backdrop-blur">
-            <nav
-              className="flex gap-0 overflow-x-auto border-b border-border px-0 py-0 text-sm font-medium [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden"
-              aria-label="Mobile navigation"
-            >
-              {[...navigation, controlsNavigation].map((item) => {
-                const isActive = item.id === activeRoute;
-                return (
-                  <Link
-                    key={item.label}
-                    className={`inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 border-b border-r border-border px-3 py-2 text-center transition ${
-                      isActive
-                        ? "border-b-accent bg-accent/10 text-accent"
-                        : "bg-white text-muted hover:border-accent/60 hover:text-foreground"
-                    }`}
-                    href={item.href as Route}
-                    aria-current={isActive ? "page" : undefined}
-                  >
-                    <item.icon aria-hidden className="h-4 w-4" />
-                    <span className="whitespace-nowrap">{item.label}</span>
-                    {item.comingSoon ? (
-                      <span className="inline-flex items-center rounded-full border border-current/20 bg-current/5 px-1 py-0.5 text-[7px] font-semibold uppercase tracking-[0.14em] leading-none">
-                        Coming soon
-                      </span>
-                    ) : null}
-                  </Link>
-                );
-              })}
-            </nav>
+            <MobileNavigation activeRoute={activeRoute} items={mobileNavigation} />
             <div className="flex min-h-16 flex-col gap-3 px-4 py-3 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-danger">
