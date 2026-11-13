@@ -1,3 +1,5 @@
+import { LoadingStatus } from "@/components/loading-status";
+
 export default function Loading() {
   return (
     <main
@@ -5,9 +7,7 @@ export default function Loading() {
       aria-busy="true"
       aria-describedby="workspace-loading-status"
     >
-      <p id="workspace-loading-status" className="sr-only" role="status" aria-live="polite">
-        Loading investigation workspace.
-      </p>
+      <LoadingStatus />
       <div
         className="grid min-h-screen motion-safe:animate-pulse lg:grid-cols-[244px_minmax(0,1fr)]"
         aria-hidden="true"
