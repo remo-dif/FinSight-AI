@@ -32,7 +32,7 @@ export function EvidenceWorkspace() {
     return <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
       <Panel as="section" className="p-6" aria-labelledby="document-library-heading">
         <h2 id="document-library-heading" className="text-lg font-semibold">{t("documentLibrary")}</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{t("selectDocuments")}</p>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{t("evidenceSignedOut")}</p>
       </Panel>
       <AuthPanel />
     </div>;
