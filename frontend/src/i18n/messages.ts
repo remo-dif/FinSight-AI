@@ -42,7 +42,7 @@ const english = {
   loadInvestigationError: "We could not load this investigation view.",
   workUnchanged: "Your current work is unchanged. Retry the route when you are ready.",
   tryAgain: "Try again",
-  loadingWorkspace: "Loading workspace",
+  loadingWorkspace: "Loading investigation workspace",
   mobileNavigation: "Mobile navigation",
   analystSession: "Analyst session",
   signIn: "Sign in",
