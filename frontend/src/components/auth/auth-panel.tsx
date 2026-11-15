@@ -25,7 +25,13 @@ function logoutFailureMessage(error: unknown) {
   return "Sign-out could not be confirmed. Your refresh session may remain active. Retry sign out or clear only this browser session.";
 }
 
-export function AuthPanel() {
+export function AuthPanel({
+  registrationEnabled = true,
+  onSignedIn
+}: {
+  registrationEnabled?: boolean;
+  onSignedIn?: () => void;
+} = {}) {
   const t = useTranslations();
   const accessToken = useSessionStore((state) => state.accessToken);
   const setAccessToken = useSessionStore((state) => state.setAccessToken);
@@ -76,6 +82,7 @@ export function AuthPanel() {
     onSuccess: (data) => {
       setAccessToken(data.access_token);
       announce(t("signedInSuccess"));
+      onSignedIn?.();
     },
     onError: (error, credentials) => authenticationFailure(error, "Sign in failed.", credentials.password),
     onSettled: () => {
@@ -171,7 +178,7 @@ export function AuthPanel() {
 
       {!accessToken ? (
         <form className="mt-4 space-y-3" onSubmit={submit}>
-          <div className="grid gap-2 sm:grid-cols-2">
+          {registrationEnabled ? <div className="grid gap-2 sm:grid-cols-2">
             <button
               type="button"
               className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${mode === "login" ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:text-foreground"}`}
@@ -190,7 +197,7 @@ export function AuthPanel() {
             >
               {t("register")}
             </button>
-          </div>
+          </div> : null}
           {[
             ...(mode === "register" ? [{ field: "full_name", label: t("fullName"), type: "text", purpose: "name", value: fullName, change: setFullName }] : []),
             { field: "email", label: t("email"), type: "email", purpose: mode === "login" ? "username" : "email", value: email, change: setEmail },
