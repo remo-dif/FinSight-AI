@@ -126,8 +126,8 @@ function UploadSession({ userDataEpoch }: { userDataEpoch: number }) {
         </Button>
       </div>
       <ol className="mt-4 grid grid-cols-1 gap-2 text-xs font-medium text-muted sm:grid-cols-3" aria-label={t("uploadProcessingSteps")}>
-        {[["validate", "Validate"], ["extract", "Extract"], ["link", "Link"]].map(([key, step]) => (
-          <li key={step} className="flex min-h-10 items-center gap-2 rounded-md border border-border bg-white p-2 transition hover:border-accent/60 hover:text-foreground">
+        {(["validate", "extract", "link"] as const).map((key) => (
+          <li key={key} className="flex min-h-10 items-center gap-2 rounded-md border border-border bg-white p-2 transition hover:border-accent/60 hover:text-foreground">
             <FileUp aria-hidden className="h-4 w-4 text-accent" />
             {t(key)}
           </li>

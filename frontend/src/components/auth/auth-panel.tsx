@@ -75,7 +75,7 @@ export function AuthPanel() {
     mutationFn: (credentials: { email: string; password: string }) => login(credentials.email, credentials.password),
     onSuccess: (data) => {
       setAccessToken(data.access_token);
-      announce(t("liveDataActive"));
+      announce(t("signedInSuccess"));
     },
     onError: (error, credentials) => authenticationFailure(error, "Sign in failed.", credentials.password),
     onSettled: () => {

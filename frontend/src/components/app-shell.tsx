@@ -6,6 +6,7 @@ import { CasesWorkspace, TriageWorkspace } from "@/components/dashboard/dashboar
 import { EvidenceWorkspace } from "@/components/evidence/evidence-workspace";
 import { MobileNavigation, type MobileNavigationItem } from "@/components/mobile-navigation";
 import { localeLabels, locales, useLocale, useLocalizedPath, useTranslations } from "@/i18n/context";
+import type { MessageKey } from "@/i18n/messages";
 import type { InitialCaseQueue } from "@/lib/server-data";
 import {
   BriefcaseBusiness,
@@ -21,54 +22,54 @@ import {
 
 type WorkspaceRoute = "triage" | "cases" | "graph" | "evidence" | "data" | "controls";
 
-const navigation: Array<{ id: WorkspaceRoute; label: string; href: `/${string}`; icon: typeof Gauge; comingSoon?: boolean }> = [
-  { id: "triage", label: "Triage", href: "/", icon: Gauge },
-  { id: "cases", label: "Cases", href: "/cases", icon: BriefcaseBusiness },
-  { id: "graph", label: "Graph", href: "/graph", icon: Network, comingSoon: true },
-  { id: "evidence", label: "Evidence", href: "/evidence", icon: FileSearch },
-  { id: "data", label: "Data", href: "/data", icon: Database, comingSoon: true }
+const navigation: Array<{ id: WorkspaceRoute; label: MessageKey; href: `/${string}`; icon: typeof Gauge; comingSoon?: boolean }> = [
+  { id: "triage", label: "triage", href: "/", icon: Gauge },
+  { id: "cases", label: "cases", href: "/cases", icon: BriefcaseBusiness },
+  { id: "graph", label: "graph", href: "/graph", icon: Network, comingSoon: true },
+  { id: "evidence", label: "evidence", href: "/evidence", icon: FileSearch },
+  { id: "data", label: "data", href: "/data", icon: Database, comingSoon: true }
 ];
 
-const controlsNavigation = { id: "controls" as const, label: "Controls", href: "/controls" as const, icon: Settings, comingSoon: true };
+const controlsNavigation = { id: "controls" as const, label: "controls" as const, href: "/controls" as const, icon: Settings, comingSoon: true };
 
-const mobileNavigation: MobileNavigationItem[] = [
+const mobileNavigation: Array<Omit<MobileNavigationItem, "label"> & { label: MessageKey }> = [
   ...navigation.filter((item) => !item.comingSoon),
   ...navigation.filter((item) => item.comingSoon),
   controlsNavigation
 ].map(({ id, label, href, comingSoon }) => ({ id, label, href, comingSoon }));
 
-const routeCopy: Record<WorkspaceRoute, { eyebrow: string; title: string; description: string; comingSoon?: boolean }> = {
+const routeCopy: Record<WorkspaceRoute, { eyebrow: MessageKey; title: MessageKey; description: MessageKey; comingSoon?: boolean }> = {
   triage: {
-    eyebrow: "Fraud command center",
-    title: "Triage alerts that need attention",
-    description: "Review the available queue and open the next case for investigation."
+    eyebrow: "fraudCommandCenter",
+    title: "triageTitle",
+    description: "triageDescription"
   },
   cases: {
-    eyebrow: "Case operations",
-    title: "Investigate and manage cases",
-    description: "Review transaction context, ownership, notes, decisions, and follow-up actions."
+    eyebrow: "caseOperations",
+    title: "casesTitle",
+    description: "casesDescription"
   },
   graph: {
-    eyebrow: "Entity intelligence",
-    title: "Trace connected accounts, devices, and beneficiaries",
-    description: "The entity graph will connect accounts, devices, beneficiaries, and shared risk signals in one investigation view.",
+    eyebrow: "entityIntelligence",
+    title: "graphTitle",
+    description: "graphDescription",
     comingSoon: true
   },
   evidence: {
-    eyebrow: "Evidence review",
-    title: "Examine your document library",
-    description: "Upload documents, monitor processing status, and ask questions about indexed files."
+    eyebrow: "evidenceReview",
+    title: "evidenceTitle",
+    description: "evidenceDescription"
   },
   data: {
-    eyebrow: "Investigation data",
-    title: "Monitor investigation data and ingestion quality",
-    description: "The data workspace will surface transaction, document, and model-grounding inputs with their processing status.",
+    eyebrow: "investigationData",
+    title: "dataTitle",
+    description: "dataDescription",
     comingSoon: true
   },
   controls: {
-    eyebrow: "Workspace controls",
-    title: "Configure operational controls and policies",
-    description: "Controls will provide a dedicated place for workspace policies, thresholds, and operational settings.",
+    eyebrow: "workspaceControls",
+    title: "controlsTitle",
+    description: "controlsDescription",
     comingSoon: true
   }
 };

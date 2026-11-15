@@ -30,6 +30,24 @@ test.describe("internationalization", () => {
     await expect(page.getByRole("heading", { name: "Trace connected accounts, devices, and beneficiaries" })).toBeVisible();
   });
 
+  test("normalizes an unsupported locale prefix when switching language", async ({ page }) => {
+    await page.goto("/fr/graph?case=case-001");
+    await page.locator("#locale-switcher").selectOption("it");
+
+    await expect(page).toHaveURL(/\/it\/graph\?case=case-001$/);
+    await expect(page.locator("html")).toHaveAttribute("lang", "it");
+  });
+
+  test("keeps the Italian locale when selecting a case", async ({ page }) => {
+    await page.goto("/it/cases");
+    const navigator = page.getByRole("navigation", { name: "Navigatore dei casi" });
+    await navigator.getByRole("button").first().click();
+
+    await expect(page).toHaveURL(/\/it\/cases\?case=/);
+    await expect(page.locator("html")).toHaveAttribute("lang", "it");
+    await expect(page.getByRole("heading", { name: "Avviso selezionato" })).toBeFocused();
+  });
+
   test("formats the same currency amount using the active locale", async ({ page }) => {
     await page.goto("/it/");
     const values = await page.evaluate(() => ({

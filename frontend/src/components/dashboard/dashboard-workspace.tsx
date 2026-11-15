@@ -24,7 +24,7 @@ import {
 } from "@/lib/api";
 import type { InitialCaseQueue } from "@/lib/server-data";
 import { useSessionStore } from "@/store/session";
-import { useLocale, useTranslations } from "@/i18n/context";
+import { localizePath, useLocale, useTranslations } from "@/i18n/context";
 
 const AuthPanel = dynamic(
   () => import("@/components/auth/auth-panel").then((module) => module.AuthPanel),
@@ -111,6 +111,7 @@ export function TriageWorkspace({ initialQueue }: { initialQueue?: InitialCaseQu
 }
 
 export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQueue?: InitialCaseQueue; initialSelectedId?: string }) {
+  const locale = useLocale();
   const { token, cases, queueStatus, activeCases, userDataEpoch } = useCaseQueue(initialQueue);
   // Explicit navigation is a request to resolve an ID under the current session.
   // A case selected from the loaded queue belongs to that queue's session.
@@ -175,7 +176,7 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
         <CaseNavigator cases={activeCases} selectedId={selectedCase?.id} status={queueStatus} onRetry={() => void cases.refetch()} onSelect={(caseRecord) => {
           setSelection({ id: caseRecord.id, epoch: userDataEpoch });
           setFocusDetailRequested(true);
-          window.history.pushState(null, "", `/cases?case=${encodeURIComponent(caseRecord.id)}`);
+          window.history.pushState(null, "", localizePath(`/cases?case=${encodeURIComponent(caseRecord.id)}`, locale));
         }} />
         {selectedCase ? (
           <AlertDetailPanel
@@ -253,8 +254,9 @@ function QueueStatus({ status, onRetry, onSession }: { status: "demo" | "loading
 }
 
 function CaseNavigator({ cases, selectedId, status, onRetry, onSelect }: { cases: InvestigationCase[]; selectedId?: string; status: "demo" | "loading" | "live" | "error"; onRetry: () => void; onSelect: (item: InvestigationCase) => void }) {
-  return <Panel as="nav" className="h-fit p-3 xl:sticky xl:top-[96px]" aria-label="Case navigator">
-    <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold">Cases</h2><span className="text-xs text-muted">{cases.length}</span></div>
+  const t = useTranslations();
+  return <Panel as="nav" className="h-fit p-3 xl:sticky xl:top-[96px]" aria-label={t("caseNavigator")}>
+    <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold">{t("cases")}</h2><span className="text-xs text-muted">{cases.length}</span></div>
     {status === "loading" && cases.length === 0 ? <p className="mt-3 text-sm text-muted" role="status">Loading cases...</p> : null}
     {status === "error" && cases.length === 0 ? <div className="mt-3 text-sm" role="alert"><p className="text-danger">Cases are unavailable.</p><button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>Retry</button></div> : null}
     {status === "error" && cases.length > 0 ? <div className="mt-3 text-sm" role="status"><p className="font-semibold text-warning">Refresh failed. Showing the most recently loaded cases.</p><button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>Retry</button></div> : null}
@@ -353,6 +355,7 @@ function AlertDetailPanel({
   onDrawerChange: (drawer: ToolDrawer, trigger?: HTMLElement) => void;
   headingRef: { current: HTMLHeadingElement | null };
 }) {
+  const t = useTranslations();
   const locale = useLocale();
   const userDataEpoch = useSessionStore((state) => state.userDataEpoch);
   const caseDetail = useQuery({
@@ -370,12 +373,12 @@ function AlertDetailPanel({
       <div className="border-b border-border p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 ref={headingRef} id="selected-alert-heading" tabIndex={-1} className="scroll-mt-28 text-xs font-semibold uppercase tracking-wide text-muted">Selected alert</h2>
+            <h2 ref={headingRef} id="selected-alert-heading" tabIndex={-1} className="scroll-mt-28 text-xs font-semibold uppercase tracking-wide text-muted">{t("selectedAlert")}</h2>
             <p className="mt-2 break-words text-xl font-semibold leading-tight">
               {caseRecord?.merchant ?? "No alert selected"}
             </p>
             <p className="mt-2 break-all text-xs text-muted">
-              <span className="font-semibold text-foreground">Case ID</span>{" "}
+              <span className="font-semibold text-foreground">{t("caseId")}</span>{" "}
               <span>{caseRecord?.id ?? "--"}</span>
             </p>
           </div>
@@ -389,7 +392,7 @@ function AlertDetailPanel({
 
       <div className="space-y-5 p-4">
         <section aria-labelledby="signal-heading">
-          <h3 id="signal-heading" className="text-sm font-semibold">Why this case was flagged</h3>
+          <h3 id="signal-heading" className="text-sm font-semibold">{t("whyFlagged")}</h3>
           <p className="mt-1 text-base font-semibold">{caseRecord?.category ?? "Awaiting selection"}</p>
           <p className="mt-2 text-sm leading-6 text-muted">
             {caseRecord?.description ?? "Select a case to review its transaction context and record an investigation."}
@@ -397,7 +400,7 @@ function AlertDetailPanel({
         </section>
 
         <section aria-labelledby="financial-context-heading">
-          <h3 id="financial-context-heading" className="text-sm font-semibold">Financial context</h3>
+          <h3 id="financial-context-heading" className="text-sm font-semibold">{t("financialContext")}</h3>
           <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
             <SummaryItem label="Exposure" value={caseRecord ? formatAmount(caseRecord, locale) : "--"} />
             <SummaryItem label="Posted" value={caseRecord?.posted_at ?? "--"} />
@@ -407,7 +410,7 @@ function AlertDetailPanel({
 
         <section aria-labelledby="supporting-documents-heading">
           <div className="flex items-center justify-between gap-3">
-            <h3 id="supporting-documents-heading" className="text-sm font-semibold">Supporting documents</h3>
+            <h3 id="supporting-documents-heading" className="text-sm font-semibold">{t("supportingDocuments")}</h3>
             <button
               type="button"
               className="text-sm font-semibold text-accent underline-offset-4 hover:underline"
