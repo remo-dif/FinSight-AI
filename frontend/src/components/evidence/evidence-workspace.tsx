@@ -4,6 +4,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { FileText, RefreshCw } from "lucide-react";
 import { ChatPanel } from "@/components/assistant/chat-panel";
 import { AuthPanel } from "@/components/auth/auth-panel";
+import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { UploadPanel } from "@/components/uploads/upload-panel";
 import { fetchUploadedDocuments, uploadedDocumentsQueryKey } from "@/lib/api";
@@ -45,24 +46,26 @@ export function EvidenceWorkspace() {
             <h2 id="document-library-heading" className="text-lg font-semibold">{t("documentLibrary")}</h2>
             <p className="mt-1 text-sm text-muted">{t("documentsForAccount")}</p>
           </div>
-          <button
+          <Button
             type="button"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border bg-white px-3 text-sm font-semibold text-muted transition hover:border-accent/60 hover:text-foreground disabled:opacity-60"
+            variant="secondary"
+            size="touch"
+            className="text-muted hover:text-foreground"
             onClick={() => void documents.refetch()}
             disabled={documents.isFetching}
           >
             <RefreshCw aria-hidden className={`h-4 w-4 ${documents.isFetching ? "animate-spin" : ""}`} />
             {t("refresh")}
-          </button>
+          </Button>
         </div>
         {documents.isPending ? <p className="mt-6 text-sm text-muted" role="status">{t("loadingDocuments")}</p> : null}
-        {documents.isError ? <div className="mt-6" role="alert"><p className="text-sm font-medium text-danger">{t("documentLibraryError")}</p><button type="button" className="mt-2 text-sm font-semibold text-accent underline-offset-4 hover:underline" onClick={() => void documents.refetch()}>{t("retry")}</button></div> : null}
+        {documents.isError ? <div className="mt-6" role="alert"><p className="text-sm font-medium text-danger">{t("documentLibraryError")}</p><Button type="button" variant="text" className="mt-2" onClick={() => void documents.refetch()}>{t("retry")}</Button></div> : null}
         {!documents.isPending && !documents.isError && items.length === 0 ? <p className="mt-6 rounded-md border border-dashed border-border p-5 text-sm text-muted">{t("noDocuments")}</p> : null}
         {items.length > 0 ? <ul className="mt-4 divide-y divide-border" aria-label={t("documents")}>{items.map((document) => <li key={document.id} className="flex items-center gap-3 py-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent"><FileText aria-hidden className="h-4 w-4" /></span>
           <div className="min-w-0 flex-1"><p className="break-all text-sm font-semibold">{document.filename}</p><p className="mt-1 text-xs text-muted"><span className="capitalize">{document.status}</span>{" · "}<time dateTime={document.created_at}>{formatDate(document.created_at, locale, { dateStyle: "medium", timeStyle: "short" })}</time></p></div>
         </li>)}</ul> : null}
-        {documents.hasNextPage ? <button type="button" className="mt-4 w-full min-h-11 rounded-md border border-border bg-white px-3 text-sm font-semibold sm:w-auto" onClick={() => void documents.fetchNextPage()} disabled={documents.isFetchingNextPage}>{documents.isFetchingNextPage ? t("loadingMore") : t("loadMore")}</button> : null}
+        {documents.hasNextPage ? <Button type="button" variant="secondary" size="touch" className="mt-4 w-full sm:w-auto" onClick={() => void documents.fetchNextPage()} disabled={documents.isFetchingNextPage}>{documents.isFetchingNextPage ? t("loadingMore") : t("loadMore")}</Button> : null}
       </Panel>
       <UploadPanel />
     </div>

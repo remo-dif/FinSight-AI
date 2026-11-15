@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { FormEvent, useState } from "react";
 import { useSessionStore } from "@/store/session";
+import { Button } from "@/components/ui/button";
 import {
   ApiError,
   addCaseNote,
@@ -190,14 +191,15 @@ function CaseStateControls({
       </label>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted">Assigned to {caseRecord.assignee_name ?? "No analyst"}</p>
-        <button
+        <Button
           type="button"
-          className="h-9 rounded-md border border-border bg-white px-3 text-sm font-semibold text-foreground hover:border-accent/60 disabled:cursor-not-allowed disabled:opacity-60"
+          variant="secondary"
+          size="sm"
           disabled={!canMutate || updatePending}
           onClick={() => onUpdate({ assignee: caseRecord.assigned_to_me ? "unassigned" : "me" })}
         >
           {caseRecord.assigned_to_me ? "Unassign me" : "Assign to me"}
-        </button>
+        </Button>
       </div>
     </section>
   );
@@ -262,14 +264,13 @@ function CaseDecisionSection({
               required
             />
           </label>
-          <button
+          <Button
             type="submit"
-            className="h-10 rounded-md bg-accent px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!canMutate || updatePending || !decision || !reason.trim()}
             aria-busy={updatePending}
           >
             {updatePending ? "Recording..." : "Record decision"}
-          </button>
+          </Button>
         </form>
       )}
     </section>
@@ -306,9 +307,9 @@ function CaseNotesSection({
       {isDetailError ? (
         <div className="mt-2 flex items-center gap-3 text-sm" role="alert">
           <p className="text-danger">Case notes could not be loaded.</p>
-          <button type="button" className="font-semibold text-accent underline-offset-4 hover:underline" onClick={onRetryDetail}>
+          <Button type="button" variant="text" onClick={onRetryDetail}>
             Retry
-          </button>
+          </Button>
         </div>
       ) : null}
       {!canMutate ? <p className="mt-2 text-sm text-muted">{isClosed ? "Notes are read-only after closure." : "Sign in to add notes or record case actions."}</p> : null}
@@ -336,14 +337,15 @@ function CaseNotesSection({
             disabled={notePending}
             required
           />
-          <button
+          <Button
             type="submit"
-            className="h-9 rounded-md border border-border bg-white px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+            variant="secondary"
+            size="sm"
             disabled={notePending || !note.trim()}
             aria-busy={notePending}
           >
             {notePending ? "Saving note..." : "Add note"}
-          </button>
+          </Button>
         </form>
       ) : null}
     </section>
