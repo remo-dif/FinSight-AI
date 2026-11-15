@@ -256,7 +256,25 @@ function CaseNavigator({ cases, selectedId, status, onRetry, onSelect }: { cases
     {status === "error" && cases.length === 0 ? <div className="mt-3 text-sm" role="alert"><p className="text-danger">Cases are unavailable.</p><button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>Retry</button></div> : null}
     {status === "error" && cases.length > 0 ? <div className="mt-3 text-sm" role="status"><p className="font-semibold text-warning">Refresh failed. Showing the most recently loaded cases.</p><button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>Retry</button></div> : null}
     {status !== "loading" && status !== "error" && cases.length === 0 ? <p className="mt-3 text-sm text-muted">No cases are available.</p> : null}
-    <ul className="mt-3 space-y-2">{cases.map((item) => <li key={item.id}><button type="button" className={`w-full rounded-md border p-3 text-left transition ${item.id === selectedId ? "border-accent bg-accent/10" : "border-border bg-white hover:border-accent/60"}`} aria-current={item.id === selectedId ? "true" : undefined} onClick={() => onSelect(item)}><span className="block break-all text-sm font-semibold">{item.id}</span><span className="mt-1 block truncate text-xs text-muted">{item.merchant} · {statusLabel(item.status)}</span></button></li>)}</ul>
+    <ul className="mt-3 space-y-2">
+      {cases.map((item) => (
+        <li key={item.id}>
+          <button
+            type="button"
+            className={`w-full rounded-md border p-3 text-left transition ${item.id === selectedId ? "border-accent bg-accent/10" : "border-border bg-white hover:border-accent/60"}`}
+            aria-current={item.id === selectedId ? "true" : undefined}
+            onClick={() => onSelect(item)}
+          >
+            <span className="block break-words text-sm font-semibold leading-5">{item.merchant}</span>
+            <span className="mt-1 block break-words text-xs font-medium text-foreground">{item.category}</span>
+            <span className="mt-2 block break-all text-xs text-muted">{item.id}</span>
+            <span className="mt-1 block text-xs text-muted">
+              {statusLabel(item.status)} · {item.assignee_name ?? "Unassigned"}
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
   </Panel>;
 }
 
@@ -349,32 +367,43 @@ function AlertDetailPanel({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 ref={headingRef} id="selected-alert-heading" tabIndex={-1} className="scroll-mt-28 text-xs font-semibold uppercase tracking-wide text-muted">Selected alert</h2>
-            <p className="mt-1 break-all text-xl font-semibold leading-tight">
-              {caseRecord?.id ?? "No alert selected"}
+            <p className="mt-2 break-words text-xl font-semibold leading-tight">
+              {caseRecord?.merchant ?? "No alert selected"}
             </p>
-            <p className="mt-1 text-sm text-muted">{caseRecord?.merchant ?? "Select a row to review the case."}</p>
+            <p className="mt-2 break-all text-xs text-muted">
+              <span className="font-semibold text-foreground">Case ID</span>{" "}
+              {caseRecord?.id ?? "--"}
+            </p>
           </div>
         </div>
 
-        <dl className="mt-4 grid grid-cols-1 gap-2 text-sm">
-          <SummaryItem label="Exposure" value={caseRecord ? formatAmount(caseRecord) : "--"} />
-          <SummaryItem label="Source" value={caseRecord?.source ?? "--"} />
+        <dl className="mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
           <SummaryItem label="Status" value={caseRecord ? statusLabel(caseRecord.status) : "--"} />
+          <SummaryItem label="Assignment" value={caseRecord?.assignee_name ?? "Unassigned"} />
         </dl>
       </div>
 
       <div className="space-y-5 p-4">
         <section aria-labelledby="signal-heading">
-          <h3 id="signal-heading" className="text-sm font-semibold">Primary signal</h3>
+          <h3 id="signal-heading" className="text-sm font-semibold">Why this case was flagged</h3>
           <p className="mt-1 text-base font-semibold">{caseRecord?.category ?? "Awaiting selection"}</p>
           <p className="mt-2 text-sm leading-6 text-muted">
             {caseRecord?.description ?? "Select a case to review its transaction context and record an investigation."}
           </p>
         </section>
 
-        <section aria-labelledby="evidence-heading">
+        <section aria-labelledby="financial-context-heading">
+          <h3 id="financial-context-heading" className="text-sm font-semibold">Financial context</h3>
+          <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
+            <SummaryItem label="Exposure" value={caseRecord ? formatAmount(caseRecord) : "--"} />
+            <SummaryItem label="Posted" value={caseRecord?.posted_at ?? "--"} />
+            <SummaryItem label="Detection source" value={caseRecord?.source ?? "--"} />
+          </dl>
+        </section>
+
+        <section aria-labelledby="supporting-documents-heading">
           <div className="flex items-center justify-between gap-3">
-            <h3 id="evidence-heading" className="text-sm font-semibold">Transaction context</h3>
+            <h3 id="supporting-documents-heading" className="text-sm font-semibold">Supporting documents</h3>
             <button
               type="button"
               className="text-sm font-semibold text-accent underline-offset-4 hover:underline"
@@ -383,10 +412,8 @@ function AlertDetailPanel({
               Upload to Document Library
             </button>
           </div>
-          <p className="mt-3 rounded-md border border-border bg-background p-3 text-sm leading-5">
-            {caseRecord
-              ? `${caseRecord.category} classification from ${caseRecord.source} source.`
-              : "Transaction details appear when a case is selected."}
+          <p className="mt-2 text-sm leading-6 text-muted">
+            Case-linked document status is not available in this view. Documents uploaded here are stored in the Document Library and are not attached to this case.
           </p>
         </section>
 
