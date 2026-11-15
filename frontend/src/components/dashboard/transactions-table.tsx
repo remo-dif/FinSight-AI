@@ -1,13 +1,15 @@
 import { demoTransactions, InvestigationCase, Transaction } from "@/lib/api";
 import { Panel } from "@/components/ui/panel";
+import { useLocale } from "@/i18n/context";
+import type { Locale } from "@/i18n/config";
 
-export function formatAmount(transaction: Transaction) {
+export function formatAmount(transaction: Transaction, locale: Locale = "en") {
   // Keep decimal strings exact, including cents above Number.MAX_SAFE_INTEGER.
   const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(transaction.amount);
   if (!match) return `${transaction.amount} ${transaction.currency}`;
   const [, sign, integer, decimals = ""] = match;
   const currency = transaction.currency;
-  const formatter = getCurrencyFormatter(currency);
+  const formatter = getCurrencyFormatter(currency, locale);
   const whole = BigInt(integer);
   const signed = sign ? (whole === BigInt(0) ? -0 : -whole) : whole;
   const parts = formatter.formatToParts(signed);
@@ -15,7 +17,7 @@ export function formatAmount(transaction: Transaction) {
   if (!parts.some(part => part.type === "fraction") && fraction) {
     let lastInteger = 0;
     parts.forEach((part, index) => { if (part.type === "integer") lastInteger = index; });
-    const separator = new Intl.NumberFormat().formatToParts(1.1).find(part => part.type === "decimal")?.value ?? ".";
+    const separator = new Intl.NumberFormat(locale === "it" ? "it-IT" : "en-US").formatToParts(1.1).find(part => part.type === "decimal")?.value ?? ".";
     parts.splice(lastInteger + 1, 0, { type: "decimal", value: separator }, { type: "fraction", value: fraction });
   }
   return parts.map(part => part.type === "fraction" ? fraction : part.value).join("");
@@ -23,15 +25,16 @@ export function formatAmount(transaction: Transaction) {
 
 const currencyFormatters = new Map<string, Intl.NumberFormat>();
 
-function getCurrencyFormatter(currency: string) {
-  let formatter = currencyFormatters.get(currency);
+function getCurrencyFormatter(currency: string, locale: Locale) {
+  const key = `${locale}:${currency}`;
+  let formatter = currencyFormatters.get(key);
   if (!formatter) {
-    formatter = new Intl.NumberFormat(undefined, {
+    formatter = new Intl.NumberFormat(locale === "it" ? "it-IT" : "en-US", {
       style: "currency",
       currency,
       maximumFractionDigits: 2
     });
-    currencyFormatters.set(currency, formatter);
+    currencyFormatters.set(key, formatter);
   }
   return formatter;
 }
@@ -58,6 +61,7 @@ export function TransactionsTable({
   queueStatus = "ready",
   onSelect
 }: TransactionsTableProps) {
+  const locale = useLocale();
   const hasUsableCases = transactions.length > 0;
   const queueMessage = queueStatus === "loading" && !hasUsableCases
     ? "Loading cases…"
@@ -127,7 +131,7 @@ export function TransactionsTable({
                     <span className="mt-1 block text-xs text-muted">{caseRecord.category || caseRecord.description}</span>
                   </span>
                   <span className="min-w-0 max-w-full break-all text-right">
-                    <span className="block font-semibold">{formatAmount(caseRecord)}</span>
+                    <span className="block font-semibold">{formatAmount(caseRecord, locale)}</span>
                     <span className="mt-1 block text-xs text-muted">{statusFor(caseRecord.status)}</span>
                   </span>
                 </span>
@@ -172,7 +176,7 @@ export function TransactionsTable({
                     <span className="text-xs font-normal text-muted">{caseRecord.source} source - {caseRecord.posted_at}</span>
                   </th>
                   <td className="px-3 py-3 text-muted">{caseRecord.category || caseRecord.description}</td>
-                  <td className="break-all px-3 py-3 text-right font-semibold">{formatAmount(caseRecord)}</td>
+                  <td className="break-all px-3 py-3 text-right font-semibold">{formatAmount(caseRecord, locale)}</td>
                   <td className="break-words px-3 py-3">{statusFor(caseRecord.status)}</td>
                 </tr>
               );

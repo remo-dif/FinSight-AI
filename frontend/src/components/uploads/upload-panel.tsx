@@ -8,6 +8,7 @@ import { Panel } from "@/components/ui/panel";
 import { caseListQueryKey, uploadedDocumentsQueryKey, uploadFinancialFile } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useSessionStore } from "@/store/session";
+import { useTranslations } from "@/i18n/context";
 
 export function UploadPanel() {
   const userDataEpoch = useSessionStore((state) => state.userDataEpoch);
@@ -15,10 +16,11 @@ export function UploadPanel() {
 }
 
 function UploadSession({ userDataEpoch }: { userDataEpoch: number }) {
+  const t = useTranslations();
   const queryClient = useQueryClient();
   const inputId = useId();
   const statusId = useId();
-  const [filename, setFilename] = useState<string>("No file selected");
+  const [filename, setFilename] = useState<string>(t("noFileSelected"));
   const [file, setFile] = useState<File | null>(null);
   const [importCurrency, setImportCurrency] = useState("");
   const isCsv = file?.name.toLowerCase().endsWith(".csv") ?? false;
@@ -39,14 +41,14 @@ function UploadSession({ userDataEpoch }: { userDataEpoch: number }) {
     : upload.isError
       ? upload.error.message
       : upload.isPending
-        ? "Uploading and processing your file..."
-        : "Files are validated before processing.";
+        ? t("uploadingProcessing")
+        : t("filesValidated");
 
   function onFile(event: ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0] ?? null;
     setFile(selected);
     setImportCurrency("");
-    setFilename(selected?.name ?? "No file selected");
+    setFilename(selected?.name ?? t("noFileSelected"));
     upload.reset();
   }
 
@@ -54,8 +56,8 @@ function UploadSession({ userDataEpoch }: { userDataEpoch: number }) {
     <Panel as="section" className="p-4" aria-labelledby="uploads-heading">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 id="uploads-heading" className="text-base font-semibold">Upload to Document Library</h2>
-          <p className="mt-1 text-sm text-muted">Uploads are stored in your document library, not attached to a case.</p>
+          <h2 id="uploads-heading" className="text-base font-semibold">{t("uploadDocument")}</h2>
+          <p className="mt-1 text-sm text-muted">{t("uploadDescription")}</p>
         </div>
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-success/10 text-success">
           <Lock aria-hidden className="h-5 w-5" />
@@ -66,7 +68,7 @@ function UploadSession({ userDataEpoch }: { userDataEpoch: number }) {
         htmlFor={inputId}
       >
         <UploadCloud aria-hidden className="h-8 w-8 text-accent" />
-        <span className="mt-3 text-sm font-semibold">Choose a document</span>
+        <span className="mt-3 text-sm font-semibold">{t("chooseDocument")}</span>
         <span className="mt-1 max-w-full truncate text-xs text-muted" aria-live="polite">{filename}</span>
         <input
           id={inputId}
@@ -77,11 +79,11 @@ function UploadSession({ userDataEpoch }: { userDataEpoch: number }) {
           onChange={onFile}
           disabled={upload.isPending}
         />
-        <span id={`${inputId}-hint`} className="sr-only">Accepted file types are CSV, PDF, PNG, JPG, and JPEG.</span>
+        <span id={`${inputId}-hint`} className="sr-only">{t("acceptedFileTypes")}</span>
       </label>
       {isCsv && (
         <div className="mt-4 space-y-2">
-          <label htmlFor={`${inputId}-currency`} className="block text-sm font-medium">CSV currency</label>
+          <label htmlFor={`${inputId}-currency`} className="block text-sm font-medium">{t("csvCurrency")}</label>
           <select
             id={`${inputId}-currency`}
             value={importCurrency}
@@ -90,15 +92,13 @@ function UploadSession({ userDataEpoch }: { userDataEpoch: number }) {
             aria-describedby={`${inputId}-currency-hint`}
             className="min-h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
           >
-            <option value="">Use currency column</option>
+            <option value="">{t("useCurrencyColumn")}</option>
             {["AUD", "CAD", "CHF", "EUR", "GBP", "JPY", "USD"].map((currency) => (
               <option key={currency} value={currency}>{currency}</option>
             ))}
           </select>
           <p id={`${inputId}-currency-hint`} className="text-xs text-muted">
-            If your CSV has no currency column or has blank currency cells, select the statement currency, then retry.
-            For mixed-currency files, use a currency column and leave this selector on “Use currency column”.
-            Explicit row currencies must match any selection. No currencies are assumed or converted.
+            {t("uploadCurrencyHint")}
           </p>
         </div>
       )}
@@ -122,14 +122,14 @@ function UploadSession({ userDataEpoch }: { userDataEpoch: number }) {
           ) : (
             <FileUp aria-hidden className="h-4 w-4" />
           )}
-          {upload.isPending ? "Uploading" : "Upload"}
+          {upload.isPending ? t("uploading") : t("upload")}
         </Button>
       </div>
-      <ol className="mt-4 grid grid-cols-1 gap-2 text-xs font-medium text-muted sm:grid-cols-3" aria-label="Upload processing steps">
-        {["Validate", "Extract", "Link"].map((step) => (
+      <ol className="mt-4 grid grid-cols-1 gap-2 text-xs font-medium text-muted sm:grid-cols-3" aria-label={t("uploadProcessingSteps")}>
+        {[["validate", "Validate"], ["extract", "Extract"], ["link", "Link"]].map(([key, step]) => (
           <li key={step} className="flex min-h-10 items-center gap-2 rounded-md border border-border bg-white p-2 transition hover:border-accent/60 hover:text-foreground">
             <FileUp aria-hidden className="h-4 w-4 text-accent" />
-            {step}
+            {t(key)}
           </li>
         ))}
       </ol>

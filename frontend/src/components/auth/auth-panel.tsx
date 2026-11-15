@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { ApiError, login, logout, register } from "@/lib/api";
 import { useSessionStore } from "@/store/session";
+import { useTranslations } from "@/i18n/context";
 
 function logoutFailureMessage(error: unknown) {
   if (error instanceof ApiError && error.kind === "timeout") {
@@ -25,6 +26,7 @@ function logoutFailureMessage(error: unknown) {
 }
 
 export function AuthPanel() {
+  const t = useTranslations();
   const accessToken = useSessionStore((state) => state.accessToken);
   const setAccessToken = useSessionStore((state) => state.setAccessToken);
   const clearSession = useSessionStore((state) => state.clearSession);
@@ -73,7 +75,7 @@ export function AuthPanel() {
     mutationFn: (credentials: { email: string; password: string }) => login(credentials.email, credentials.password),
     onSuccess: (data) => {
       setAccessToken(data.access_token);
-      announce("Signed in. Live finance tools are enabled.");
+      announce(t("liveDataActive"));
     },
     onError: (error, credentials) => authenticationFailure(error, "Sign in failed.", credentials.password),
     onSettled: () => {
@@ -131,9 +133,9 @@ export function AuthPanel() {
     <Panel as="section" className="p-4" aria-labelledby="auth-heading">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 id="auth-heading" className="text-base font-semibold">Analyst session</h2>
+          <h2 id="auth-heading" className="text-base font-semibold">{t("analystSession")}</h2>
           <p className="mt-1 text-sm text-muted">
-            {accessToken ? "Live investigation data is active." : "Sign in to replace demo alerts with live data."}
+            {accessToken ? t("liveDataActive") : t("signInForLive")}
           </p>
         </div>
         {accessToken ? (
@@ -144,7 +146,7 @@ export function AuthPanel() {
             disabled={logoutMutation.isPending}
           >
             <LogOut aria-hidden className="h-4 w-4" />
-            Sign out
+            {t("signOut")}
           </Button>
         ) : null}
       </div>
@@ -163,7 +165,7 @@ export function AuthPanel() {
             );
           }}
         >
-          Clear this device&apos;s session
+          {t("clearDeviceSession")}
         </Button>
       ) : null}
 
@@ -177,7 +179,7 @@ export function AuthPanel() {
               onClick={() => switchMode("login")}
               aria-pressed={mode === "login"}
             >
-              Sign in
+              {t("signIn")}
             </button>
             <button
               type="button"
@@ -186,13 +188,13 @@ export function AuthPanel() {
               onClick={() => switchMode("register")}
               aria-pressed={mode === "register"}
             >
-              Register
+              {t("register")}
             </button>
           </div>
           {[
-            ...(mode === "register" ? [{ field: "full_name", label: "Full name", type: "text", purpose: "name", value: fullName, change: setFullName }] : []),
-            { field: "email", label: "Email", type: "email", purpose: mode === "login" ? "username" : "email", value: email, change: setEmail },
-            { field: "password", label: "Password", type: "password", purpose: mode === "login" ? "current-password" : "new-password", value: password, change: setPassword }
+            ...(mode === "register" ? [{ field: "full_name", label: t("fullName"), type: "text", purpose: "name", value: fullName, change: setFullName }] : []),
+            { field: "email", label: t("email"), type: "email", purpose: mode === "login" ? "username" : "email", value: email, change: setEmail },
+            { field: "password", label: t("password"), type: "password", purpose: mode === "login" ? "current-password" : "new-password", value: password, change: setPassword }
           ].map(({ field, label, type, purpose, value, change }) => (
             <div key={field}>
               <label className="block text-sm font-medium" htmlFor={`auth-${field}`}>{label}</label>
@@ -215,12 +217,12 @@ export function AuthPanel() {
           >
             {mode === "login" ? <LogIn aria-hidden className="h-4 w-4" /> : <UserPlus aria-hidden className="h-4 w-4" />}
             {loginMutation.isPending
-              ? "Signing in..."
+              ? t("signingIn")
               : registerMutation.isPending
-                ? "Creating account..."
+                ? t("creatingAccount")
                 : mode === "login"
-                  ? "Sign in"
-                  : "Create account"}
+                  ? t("signIn")
+                  : t("createAccount")}
           </Button>
         </form>
       ) : null}

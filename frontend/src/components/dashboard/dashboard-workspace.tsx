@@ -24,6 +24,7 @@ import {
 } from "@/lib/api";
 import type { InitialCaseQueue } from "@/lib/server-data";
 import { useSessionStore } from "@/store/session";
+import { useLocale, useTranslations } from "@/i18n/context";
 
 const AuthPanel = dynamic(
   () => import("@/components/auth/auth-panel").then((module) => module.AuthPanel),
@@ -73,6 +74,8 @@ function useCaseQueue(initialQueue?: InitialCaseQueue) {
 }
 
 export function TriageWorkspace({ initialQueue }: { initialQueue?: InitialCaseQueue }) {
+  const t = useTranslations();
+  const locale = useLocale();
   const { cases, queueStatus, activeCases } = useCaseQueue(initialQueue);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawer, setDrawer] = useState<ToolDrawer>(null);
@@ -94,13 +97,13 @@ export function TriageWorkspace({ initialQueue }: { initialQueue?: InitialCaseQu
         />
       </div>
       <Panel as="aside" className="h-fit p-4 xl:sticky xl:top-[96px]" aria-labelledby="triage-next-heading">
-        <h2 id="triage-next-heading" className="text-base font-semibold">Next investigation</h2>
+        <h2 id="triage-next-heading" className="text-base font-semibold">{t("nextInvestigation")}</h2>
         {selectedCase ? <>
           <p className="mt-3 break-all text-lg font-semibold">{selectedCase.id}</p>
           <p className="mt-1 text-sm text-muted">{selectedCase.merchant}</p>
-          <dl className="mt-4 space-y-2 text-sm"><SummaryItem label="Status" value={statusLabel(selectedCase.status)} /><SummaryItem label="Assignment" value={selectedCase.assignee_name ?? "Unassigned"} /></dl>
-          <Link className="mt-4 inline-flex min-h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-white" href={`/cases?case=${encodeURIComponent(selectedCase.id)}`}>Open case</Link>
-        </> : <p className="mt-3 text-sm text-muted">Select an alert to choose the next investigation.</p>}
+          <dl className="mt-4 space-y-2 text-sm"><SummaryItem label={t("status")} value={statusLabel(selectedCase.status)} /><SummaryItem label="Assignment" value={selectedCase.assignee_name ?? "Unassigned"} /></dl>
+          <Link className="mt-4 inline-flex min-h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-white" href={`/${locale}/cases?case=${encodeURIComponent(selectedCase.id)}` as never}>{t("openCase")}</Link>
+        </> : <p className="mt-3 text-sm text-muted">{t("selectAlert")}</p>}
       </Panel>
     </div>
     {drawer ? <ContextDrawer drawer={drawer} onClose={() => setDrawer(null)} triggerRef={drawerTriggerRef} /> : null}
@@ -350,6 +353,7 @@ function AlertDetailPanel({
   onDrawerChange: (drawer: ToolDrawer, trigger?: HTMLElement) => void;
   headingRef: { current: HTMLHeadingElement | null };
 }) {
+  const locale = useLocale();
   const userDataEpoch = useSessionStore((state) => state.userDataEpoch);
   const caseDetail = useQuery({
     queryKey: caseDetailQueryKey(caseRecord?.id ?? "none"),
@@ -395,7 +399,7 @@ function AlertDetailPanel({
         <section aria-labelledby="financial-context-heading">
           <h3 id="financial-context-heading" className="text-sm font-semibold">Financial context</h3>
           <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
-            <SummaryItem label="Exposure" value={caseRecord ? formatAmount(caseRecord) : "--"} />
+            <SummaryItem label="Exposure" value={caseRecord ? formatAmount(caseRecord, locale) : "--"} />
             <SummaryItem label="Posted" value={caseRecord?.posted_at ?? "--"} />
             <SummaryItem label="Detection source" value={caseRecord?.source ?? "--"} />
           </dl>

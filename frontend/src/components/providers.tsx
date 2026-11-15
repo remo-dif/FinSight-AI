@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/reac
 import { useEffect, useState } from "react";
 import { restoreSession } from "@/lib/api";
 import { useSessionStore } from "@/store/session";
+import { LocaleProvider } from "@/i18n/context";
+import type { Locale } from "@/i18n/config";
 
 function SessionBootstrap() {
   const queryClient = useQueryClient();
@@ -26,7 +28,7 @@ function SessionBootstrap() {
   return null;
 }
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({ children, locale }: { children: React.ReactNode; locale: Locale }) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -42,9 +44,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
       })
   );
   return (
-    <QueryClientProvider client={queryClient}>
-      <SessionBootstrap />
-      {children}
-    </QueryClientProvider>
+    <LocaleProvider locale={locale}>
+      <QueryClientProvider client={queryClient}>
+        <SessionBootstrap />
+        {children}
+      </QueryClientProvider>
+    </LocaleProvider>
   );
 }

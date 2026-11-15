@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { defaultLocale, isLocale } from "@/i18n/config";
 
 export function middleware(request: NextRequest) {
   const nonce = btoa(crypto.randomUUID());
@@ -22,9 +23,19 @@ export function middleware(request: NextRequest) {
   // Overwrite rather than trust client-supplied policy or nonce headers.
   headers.set("x-nonce", nonce);
   headers.set("Content-Security-Policy", policy);
-  const response = NextResponse.next({ request: { headers } });
+  const segments = request.nextUrl.pathname.split("/").filter(Boolean);
+  const requestedLocale = segments[0];
+  const knownRoutes = new Set(["", "cases", "graph", "evidence", "data", "controls"]);
+  const hasLocalePrefix = isLocale(requestedLocale);
+  const hasUnknownPrefix = Boolean(requestedLocale && !knownRoutes.has(requestedLocale));
+  const locale = hasLocalePrefix ? requestedLocale : defaultLocale;
+  headers.set("x-locale", locale);
+  const response = hasLocalePrefix || hasUnknownPrefix
+    ? NextResponse.rewrite(new URL(`/${segments.slice(1).join("/")}${request.nextUrl.search}`, request.url), { request: { headers } })
+    : NextResponse.next({ request: { headers } });
   response.headers.set("Content-Security-Policy", policy);
   response.headers.set("Cache-Control", "private, no-store");
+  response.headers.set("x-locale", locale);
   return response;
 }
 
