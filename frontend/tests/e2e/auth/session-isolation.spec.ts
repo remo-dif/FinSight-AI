@@ -86,7 +86,9 @@ test("failed refresh drops A's SSR data, documents and transcript before B signs
     await auth.locator("form button[type='submit']").click();
     await bQueueStarted.wait;
     await expect.soft(page.getByText("CASE-SSR-A", { exact: true })).toHaveCount(0, { timeout: 1500 });
-    await expect(page.getByText("CASE-LIVE-A", { exact: true })).toHaveCount(0);
+    // The returnTo URL may still name the requested case while it is
+    // re-authorized for B, but A's queue control must be gone immediately.
+    await expect(page.getByRole("button", { name: /CASE-LIVE-A/ })).toHaveCount(0);
     bQueue.release();
     await expect(page.getByRole("button", { name: /CASE-B-ONLY/ }).first()).toBeVisible();
     await page.getByRole("button", { name: "Ask copilot" }).click();

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { json, mockLogin, mockRefreshFailure } from "../fixtures/api";
+import { json, mockDashboardData, mockLogin, mockRefreshFailure } from "../fixtures/api";
 
 test("reduced motion preserves focus, dialogs, navigation, and page geometry", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -45,6 +45,7 @@ test("loading animations are disabled when reduced motion is requested", async (
   await page.emulateMedia({ reducedMotion: "reduce" });
   await mockLogin(page);
   await mockRefreshFailure(page);
+  await mockDashboardData(page);
   await page.route("**/api/uploads", async (route) => {
     await blocked;
     await json(route, 200, { status: "accepted", imported: 1, indexed: 1 });

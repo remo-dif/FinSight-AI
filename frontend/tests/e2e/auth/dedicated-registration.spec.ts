@@ -1,16 +1,22 @@
 import { expect, test } from "@playwright/test";
 import { json, mockRefreshFailure } from "../fixtures/api";
 
-test("registration is available only on the dedicated route", async ({ page }) => {
-  await mockRefreshFailure(page);
+test("registration is available only on the dedicated route", async ({ context, page }) => {
   for (const path of ["/", "/cases"]) {
-    await page.goto(path);
-    await page.getByRole("link", { name: "Sign in", exact: true }).click();
-    const session = page.getByRole("region", { name: "Analyst session" });
-    await expect(session.getByRole("button", { name: "Register", exact: true })).toHaveCount(0);
-    await expect(session.getByRole("button", { name: "Create account", exact: true })).toHaveCount(0);
+    const workspace = await context.newPage();
+    await mockRefreshFailure(workspace);
+    try {
+      await workspace.goto(path);
+      await workspace.getByRole("link", { name: "Sign in", exact: true }).click();
+      const session = workspace.getByRole("region", { name: "Analyst session" });
+      await expect(session.getByRole("button", { name: "Register", exact: true })).toHaveCount(0);
+      await expect(session.getByRole("button", { name: "Create account", exact: true })).toHaveCount(0);
+    } finally {
+      await workspace.close();
+    }
   }
 
+  await mockRefreshFailure(page);
   await page.goto("/evidence");
   const evidenceSession = page.getByRole("region", { name: "Analyst session" });
   await expect(evidenceSession.getByRole("button", { name: "Register", exact: true })).toHaveCount(0);

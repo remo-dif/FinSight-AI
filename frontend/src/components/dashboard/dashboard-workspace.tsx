@@ -62,7 +62,9 @@ function useCaseQueue(initialQueue?: InitialCaseQueue) {
   const hasServerSession = Boolean(serverCases) || initialQueue?.status === "unavailable";
   const hasSession = Boolean(token) || hasServerSession;
   const cases = useQuery({
-    queryKey: caseListQueryKey(),
+    // Partition authenticated data by ownership. Prefix invalidations still
+    // match this key, while an account change cannot retain the prior queue.
+    queryKey: [...caseListQueryKey(), userDataEpoch],
     queryFn: () => fetchCases(50),
     enabled: Boolean(token),
     initialData: serverCases,

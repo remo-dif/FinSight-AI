@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { json, mockDashboardData, mockLogin, mockRefreshFailure } from "../fixtures/api";
 
+async function signIn(page: import("@playwright/test").Page) {
+  await page.getByRole("link", { name: "Sign in", exact: true }).click();
+  await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
+}
+
 async function openDocumentAssistant(page: import("@playwright/test").Page) {
   await mockLogin(page);
   await mockDashboardData(page);
@@ -23,11 +28,7 @@ async function openDocumentAssistant(page: import("@playwright/test").Page) {
     ]);
   });
   await page.goto("/cases");
-  await page.getByRole("link", { name: "Sign in" }).click();
-  await page
-    .getByRole("region", { name: "Analyst session" })
-    .locator("form button[type='submit']")
-    .click();
+  await signIn(page);
   await page.getByRole("button", { name: "Ask copilot" }).click();
   await page.getByRole("button", { name: "Document Q&A" }).click();
   await expect(page.getByRole("option", { name: /statement\.pdf · uploaded 2026-10-01 · ID document/ })).toBeVisible();
@@ -138,8 +139,7 @@ test("document picker distinguishes duplicate filenames and response scope stays
   });
 
   await page.goto("/cases");
-  await page.getByRole("link", { name: "Sign in" }).click();
-  await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
+  await signIn(page);
   await page.getByRole("button", { name: "Ask copilot" }).click();
   await page.getByRole("button", { name: "Document Q&A" }).click();
 
@@ -186,11 +186,7 @@ test("document picker loads bounded pages without losing the selected scope", as
     await json(route, 200, documents);
   });
   await page.goto("/cases");
-  await page.getByRole("link", { name: "Sign in" }).click();
-  await page
-    .getByRole("region", { name: "Analyst session" })
-    .locator("form button[type='submit']")
-    .click();
+  await signIn(page);
   await page.getByRole("button", { name: "Ask copilot" }).click();
   await page.getByRole("button", { name: "Document Q&A" }).click();
   const selector = page.getByLabel("Select indexed documents");
@@ -237,7 +233,7 @@ test("a newly uploaded indexed document becomes selectable in Document Q&A", asy
   });
 
   await page.goto("/evidence");
-  await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
+  await signIn(page);
   await page.locator("input[type='file']").setInputFiles({
     name: "new-evidence.pdf",
     mimeType: "application/pdf",
