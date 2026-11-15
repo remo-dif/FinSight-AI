@@ -15,7 +15,7 @@ test("analyst can update case state, record a decision and note, then use the co
     .locator("form button[type='submit']")
     .click();
 
-  await expect(page.getByText("Live investigation data is active.")).toBeVisible();
+  await expect(page.getByText(/Live queue is active/)).toBeVisible();
   const selectedAlert = page.getByRole("region", { name: "Selected alert" });
   await expect(selectedAlert.getByText("CASE-9001", { exact: true })).toBeVisible();
   await expect(selectedAlert).toContainText("Wire mule cluster");

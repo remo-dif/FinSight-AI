@@ -343,7 +343,12 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
           if (!item || typeof item !== "object" || !("loc" in item) || !("msg" in item)) return [];
           if (!Array.isArray(item.loc) || !item.loc.every((part: unknown) => typeof part === "string" || typeof part === "number") || typeof item.msg !== "string") return [];
           // Do not retain Pydantic input/ctx: those can contain passwords.
-          return [{ location: [...item.loc], message: item.msg }];
+          const isPasswordIssue = item.loc.at(-1) === "password";
+          const sensitiveInput = "input" in item && typeof item.input === "string" ? item.input : "";
+          const message = isPasswordIssue && sensitiveInput
+            ? item.msg.split(sensitiveInput).join("[redacted]")
+            : item.msg;
+          return [{ location: [...item.loc], message }];
         });
       }
     } catch {

@@ -49,7 +49,7 @@ test("does not persist bearer tokens after analyst sign in", async ({ page, isMo
     .getByRole("region", { name: "Analyst session" })
     .locator("form button[type='submit']")
     .click();
-  await expect(page.getByText("Live investigation data is active.")).toBeVisible();
+  await expect(page.getByText(/Live queue is active/)).toBeVisible();
 
   const stored = await page.evaluate(() => localStorage.getItem("finsight-session"));
   expect(stored).not.toContain("test-access-token");

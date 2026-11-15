@@ -68,5 +68,6 @@ test("authentication announces pending state and ignores duplicate form submissi
   await submit.click();
   await retry;
   await expect.poll(() => attempts).toBe(2);
-  await expect(auth.getByRole("status")).toContainText("Signed in");
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("region", { name: "Analyst session" })).toHaveCount(0);
 });

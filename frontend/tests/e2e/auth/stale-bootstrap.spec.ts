@@ -21,13 +21,13 @@ for (const status of [401, 200]) {
       await activateControl(page.getByRole("link", { name: "Sign in", exact: true }), isMobile);
       const auth = page.getByRole("region", { name: "Analyst session" });
       await activateControl(auth.locator("form button[type=submit]"), isMobile);
-      await expect(page.getByText("Live investigation data is active.")).toBeVisible();
+      await expect(page.getByText(/Live queue is active/)).toBeVisible();
       const response = page.waitForResponse(r => new URL(r.url()).pathname === "/api/auth/refresh");
       release();
       await response;
       // Wait for the response/UI turn, never for bootstrap before logging in.
       await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
-      await expect(page.getByText("Live investigation data is active.")).toBeVisible();
+      await expect(page.getByText(/Live queue is active/)).toBeVisible();
       const detailRequest = page.waitForRequest(r => new URL(r.url()).pathname === `/api/cases/${liveTransactions[1].id}`);
       const select = page.getByRole("navigation", { name: "Case navigator" }).getByRole("button").filter({ hasText: liveTransactions[1].id });
       await activateControl(select, isMobile);

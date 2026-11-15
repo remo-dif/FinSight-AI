@@ -56,9 +56,13 @@ export function AuthPanel({
   const [logoutFailed, setLogoutFailed] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const authenticationInFlight = useRef(false);
+  const sensitivePasswords = useRef(new Set<string>());
 
-  function authenticationFailure(error: unknown, fallback: string, submittedPassword: string) {
-    const redact = (text: string) => submittedPassword ? text.split(submittedPassword).join("[redacted]") : text;
+  function authenticationFailure(error: unknown, fallback: string) {
+    const redact = (text: string) => [...sensitivePasswords.current].reduce(
+      (safe, secret) => secret ? safe.split(secret).join("[redacted]") : safe,
+      text
+    );
     const errors: Record<string, string> = {};
     if (error instanceof ApiError) {
       for (const issue of error.validationIssues) {
@@ -70,8 +74,8 @@ export function AuthPanel({
       }
     }
     setFieldErrors(errors);
-    announce(redact(error instanceof Error ? error.message : fallback), "alert");
     const first = ["full_name", "email", "password"].find(field => errors[field]);
+    announce(first ? errors[first] : redact(error instanceof Error ? error.message : fallback), "alert");
     if (first) document.getElementById(`auth-${first}`)?.focus();
     setPassword("");
   }
@@ -94,9 +98,10 @@ export function AuthPanel({
       announce(t("signedInSuccess"));
       onSignedIn?.();
     },
-    onError: (error, credentials) => authenticationFailure(error, "Sign in failed.", credentials.password),
+    onError: (error) => authenticationFailure(error, "Sign in failed."),
     onSettled: () => {
       authenticationInFlight.current = false;
+      sensitivePasswords.current.clear();
     }
   });
 
@@ -112,9 +117,10 @@ export function AuthPanel({
       setPassword("");
       announce(data.message);
     },
-    onError: (error, credentials) => authenticationFailure(error, "Registration failed.", credentials.password),
+    onError: (error) => authenticationFailure(error, "Registration failed."),
     onSettled: () => {
       authenticationInFlight.current = false;
+      sensitivePasswords.current.clear();
     }
   });
 
@@ -141,6 +147,7 @@ export function AuthPanel({
     event.preventDefault();
     if (authenticationInFlight.current || loginMutation.isPending || registerMutation.isPending) return;
     authenticationInFlight.current = true;
+    sensitivePasswords.current.add(password);
     announce(null);
     setFieldErrors({});
     if (mode === "login") {
@@ -215,7 +222,10 @@ export function AuthPanel({
           {[
             ...(mode === "register" ? [{ field: "full_name", label: t("fullName"), type: "text", purpose: "name", value: fullName, change: setFullName }] : []),
             { field: "email", label: t("email"), type: "email", purpose: mode === "login" ? "username" : "email", value: email, change: setEmail },
-            { field: "password", label: t("password"), type: "password", purpose: mode === "login" ? "current-password" : "new-password", value: password, change: setPassword }
+            { field: "password", label: t("password"), type: "password", purpose: mode === "login" ? "current-password" : "new-password", value: password, change: (value: string) => {
+              sensitivePasswords.current.add(value);
+              setPassword(value);
+            } }
           ].map(({ field, label, type, purpose, value, change }) => (
             <div key={field}>
               <label className="block text-sm font-medium" htmlFor={`auth-${field}`}>{label}</label>

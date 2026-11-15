@@ -55,7 +55,7 @@ test("loading animations are disabled when reduced motion is requested", async (
   await auth.getByLabel("Email", { exact: true }).fill("analyst@example.test");
   await auth.getByLabel("Password", { exact: true }).fill("Synthetic-password-42");
   await auth.locator("form button[type='submit']").click();
-  await expect(page.getByText("Live investigation data is active.")).toBeVisible();
+  await expect(page.getByText(/Live queue is active/)).toBeVisible();
   await page.getByRole("button", { name: "Upload evidence" }).click();
 
   const upload = page.getByRole("dialog", { name: "Evidence ingestion" });

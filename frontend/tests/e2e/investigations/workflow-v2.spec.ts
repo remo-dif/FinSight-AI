@@ -31,7 +31,7 @@ for (const decision of ["escalate", "request_verification"] as const) {
     await page.goto("/cases");
     await page.getByRole("link", { name: "Sign in" }).click();
     await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
-    await expect(page.getByText("Live investigation data is active.")).toBeVisible();
+    await expect(page.getByText(/Live queue is active/)).toBeVisible();
     const selected = page.getByRole("region", { name: "Selected alert" });
     const outcomeLabel = decision === "escalate" ? "Escalation investigation outcome" : "Verification result and outcome";
     await expect(selected.getByRole("button", { name: "Record follow-up outcome" })).toBeDisabled();
@@ -66,7 +66,7 @@ test("follow-up conflicts remain visible and refresh the case", async ({ page, i
   await page.goto("/cases");
   await page.getByRole("link", { name: "Sign in" }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
-  await expect(page.getByText("Live investigation data is active.")).toBeVisible();
+  await expect(page.getByText(/Live queue is active/)).toBeVisible();
   const selected = page.getByRole("region", { name: "Selected alert" });
   await selected.getByLabel("Escalation investigation outcome").fill("Reviewed");
   const before = reads;

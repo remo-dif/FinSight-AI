@@ -6,11 +6,13 @@ type SessionState = {
   sessionGeneration: number;
   userDataEpoch: number;
   chatSessionId: string | null;
+  sessionRestoreSettled: boolean;
   setAccessToken: (accessToken: string | null) => void;
   clearSession: () => void;
   invalidateRefreshes: () => void;
   rotateAccessToken: (accessToken: string, generation: number) => boolean;
   setChatSessionId: (sessionId: string | null) => void;
+  setSessionRestoreSettled: () => void;
 };
 
 export const useSessionStore = create<SessionState>()(
@@ -20,6 +22,7 @@ export const useSessionStore = create<SessionState>()(
       sessionGeneration: 0,
       userDataEpoch: 0,
       chatSessionId: null,
+      sessionRestoreSettled: false,
       // A login or clear changes ownership. A refresh fence alone does not.
       setAccessToken: (accessToken) => set(state => ({
         accessToken,
@@ -44,7 +47,8 @@ export const useSessionStore = create<SessionState>()(
         });
         return applied;
       },
-      setChatSessionId: (chatSessionId) => set({ chatSessionId })
+      setChatSessionId: (chatSessionId) => set({ chatSessionId }),
+      setSessionRestoreSettled: () => set({ sessionRestoreSettled: true })
     }),
     {
       name: "finsight-session",

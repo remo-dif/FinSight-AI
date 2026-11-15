@@ -7,7 +7,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AuthPanel } from "@/components/auth/auth-panel";
 import { localeLabels, locales, localizePath, useLocale, useLocalizedPath, useTranslations } from "@/i18n/context";
-import { restoreSession } from "@/lib/api";
 import { useSessionStore } from "@/store/session";
 
 export function safeReturnTo(value: string | null, locale: ReturnType<typeof useLocale>) {
@@ -31,19 +30,16 @@ export function LoginPage() {
   const switchLocale = useLocalizedPath();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const sessionRestoreSettled = useSessionStore((state) => state.sessionRestoreSettled);
   const [checkingSession, setCheckingSession] = useState(true);
   const returnTo = safeReturnTo(searchParams.get("returnTo"), locale);
   const registerHref = `${localizePath("/register", locale)}?returnTo=${encodeURIComponent(returnTo)}`;
 
   useEffect(() => {
-    let active = true;
-    void restoreSession().then(() => {
-      if (!active) return;
-      if (useSessionStore.getState().accessToken) router.replace(returnTo as Route);
-      else setCheckingSession(false);
-    });
-    return () => { active = false; };
-  }, [returnTo, router]);
+    if (!sessionRestoreSettled) return;
+    if (useSessionStore.getState().accessToken) router.replace(returnTo as Route);
+    else setCheckingSession(false);
+  }, [returnTo, router, sessionRestoreSettled]);
 
   return (
     <main className="grid min-h-[100dvh] place-items-center bg-background px-4 py-8 text-foreground">
@@ -67,11 +63,8 @@ export function LoginPage() {
         </label>
         <div className="mt-6">
           {searchParams.get("registered") === "1" ? <p className="mb-3 text-sm text-success" role="status">{t("registrationComplete")}</p> : null}
-          {checkingSession ? (
-            <p className="rounded-lg border border-border bg-panel p-4 text-sm text-muted shadow-soft" role="status">{t("loginCheckingSession")}</p>
-          ) : (
-            <AuthPanel showForm registrationEnabled={false} onSignedIn={() => router.replace(returnTo as Route)} />
-          )}
+          {checkingSession ? <p className="mb-3 text-sm text-muted" role="status">{t("loginCheckingSession")}</p> : null}
+          <AuthPanel showForm registrationEnabled={false} onSignedIn={() => router.replace(returnTo as Route)} />
         </div>
         <Link className="mt-5 inline-flex min-h-10 items-center text-sm font-semibold text-accent underline-offset-4 hover:underline" href={localizePath("/", locale) as Route}>
           {t("continueWithoutSigningIn")}
