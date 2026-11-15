@@ -87,7 +87,7 @@ export function AppShell({
   const switchLocale = useLocalizedPath();
   const copy = routeCopy[activeRoute];
   const isComingSoon = Boolean(copy.comingSoon);
-  const localizedHref = (href: string) => `/${locale}${href === "/" ? "" : href}`;
+  const localizedHref = (href: string) => `${locale === "en" ? "" : `/${locale}`}${href === "/" ? "" : href}` || "/";
 
   return (
     <main className="min-h-[100dvh] overflow-x-clip bg-background text-foreground">

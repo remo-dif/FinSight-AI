@@ -17,7 +17,7 @@ test.describe("internationalization", () => {
     await page.goto("/it/cases?case=case-001");
     await page.locator("#locale-switcher").selectOption("en");
 
-    await expect(page).toHaveURL(/\/en\/cases\?case=case-001$/);
+    await expect(page).toHaveURL(/\/cases\?case=case-001$/);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page.getByRole("heading", { name: "Investigate and manage cases" })).toBeVisible();
   });
@@ -33,12 +33,12 @@ test.describe("internationalization", () => {
   test("formats the same currency amount using the active locale", async ({ page }) => {
     await page.goto("/it/");
     const values = await page.evaluate(() => ({
-      en: new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR" }).format(1234.56),
-      it: new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(1234.56)
+      en: new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR" }).format(12345.67),
+      it: new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(12345.67)
     }));
 
-    expect(values.en).toContain("1,234.56");
-    expect(values.it).toContain("1.234,56");
+    expect(values.en).toContain("12,345.67");
+    expect(values.it).toContain("12.345,67");
     expect(values.it).toContain("€");
   });
 });

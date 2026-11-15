@@ -102,7 +102,7 @@ export function TriageWorkspace({ initialQueue }: { initialQueue?: InitialCaseQu
           <p className="mt-3 break-all text-lg font-semibold">{selectedCase.id}</p>
           <p className="mt-1 text-sm text-muted">{selectedCase.merchant}</p>
           <dl className="mt-4 space-y-2 text-sm"><SummaryItem label={t("status")} value={statusLabel(selectedCase.status)} /><SummaryItem label="Assignment" value={selectedCase.assignee_name ?? "Unassigned"} /></dl>
-          <Link className="mt-4 inline-flex min-h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-white" href={`/${locale}/cases?case=${encodeURIComponent(selectedCase.id)}` as never}>{t("openCase")}</Link>
+          <Link className="mt-4 inline-flex min-h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-white" href={`${locale === "en" ? "" : `/${locale}`}/cases?case=${encodeURIComponent(selectedCase.id)}` as never}>{t("openCase")}</Link>
         </> : <p className="mt-3 text-sm text-muted">{t("selectAlert")}</p>}
       </Panel>
     </div>

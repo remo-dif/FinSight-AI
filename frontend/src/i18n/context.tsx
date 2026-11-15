@@ -10,7 +10,7 @@ const LocaleContext = createContext<Locale>(defaultLocale);
 export function LocaleProvider({ locale, children }: { locale: Locale; children: ReactNode }) {
   const pathname = usePathname() || "/";
   const pathLocale = pathname.split("/").filter(Boolean)[0];
-  const activeLocale = isLocale(pathLocale) ? pathLocale : locale;
+  const activeLocale = isLocale(pathLocale) ? pathLocale : pathLocale === "" ? locale : "en";
   useEffect(() => {
     document.documentElement.lang = activeLocale;
   }, [activeLocale]);
@@ -33,7 +33,8 @@ export function useLocalizedPath() {
     if (isLocale(withoutLocale[0])) withoutLocale.shift();
     const path = withoutLocale.length ? `/${withoutLocale.join("/")}` : "/";
     const query = searchParams.toString();
-    router.push(`/${nextLocale}${path}${query ? `?${query}` : ""}` as never);
+    const prefix = nextLocale === defaultLocale ? "" : `/${nextLocale}`;
+    router.push(`${prefix}${path}${query ? `?${query}` : ""}` as never);
   };
 }
 
