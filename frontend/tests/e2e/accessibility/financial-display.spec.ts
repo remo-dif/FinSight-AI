@@ -27,7 +27,8 @@ test("display preserves decimal strings, signs, precision and currency units", a
   for (const record of records) {
     const button = page.getByRole("navigation", { name: "Case navigator" }).getByRole("button").filter({ hasText: record.id });
     await button.click();
-    await expect(selected.locator("dd").first()).toHaveText(record.expected);
+    const exposure = selected.locator("dt").filter({ hasText: /^Exposure$/ }).locator("..").locator("dd");
+    await expect(exposure).toHaveText(record.expected);
   }
 });
 
