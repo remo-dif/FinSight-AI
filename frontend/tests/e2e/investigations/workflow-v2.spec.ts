@@ -29,10 +29,9 @@ for (const decision of ["escalate", "request_verification"] as const) {
       await json(route, 200, record);
     });
     await page.goto("/cases");
-    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.getByRole("link", { name: "Sign in" }).click();
     await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
     await expect(page.getByText("Live investigation data is active.")).toBeVisible();
-    await page.getByRole("button", { name: "Close panel" }).click();
     const selected = page.getByRole("region", { name: "Selected alert" });
     const outcomeLabel = decision === "escalate" ? "Escalation investigation outcome" : "Verification result and outcome";
     await expect(selected.getByRole("button", { name: "Record follow-up outcome" })).toBeDisabled();
@@ -65,10 +64,9 @@ test("follow-up conflicts remain visible and refresh the case", async ({ page, i
   await page.route(`**/api/cases/${record.id}`, (route) => { reads += 1; return json(route, 200, { ...record, notes: [], follow_ups: [] }); });
   await page.route(`**/api/cases/${record.id}/follow-ups`, (route) => json(route, 409, { detail: "Case changed while saving. Refresh the case and retry" }));
   await page.goto("/cases");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("link", { name: "Sign in" }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
   await expect(page.getByText("Live investigation data is active.")).toBeVisible();
-  await page.getByRole("button", { name: "Close panel" }).click();
   const selected = page.getByRole("region", { name: "Selected alert" });
   await selected.getByLabel("Escalation investigation outcome").fill("Reviewed");
   const before = reads;

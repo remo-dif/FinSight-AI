@@ -14,14 +14,11 @@ import {
   Database,
   FileSearch,
   Gauge,
-  LogIn,
   Network,
   Settings,
   ShieldAlert,
   Siren
 } from "lucide-react";
-import { usePathname, useSearchParams } from "next/navigation";
-import { useSessionStore } from "@/store/session";
 
 type WorkspaceRoute = "triage" | "cases" | "graph" | "evidence" | "data" | "controls";
 
@@ -89,10 +86,6 @@ export function AppShell({
   const t = useTranslations();
   const locale = useLocale();
   const switchLocale = useLocalizedPath();
-  const pathname = usePathname() || "/";
-  const searchParams = useSearchParams();
-  const accessToken = useSessionStore((state) => state.accessToken);
-  const currentDestination = `${pathname}${searchParams.size ? `?${searchParams.toString()}` : ""}`;
   const copy = routeCopy[activeRoute];
   const isComingSoon = Boolean(copy.comingSoon);
   const localizedHref = (href: string) => `${locale === "en" ? "" : `/${locale}`}${href === "/" ? "" : href}` || "/";
@@ -171,15 +164,6 @@ export function AppShell({
                   </select>
                 </label>
               </div>
-              {!accessToken ? (
-                <Link
-                  className="inline-flex min-h-10 items-center justify-center gap-2 self-start rounded-md border border-border bg-white px-4 text-sm font-semibold text-accent transition hover:border-accent/60"
-                  href={`${localizedHref("/login")}?returnTo=${encodeURIComponent(currentDestination)}` as Route}
-                >
-                  <LogIn aria-hidden className="h-4 w-4" />
-                  {t("signIn")}
-                </Link>
-              ) : null}
             </div>
           </header>
 

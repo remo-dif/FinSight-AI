@@ -35,7 +35,7 @@ export function RegisterPage() {
           </select>
         </label>
         <div className="mt-6">
-          <AuthPanel initialMode="register" onRegistered={() => router.replace(`${loginHref}&registered=1` as Route)} />
+          <AuthPanel showForm initialMode="register" onRegistered={() => router.replace(`${loginHref}&registered=1` as Route)} />
         </div>
         <p className="mt-5 text-sm text-muted">
           {t("alreadyHaveAccount")} {" "}

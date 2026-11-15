@@ -32,10 +32,9 @@ async function openLiveCases(page: import("@playwright/test").Page) {
     return json(route, 200, { ...record, notes: [], follow_ups: [], revision: 0 });
   });
   await page.goto("/cases");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("link", { name: "Sign in", exact: true }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
   await expect(page.getByText("Live investigation data is active.")).toBeVisible();
-  await page.getByRole("button", { name: "Close panel" }).click();
 }
 
 test("case navigation prioritizes the reason for review without presenting exposure as risk", async ({ page }) => {

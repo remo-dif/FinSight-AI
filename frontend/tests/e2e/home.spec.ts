@@ -44,7 +44,7 @@ test("does not persist bearer tokens after analyst sign in", async ({ page, isMo
   });
 
   await page.goto("/cases");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("link", { name: "Sign in" }).click();
   await page
     .getByRole("region", { name: "Analyst session" })
     .locator("form button[type='submit']")

@@ -9,14 +9,13 @@ test("analyst can update case state, record a decision and note, then use the co
   await mockChatSuccess(page);
 
   await page.goto("/cases");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("link", { name: "Sign in" }).click();
   await page
     .getByRole("region", { name: "Analyst session" })
     .locator("form button[type='submit']")
     .click();
 
   await expect(page.getByText("Live investigation data is active.")).toBeVisible();
-  await page.getByRole("button", { name: "Close panel" }).click();
   const selectedAlert = page.getByRole("region", { name: "Selected alert" });
   await expect(selectedAlert.getByText("CASE-9001", { exact: true })).toBeVisible();
   await expect(selectedAlert).toContainText("Wire mule cluster");

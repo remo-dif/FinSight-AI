@@ -10,10 +10,9 @@ for (const width of [1440, 768, 375, 320]) {
     await page.route("**/api/cases?limit=50", r => json(r, 200, [record]));
     await page.route(`**/api/cases/${record.id}`, r => json(r, 200, { ...record, notes: [] }));
     await page.goto("/cases");
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await page.getByRole("link", { name: "Sign in", exact: true }).click();
     await page.getByRole("region", { name: "Analyst session" }).locator("form button[type=submit]").click();
     await expect(page.getByText("Live investigation data is active.")).toBeVisible();
-    await page.getByRole("button", { name: "Close panel" }).click();
     await page.addStyleTag({ content: "* { line-height: 1.5 !important; letter-spacing: .12em !important; word-spacing: .16em !important; } p { margin-bottom: 2em !important; }" });
     const selected = page.getByRole("region", { name: "Selected alert" });
     await expect(selected).toContainText(record.id);

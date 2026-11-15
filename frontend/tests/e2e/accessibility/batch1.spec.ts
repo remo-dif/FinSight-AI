@@ -3,7 +3,7 @@ import { activateControl, json } from "../fixtures/api";
 
 test("authentication identifies purpose and associates structured errors without exposing input", async ({ page, isMobile }) => {
   await page.goto("/");
-  await activateControl(page.getByRole("button", { name: "Sign in", exact: true }), isMobile);
+  await activateControl(page.getByRole("link", { name: "Sign in", exact: true }), isMobile);
   const auth = page.getByRole("region", { name: "Analyst session" });
   await expect(auth.getByLabel("Email", { exact: true })).toHaveAttribute("autocomplete", "username");
   await expect(auth.getByLabel("Password", { exact: true })).toHaveAttribute("autocomplete", "current-password");
@@ -40,7 +40,7 @@ test("workspace ARIA references resolve to actual elements", async ({ page }) =>
 
 test("placeholder and essential input borders meet composited contrast thresholds", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("link", { name: "Sign in", exact: true }).click();
   const values = await page.getByLabel("Email").evaluate(input => {
     const parse = (value: string) => (value.match(/[\d.]+/g) || []).map(Number);
     const composite = (fg: number[], bg: number[]) => fg.slice(0, 3).map((v, i) => v * (fg[3] ?? 1) + bg[i] * (1 - (fg[3] ?? 1)));
@@ -64,7 +64,7 @@ test("lazy panel loading exposes a valid status instead of a labelled generic di
   const gate = new Promise<void>(resolve => { release = resolve; });
   await page.route("**/_next/static/chunks/*.js", async route => { await gate; await route.continue(); });
   try {
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await page.getByRole("link", { name: "Sign in", exact: true }).click();
     await expect(page.getByRole("status").filter({ hasText: "Loading panel" })).toHaveCount(1);
   } finally { release(); }
   await expect(page.getByRole("region", { name: "Analyst session" })).toBeVisible();
@@ -73,7 +73,7 @@ test("lazy panel loading exposes a valid status instead of a labelled generic di
 
 test("validation never echoes the submitted password even if it is edited during the request", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("link", { name: "Sign in", exact: true }).click();
   const auth = page.getByRole("region", { name: "Analyst session" });
   await auth.getByRole("button", { name: "Register", exact: true }).click();
   await auth.getByLabel("Password", { exact: true }).fill("synthetic-original-password");

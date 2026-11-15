@@ -33,7 +33,7 @@ for (const scenario of validationCases) {
     await mockRefreshFailure(page);
     await page.route("**/api/auth/login", async (route) => json(route, 422, { detail: scenario.detail }));
     await page.goto("/");
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await page.getByRole("link", { name: "Sign in", exact: true }).click();
     const session = page.getByRole("region", { name: "Analyst session" });
     await session.locator("form button[type='submit']").click();
     await expect(session.getByRole("alert")).toHaveText(scenario.expected);

@@ -70,7 +70,7 @@ export function LoginPage() {
           {checkingSession ? (
             <p className="rounded-lg border border-border bg-panel p-4 text-sm text-muted shadow-soft" role="status">{t("loginCheckingSession")}</p>
           ) : (
-            <AuthPanel registrationEnabled={false} onSignedIn={() => router.replace(returnTo as Route)} />
+            <AuthPanel showForm registrationEnabled={false} onSignedIn={() => router.replace(returnTo as Route)} />
           )}
         </div>
         <Link className="mt-5 inline-flex min-h-10 items-center text-sm font-semibold text-accent underline-offset-4 hover:underline" href={localizePath("/", locale) as Route}>

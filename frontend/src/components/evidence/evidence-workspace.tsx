@@ -9,7 +9,7 @@ import { Panel } from "@/components/ui/panel";
 import { UploadPanel } from "@/components/uploads/upload-panel";
 import { fetchUploadedDocuments, uploadedDocumentsQueryKey } from "@/lib/api";
 import { useSessionStore } from "@/store/session";
-import { useLocale, useTranslations } from "@/i18n/context";
+import { localizePath, useLocale, useTranslations } from "@/i18n/context";
 import { formatDate } from "@/i18n/format";
 
 const PAGE_SIZE = 100;
@@ -34,7 +34,7 @@ export function EvidenceWorkspace() {
         <h2 id="document-library-heading" className="text-lg font-semibold">{t("documentLibrary")}</h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{t("evidenceSignedOut")}</p>
       </Panel>
-      <AuthPanel />
+      <AuthPanel loginHref={`${localizePath("/login", locale)}?returnTo=${encodeURIComponent(localizePath("/evidence", locale))}`} />
     </div>;
   }
 

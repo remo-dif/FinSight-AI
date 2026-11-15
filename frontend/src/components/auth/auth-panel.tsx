@@ -1,6 +1,8 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
+import Link from "next/link";
+import type { Route } from "next";
 import { LogIn, LogOut, UserPlus } from "lucide-react";
 import { FormEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -28,11 +30,15 @@ function logoutFailureMessage(error: unknown) {
 export function AuthPanel({
   registrationEnabled = false,
   initialMode = "login",
+  showForm = false,
+  loginHref = "/login",
   onSignedIn,
   onRegistered
 }: {
   registrationEnabled?: boolean;
   initialMode?: "login" | "register";
+  showForm?: boolean;
+  loginHref?: string;
   onSignedIn?: () => void;
   onRegistered?: (message: string) => void;
 } = {}) {
@@ -184,7 +190,7 @@ export function AuthPanel({
         </Button>
       ) : null}
 
-      {!accessToken ? (
+      {!accessToken && showForm ? (
         <form className="mt-4 space-y-3" onSubmit={submit}>
           {registrationEnabled ? <div className="grid gap-2 sm:grid-cols-2">
             <button
@@ -240,6 +246,11 @@ export function AuthPanel({
                   : t("createAccount")}
           </Button>
         </form>
+      ) : !accessToken ? (
+        <Link className="mt-4 inline-flex min-h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-white" href={loginHref as Route}>
+          <LogIn aria-hidden className="h-4 w-4" />
+          {t("signIn")}
+        </Link>
       ) : null}
 
       {message ? (

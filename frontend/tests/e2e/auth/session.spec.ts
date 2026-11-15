@@ -10,11 +10,12 @@ import {
 } from "../fixtures/api";
 
 async function submitLogin(page: import("@playwright/test").Page) {
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("link", { name: "Sign in" }).click();
   await page
     .getByRole("region", { name: "Analyst session" })
     .locator("form button[type='submit']")
     .click();
+  await page.getByRole("button", { name: "Session active" }).click();
 }
 
 test("valid login enables live dashboard data and logout clears the session", async ({ page, isMobile }) => {

@@ -165,7 +165,7 @@ test("axe-core WCAG scans cover the reported workspace states", async ({ page, i
   await scan(page, "anonymous workspace immediate", false);
   await scan(page, "anonymous workspace settled");
 
-  await activateControl(page.getByRole("button", { name: "Sign in", exact: true }), isMobile);
+  await activateControl(page.getByRole("link", { name: "Sign in", exact: true }), isMobile);
   const auth = page.getByRole("region", { name: "Analyst session" });
   await scan(page, "login");
 
@@ -184,7 +184,6 @@ test("axe-core WCAG scans cover the reported workspace states", async ({ page, i
   await mockDashboardData(page);
   await activateControl(auth.locator("form button[type='submit']"), isMobile);
   await expect(page.getByText("Live investigation data is active.")).toBeVisible();
-  await activateControl(page.getByRole("button", { name: "Close panel" }), isMobile);
   await activateControl(page.getByRole("link", { name: "Cases", exact: true }), isMobile);
   await expect(page.getByRole("region", { name: "Selected alert" })).toContainText("CASE-9001");
   await scan(page, "live case immediate", false);

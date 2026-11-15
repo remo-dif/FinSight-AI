@@ -5,7 +5,7 @@ test("authentication starts empty with a helpful email example and reflows on mo
   await page.setViewportSize({ width: 375, height: 812 });
   await mockRefreshFailure(page);
   await page.goto("/");
-  await activateControl(page.getByRole("button", { name: "Sign in", exact: true }), isMobile);
+  await activateControl(page.getByRole("link", { name: "Sign in", exact: true }), isMobile);
 
   const auth = page.getByRole("region", { name: "Analyst session" });
   const email = auth.getByLabel("Email", { exact: true });
@@ -37,7 +37,7 @@ test("authentication announces pending state and ignores duplicate form submissi
     await json(route, 200, { access_token: "test-access-token" });
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("link", { name: "Sign in", exact: true }).click();
 
   const auth = page.getByRole("region", { name: "Analyst session" });
   await auth.getByLabel("Email", { exact: true }).fill("analyst@example.test");

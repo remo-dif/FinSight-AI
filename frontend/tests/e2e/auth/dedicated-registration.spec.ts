@@ -5,7 +5,7 @@ test("registration is available only on the dedicated route", async ({ page }) =
   await mockRefreshFailure(page);
   for (const path of ["/", "/cases"]) {
     await page.goto(path);
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await page.getByRole("link", { name: "Sign in", exact: true }).click();
     const session = page.getByRole("region", { name: "Analyst session" });
     await expect(session.getByRole("button", { name: "Register", exact: true })).toHaveCount(0);
     await expect(session.getByRole("button", { name: "Create account", exact: true })).toHaveCount(0);

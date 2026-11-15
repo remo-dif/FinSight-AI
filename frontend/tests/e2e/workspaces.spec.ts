@@ -2,9 +2,8 @@ import { expect, test } from "@playwright/test";
 import { json, liveTransactions, mockDashboardData, mockLogin, mockRefreshFailure } from "./fixtures/api";
 
 async function signInFromCases(page: import("@playwright/test").Page) {
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("link", { name: "Sign in" }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
-  await page.getByRole("button", { name: "Close panel" }).click();
 }
 
 test("Triage opens a shareable selected case in the Cases workspace", async ({ page }) => {
