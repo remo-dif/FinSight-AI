@@ -372,7 +372,7 @@ function AlertDetailPanel({
             </p>
             <p className="mt-2 break-all text-xs text-muted">
               <span className="font-semibold text-foreground">Case ID</span>{" "}
-              {caseRecord?.id ?? "--"}
+              <span>{caseRecord?.id ?? "--"}</span>
             </p>
           </div>
         </div>
