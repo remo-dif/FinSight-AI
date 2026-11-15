@@ -49,10 +49,8 @@ test("registration displays structured validation messages", async ({ page, isMo
   await page.route("**/api/auth/register", async (route) => json(route, 422, {
     detail: [{ type: "value_error", loc: ["body", "password"], msg: passwordMessage, input: secretInput }]
   }));
-  await page.goto("/");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.goto("/register");
   const session = page.getByRole("region", { name: "Analyst session" });
-  await session.getByRole("button", { name: "Register", exact: true }).click();
   await session.getByRole("button", { name: "Create account", exact: true }).click();
   await expect(session.getByRole("alert")).toHaveText(passwordMessage);
   await expect(session).not.toContainText(secretInput);

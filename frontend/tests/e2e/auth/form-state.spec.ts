@@ -14,10 +14,11 @@ test("authentication starts empty with a helpful email example and reflows on mo
   await expect(email).toHaveAttribute("placeholder", "name@example.com");
   await expect(password).toHaveValue("");
 
-  await activateControl(auth.getByRole("button", { name: "Register", exact: true }), isMobile);
-  await expect(auth.getByLabel("Full name", { exact: true })).toHaveValue("");
-  await expect(email).toHaveValue("");
-  await expect(auth.getByLabel("Password", { exact: true })).toHaveValue("");
+  await page.goto("/register");
+  const registration = page.getByRole("region", { name: "Analyst session" });
+  await expect(registration.getByLabel("Full name", { exact: true })).toHaveValue("");
+  await expect(registration.getByLabel("Email", { exact: true })).toHaveValue("");
+  await expect(registration.getByLabel("Password", { exact: true })).toHaveValue("");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 

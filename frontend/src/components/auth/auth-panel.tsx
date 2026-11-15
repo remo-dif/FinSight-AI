@@ -26,18 +26,22 @@ function logoutFailureMessage(error: unknown) {
 }
 
 export function AuthPanel({
-  registrationEnabled = true,
-  onSignedIn
+  registrationEnabled = false,
+  initialMode = "login",
+  onSignedIn,
+  onRegistered
 }: {
   registrationEnabled?: boolean;
+  initialMode?: "login" | "register";
   onSignedIn?: () => void;
+  onRegistered?: (message: string) => void;
 } = {}) {
   const t = useTranslations();
   const accessToken = useSessionStore((state) => state.accessToken);
   const setAccessToken = useSessionStore((state) => state.setAccessToken);
   const clearSession = useSessionStore((state) => state.clearSession);
   const userDataEpoch = useSessionStore((state) => state.userDataEpoch);
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -93,6 +97,10 @@ export function AuthPanel({
   const registerMutation = useMutation({
     mutationFn: (credentials: { email: string; password: string; fullName: string }) => register(credentials.email, credentials.password, credentials.fullName),
     onSuccess: (data) => {
+      if (onRegistered) {
+        onRegistered(data.message);
+        return;
+      }
       setMode("login");
       setFieldErrors({});
       setPassword("");

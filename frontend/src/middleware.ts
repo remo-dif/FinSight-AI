@@ -25,7 +25,7 @@ export function middleware(request: NextRequest) {
   headers.set("Content-Security-Policy", policy);
   const segments = request.nextUrl.pathname.split("/").filter(Boolean);
   const requestedLocale = segments[0];
-  const knownRoutes = new Set(["", "cases", "graph", "evidence", "data", "controls", "login"]);
+  const knownRoutes = new Set(["", "cases", "graph", "evidence", "data", "controls", "login", "register"]);
   const hasLocalePrefix = isLocale(requestedLocale);
   const hasUnknownPrefix = Boolean(requestedLocale && !knownRoutes.has(requestedLocale));
   const locale = hasLocalePrefix ? requestedLocale : defaultLocale;

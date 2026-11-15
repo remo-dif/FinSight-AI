@@ -18,7 +18,7 @@ export function safeReturnTo(value: string | null, locale: ReturnType<typeof use
     if (parsed.origin !== "https://finsight.local") return fallback;
     const segments = parsed.pathname.split("/").filter(Boolean);
     const route = locales.includes(segments[0] as (typeof locales)[number]) ? segments[1] : segments[0];
-    if (route === "login") return fallback;
+    if (route === "login" || route === "register") return fallback;
     return `${parsed.pathname}${parsed.search}${parsed.hash}`;
   } catch {
     return fallback;
@@ -33,6 +33,7 @@ export function LoginPage() {
   const searchParams = useSearchParams();
   const [checkingSession, setCheckingSession] = useState(true);
   const returnTo = safeReturnTo(searchParams.get("returnTo"), locale);
+  const registerHref = `${localizePath("/register", locale)}?returnTo=${encodeURIComponent(returnTo)}`;
 
   useEffect(() => {
     let active = true;
@@ -65,6 +66,7 @@ export function LoginPage() {
           </select>
         </label>
         <div className="mt-6">
+          {searchParams.get("registered") === "1" ? <p className="mb-3 text-sm text-success" role="status">{t("registrationComplete")}</p> : null}
           {checkingSession ? (
             <p className="rounded-lg border border-border bg-panel p-4 text-sm text-muted shadow-soft" role="status">{t("loginCheckingSession")}</p>
           ) : (
@@ -74,6 +76,10 @@ export function LoginPage() {
         <Link className="mt-5 inline-flex min-h-10 items-center text-sm font-semibold text-accent underline-offset-4 hover:underline" href={localizePath("/", locale) as Route}>
           {t("continueWithoutSigningIn")}
         </Link>
+        <p className="mt-2 text-sm text-muted">
+          {t("needAccount")} {" "}
+          <Link className="font-semibold text-accent underline-offset-4 hover:underline" href={registerHref as Route}>{t("createAccount")}</Link>
+        </p>
       </div>
     </main>
   );

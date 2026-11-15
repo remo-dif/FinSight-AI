@@ -17,11 +17,9 @@ for (const scenario of [
     const refreshResponse = page.waitForResponse((response) =>
       response.request().method() === "POST" && new URL(response.url()).pathname === "/api/auth/refresh"
     );
-    await page.goto("/");
+    await page.goto("/register");
     expect((await refreshResponse).status()).toBe(401);
-    await activateControl(page.getByRole("button", { name: "Sign in" }), isMobile);
     const panel = page.getByRole("region", { name: "Analyst session" });
-    await activateControl(panel.getByRole("button", { name: "Register", exact: true }), isMobile);
     await panel.getByLabel("Full name", { exact: true }).fill("Synthetic Analyst");
     await panel.getByLabel("Email", { exact: true }).fill(scenario.email);
     await panel.getByLabel("Password", { exact: true }).fill("Synthetic-registration-password-42");
@@ -36,26 +34,17 @@ for (const scenario of [
       password: "Synthetic-registration-password-42",
       full_name: "Synthetic Analyst"
     });
-    await expect(panel).toContainText("Registration request processed.");
-    await expect(panel).not.toContainText("Account created");
-    await expect(panel).toContainText("Sign in to replace demo alerts with live data.");
+    await expect(page).toHaveURL(/\/login\?returnTo=%2F&registered=1$/);
+    await expect(page.getByRole("status")).toContainText("Registration processed");
     await expect(page.getByText("Live investigation data is active.")).toHaveCount(0);
-    await expect(panel.getByRole("button", { name: "Sign in", exact: true, pressed: true })).toHaveAttribute("aria-pressed", "true");
     expect(loginRequests).toBe(0);
     expect(registrationRequests).toBe(1);
   });
 }
 
-test("authentication controls work with keyboard and touch", async ({ page, isMobile }) => {
-  await page.goto("/");
-  const signIn = page.getByRole("button", { name: "Sign in", exact: true });
-  await signIn.focus();
-  await page.keyboard.press("Enter");
-
+test("authentication controls work with keyboard and touch", async ({ page }) => {
+  await page.goto("/register");
   const panel = page.getByRole("region", { name: "Analyst session" });
-  const register = panel.getByRole("button", { name: "Register", exact: true });
-  await activateControl(register, isMobile);
-  await expect(register).toHaveAttribute("aria-pressed", "true");
 
   const fullName = panel.getByLabel("Full name", { exact: true });
   const email = panel.getByLabel("Email", { exact: true });
@@ -80,5 +69,5 @@ test("authentication controls work with keyboard and touch", async ({ page, isMo
   await submit.focus();
   await page.keyboard.press("Enter");
   expect((await responsePromise).status()).toBe(202);
-  await expect(panel).toContainText("Registration request processed.");
+  await expect(page).toHaveURL(/\/login/);
 });
