@@ -1,4 +1,5 @@
 import { Panel } from "@/components/ui/panel";
+import { useTranslations } from "@/i18n/context";
 
 export type SpendingChartDatum = {
   name: string;
@@ -14,6 +15,7 @@ const defaultData: SpendingChartDatum[] = [
 ];
 
 export function SpendingChart({ data = defaultData }: { data?: SpendingChartDatum[] }) {
+  const t = useTranslations();
   const chartData = data.length ? data : defaultData;
   const max = Math.max(...chartData.map((item) => item.value), 1);
 
@@ -21,13 +23,13 @@ export function SpendingChart({ data = defaultData }: { data?: SpendingChartDatu
     <Panel as="section" className="h-full p-4" aria-labelledby="risk-drivers-heading">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 id="risk-drivers-heading" className="text-base font-semibold">Risk drivers</h2>
-          <p className="mt-1 text-sm text-muted">Top signals contributing to open alerts</p>
+          <h2 id="risk-drivers-heading" className="text-base font-semibold">{t("riskDrivers")}</h2>
+          <p className="mt-1 text-sm text-muted">{t("topSignals")}</p>
         </div>
-        <span className="rounded-md bg-danger/10 px-2 py-1 text-xs font-semibold text-danger">Rules + AI</span>
+        <span className="rounded-md bg-danger/10 px-2 py-1 text-xs font-semibold text-danger">{t("rulesAi")}</span>
       </div>
 
-      <ul className="mt-5 space-y-4" aria-label="Risk driver distribution">
+      <ul className="mt-5 space-y-4" aria-label={t("riskDriverDistribution")}>
         {chartData.map((entry) => (
           <li key={entry.name}>
             <div className="mb-1 flex items-center justify-between gap-3 text-sm">
@@ -45,8 +47,8 @@ export function SpendingChart({ data = defaultData }: { data?: SpendingChartDatu
       </ul>
 
       <div className="mt-5 rounded-md border border-border bg-background p-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted">Model calibration</p>
-        <p className="mt-1 text-sm leading-5">Reviewers overturned 8% of high-risk alerts this week. Threshold drift should be checked before increasing automation.</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">{t("modelCalibration")}</p>
+        <p className="mt-1 text-sm leading-5">{t("calibrationText")}</p>
       </div>
     </Panel>
   );

@@ -14,6 +14,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useTranslations } from "@/i18n/context";
 
 export type MobileNavigationItem = {
   id: "triage" | "cases" | "graph" | "evidence" | "data" | "controls";
@@ -38,6 +39,7 @@ export function MobileNavigation({
   activeRoute: MobileNavigationItem["id"];
   items: MobileNavigationItem[];
 }) {
+  const t = useTranslations();
   const navigationRef = useRef<HTMLElement>(null);
   const itemRefs = useRef(new Map<MobileNavigationItem["id"], HTMLAnchorElement>());
   const [overflow, setOverflow] = useState({ start: false, end: false });
@@ -95,7 +97,7 @@ export function MobileNavigation({
       <nav
         ref={navigationRef}
         className="flex gap-0 overflow-x-auto border-b border-border px-0 py-0 text-sm font-medium [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        aria-label="Mobile navigation"
+        aria-label={t("mobileNavigation")}
       >
         {items.map((item) => {
           const Icon = icons[item.id];
@@ -119,7 +121,7 @@ export function MobileNavigation({
               <span className="whitespace-nowrap">{item.label}</span>
               {item.comingSoon ? (
                 <span className="inline-flex items-center rounded-full border border-current/20 bg-current/5 px-1.5 py-0.5 text-xs font-semibold uppercase leading-none tracking-wide">
-                  Coming soon
+                  {t("comingSoon")}
                 </span>
               ) : null}
             </Link>
