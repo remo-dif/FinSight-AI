@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { Button } from "@/components/ui/button";
 
 export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
@@ -13,9 +14,9 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
         <p className="text-xs font-semibold uppercase tracking-wide text-danger">Workspace unavailable</p>
         <h1 id="route-error-heading" className="mt-2 text-xl font-semibold">We could not load this investigation view.</h1>
         <p className="mt-2 text-sm text-muted">Your current work is unchanged. Retry the route when you are ready.</p>
-        <button type="button" className="mt-5 h-10 rounded-md bg-accent px-4 font-semibold text-white" onClick={reset}>
+        <Button type="button" className="mt-5" onClick={reset}>
           Try again
-        </button>
+        </Button>
       </section>
     </main>
   );
