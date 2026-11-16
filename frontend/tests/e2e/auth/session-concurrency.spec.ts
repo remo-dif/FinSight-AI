@@ -49,6 +49,13 @@ test("normal rotations remain single-flight within the same session", async () =
   expect(useSessionStore.getState().accessToken).toBe("rotated-token");
 });
 
+test("a malformed successful refresh response clears the session", async () => {
+  useSessionStore.getState().setAccessToken("expired-token");
+  globalThis.fetch = async () => Response.json({});
+  expect(await restoreSession()).toBe(false);
+  expect(useSessionStore.getState().accessToken).toBeNull();
+});
+
 test("an old flight cannot absorb or clear a newer session's refresh flight", async () => {
   useSessionStore.getState().clearSession();
   const old = deferred<Response>(), fresh = deferred<Response>();

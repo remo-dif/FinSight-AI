@@ -56,10 +56,11 @@ export function AuthPanel({
   const [logoutFailed, setLogoutFailed] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const authenticationInFlight = useRef(false);
-  const sensitivePasswords = useRef(new Set<string>());
+  const currentPassword = useRef("");
+  const submittedPassword = useRef("");
 
   function authenticationFailure(error: unknown, fallback: string) {
-    const redact = (text: string) => [...sensitivePasswords.current].reduce(
+    const redact = (text: string) => [...new Set([currentPassword.current, submittedPassword.current])].reduce(
       (safe, secret) => secret ? safe.split(secret).join("[redacted]") : safe,
       text
     );
@@ -101,7 +102,8 @@ export function AuthPanel({
     onError: (error) => authenticationFailure(error, "Sign in failed."),
     onSettled: () => {
       authenticationInFlight.current = false;
-      sensitivePasswords.current.clear();
+      currentPassword.current = "";
+      submittedPassword.current = "";
     }
   });
 
@@ -120,7 +122,8 @@ export function AuthPanel({
     onError: (error) => authenticationFailure(error, "Registration failed."),
     onSettled: () => {
       authenticationInFlight.current = false;
-      sensitivePasswords.current.clear();
+      currentPassword.current = "";
+      submittedPassword.current = "";
     }
   });
 
@@ -147,7 +150,7 @@ export function AuthPanel({
     event.preventDefault();
     if (authenticationInFlight.current || loginMutation.isPending || registerMutation.isPending) return;
     authenticationInFlight.current = true;
-    sensitivePasswords.current.add(password);
+    submittedPassword.current = password;
     announce(null);
     setFieldErrors({});
     if (mode === "login") {
@@ -223,7 +226,7 @@ export function AuthPanel({
             ...(mode === "register" ? [{ field: "full_name", label: t("fullName"), type: "text", purpose: "name", value: fullName, change: setFullName }] : []),
             { field: "email", label: t("email"), type: "email", purpose: mode === "login" ? "username" : "email", value: email, change: setEmail },
             { field: "password", label: t("password"), type: "password", purpose: mode === "login" ? "current-password" : "new-password", value: password, change: (value: string) => {
-              sensitivePasswords.current.add(value);
+              currentPassword.current = value;
               setPassword(value);
             } }
           ].map(({ field, label, type, purpose, value, change }) => (

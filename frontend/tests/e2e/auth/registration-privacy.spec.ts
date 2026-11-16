@@ -20,14 +20,17 @@ for (const scenario of [
     await page.goto("/register");
     expect((await refreshResponse).status()).toBe(401);
     const panel = page.getByRole("region", { name: "Analyst session" });
-    await panel.getByLabel("Email", { exact: true }).fill(scenario.email);
-    await expect(panel.getByLabel("Email", { exact: true })).toHaveValue(scenario.email);
-    await panel.getByLabel("Password", { exact: true }).fill("Synthetic-registration-password-42");
-    await expect(panel.getByLabel("Password", { exact: true })).toHaveValue("Synthetic-registration-password-42");
-    // WebKit credential autofill may update adjacent fields; enter the
-    // non-credential profile field after those updates have settled.
-    await panel.getByLabel("Full name", { exact: true }).fill("Synthetic Analyst");
+    const fullName = panel.getByLabel("Full name", { exact: true });
+    const email = panel.getByLabel("Email", { exact: true });
+    const password = panel.getByLabel("Password", { exact: true });
+    // Trusted keyboard input avoids WebKit treating synthetic fill operations
+    // as a credential-autofill transaction and clearing an adjacent field.
+    await fullName.pressSequentially("Synthetic Analyst");
+    await email.pressSequentially(scenario.email);
+    await password.pressSequentially("Synthetic-registration-password-42");
     await expect(panel.getByLabel("Full name", { exact: true })).toHaveValue("Synthetic Analyst");
+    await expect(email).toHaveValue(scenario.email);
+    await expect(password).toHaveValue("Synthetic-registration-password-42");
     const responsePromise = page.waitForResponse((response) =>
       response.request().method() === "POST" && new URL(response.url()).pathname === "/api/auth/register"
     );

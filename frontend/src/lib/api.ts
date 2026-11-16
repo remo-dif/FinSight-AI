@@ -168,6 +168,21 @@ export class ApiError extends Error {
   }
 }
 
+function parseTokenResponse(value: unknown): TokenResponse {
+  if (!value || typeof value !== "object") {
+    throw new ApiError("The authentication server returned an invalid response. Please try again.");
+  }
+  const response = value as Partial<TokenResponse>;
+  if (
+    typeof response.access_token !== "string" || response.access_token.trim() === "" ||
+    typeof response.refresh_token !== "string" || response.refresh_token.trim() === "" ||
+    typeof response.token_type !== "string" || response.token_type.trim() === ""
+  ) {
+    throw new ApiError("The authentication server returned an invalid response. Please try again.");
+  }
+  return response as TokenResponse;
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "production" ? "" : "http://localhost:8000");
 const API_REQUEST_TIMEOUT_MS = 10_000;
 let refreshRequest: { generation: number; promise: Promise<string | null> } | null = null;
@@ -234,7 +249,7 @@ async function performTokenRefresh(generation: number): Promise<string | null> {
       return null;
     }
 
-    const data = (await response.json()) as TokenResponse;
+    const data = parseTokenResponse(await response.json());
     return useSessionStore.getState().rotateAccessToken(data.access_token, generation) ? data.access_token : null;
   } catch {
     if (useSessionStore.getState().sessionGeneration === generation) useSessionStore.getState().clearSession();
@@ -412,11 +427,12 @@ export function askDocumentQuestion(
   });
 }
 
-export function login(email: string, password: string): Promise<TokenResponse> {
-  return apiFetch<TokenResponse>("/api/auth/login", {
+export async function login(email: string, password: string): Promise<TokenResponse> {
+  const response = await apiFetch<unknown>("/api/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password })
   });
+  return parseTokenResponse(response);
 }
 
 export function register(email: string, password: string, fullName: string): Promise<{ message: string }> {
@@ -426,11 +442,12 @@ export function register(email: string, password: string, fullName: string): Pro
   });
 }
 
-export function refreshSession(refreshToken: string): Promise<TokenResponse> {
-  return apiFetch<TokenResponse>("/api/auth/refresh", {
+export async function refreshSession(refreshToken: string): Promise<TokenResponse> {
+  const response = await apiFetch<unknown>("/api/auth/refresh", {
     method: "POST",
     body: JSON.stringify({ refresh_token: refreshToken })
   });
+  return parseTokenResponse(response);
 }
 
 export async function logout(expectedUserDataEpoch = useSessionStore.getState().userDataEpoch): Promise<void> {
