@@ -48,6 +48,21 @@ test.describe("internationalization", () => {
     await expect(page.getByRole("heading", { name: "Avviso selezionato" })).toBeFocused();
   });
 
+  test("localizes the operational case workflow rather than mixing interface languages", async ({ page }) => {
+    await page.goto("/it/cases");
+
+    await expect(page.getByText("Coda dimostrativa. Accedi per caricare i casi in tempo reale.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Accedi", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Chiedi al copilota" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Carica evidenze" })).toBeVisible();
+    await expect(page.getByText("Stato", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Assegnazione", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Esposizione", { exact: true })).toBeVisible();
+    await expect(page.getByText("Fonte di rilevamento", { exact: true })).toBeVisible();
+    await expect(page.getByText("Accedi per aggiungere note o registrare azioni sul caso.")).toBeVisible();
+    await expect(page.getByText("Demo queue. Sign in to load live cases.")).toHaveCount(0);
+  });
+
   test("formats the same currency amount using the active locale", async ({ page }) => {
     await page.goto("/it/");
     const values = await page.evaluate(() => ({

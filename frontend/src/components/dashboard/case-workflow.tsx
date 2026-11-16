@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { FormEvent, useState } from "react";
 import { useSessionStore } from "@/store/session";
 import { Button } from "@/components/ui/button";
+import { useLocale, useTranslations } from "@/i18n/context";
 import {
   ApiError,
   addCaseNote,
@@ -17,19 +18,6 @@ import {
   InvestigationCase,
   updateCase
 } from "@/lib/api";
-
-const statusLabels: Record<CaseStatus, string> = {
-  new: "New",
-  needs_evidence: "Needs evidence",
-  escalated: "Escalated",
-  resolved: "Resolved"
-};
-
-const decisionLabels: Record<CaseDecision, string> = {
-  escalate: "Escalate to fraud operations",
-  request_verification: "Request customer verification",
-  false_positive: "Mark as false positive"
-};
 
 type CaseUpdatePayload = Parameters<typeof updateCase>[1];
 
@@ -48,6 +36,7 @@ export function CaseWorkflow({
   isDetailError: boolean;
   onRetryDetail: () => void;
 }) {
+  const t = useTranslations();
   const queryClient = useQueryClient();
   const userDataEpoch = useSessionStore((state) => state.userDataEpoch);
   const [decision, setDecision] = useState<CaseDecision | "">("");
@@ -82,7 +71,7 @@ export function CaseWorkflow({
     },
     onError: async (error, { caseId, userDataEpoch }) => {
       if (useSessionStore.getState().userDataEpoch !== userDataEpoch) return;
-      setErrorMessage(error instanceof Error ? error.message : "The case update was not saved. Refresh the case and try again.");
+      setErrorMessage(error instanceof Error ? error.message : t("caseUpdateError"));
       if (error instanceof ApiError && error.status === 409) await refreshCase(caseId);
     }
   });
@@ -100,7 +89,7 @@ export function CaseWorkflow({
     },
     onError: async (error, { caseId, userDataEpoch }) => {
       if (useSessionStore.getState().userDataEpoch !== userDataEpoch) return;
-      setErrorMessage(error instanceof Error ? error.message : "The note was not saved. Please try again.");
+      setErrorMessage(error instanceof Error ? error.message : t("noteUpdateError"));
       if (error instanceof ApiError && error.status === 409) await refreshCase(caseId);
     }
   });
@@ -155,7 +144,7 @@ export function CaseWorkflow({
 
       {errorMessage ? <p className="text-sm text-danger" role="alert">{errorMessage}</p> : null}
       {updatePending || noteMutation.isPending ? (
-        <p className="sr-only" role="status" aria-live="polite">Saving case changes.</p>
+        <p className="sr-only" role="status" aria-live="polite">{t("savingChanges")}</p>
       ) : null}
     </div>
   );
@@ -172,11 +161,18 @@ function CaseStateControls({
   updatePending: boolean;
   onUpdate: (update: CaseUpdatePayload) => void;
 }) {
+  const t = useTranslations();
+  const statusLabels: Record<CaseStatus, string> = {
+    new: t("statusNew"),
+    needs_evidence: t("statusNeedsEvidence"),
+    escalated: t("statusEscalated"),
+    resolved: t("statusResolved")
+  };
   return (
     <section aria-labelledby="case-state-heading">
-      <h3 id="case-state-heading" className="text-sm font-semibold">Case state</h3>
+      <h3 id="case-state-heading" className="text-sm font-semibold">{t("caseState")}</h3>
       <label className="mt-3 block text-sm font-medium" htmlFor="case-status">
-        Status
+        {t("status")}
         <select
           id="case-status"
           className="mt-1 h-10 w-full rounded-md border border-border bg-white px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
@@ -190,7 +186,7 @@ function CaseStateControls({
         </select>
       </label>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted">Assigned to {caseRecord.assignee_name ?? "No analyst"}</p>
+        <p className="text-sm text-muted">{t("assignedTo", { name: caseRecord.assignee_name ?? t("noAnalyst") })}</p>
         <Button
           type="button"
           variant="secondary"
@@ -198,7 +194,7 @@ function CaseStateControls({
           disabled={!canMutate || updatePending}
           onClick={() => onUpdate({ assignee: caseRecord.assigned_to_me ? "unassigned" : "me" })}
         >
-          {caseRecord.assigned_to_me ? "Unassign me" : "Assign to me"}
+          {caseRecord.assigned_to_me ? t("unassignMe") : t("assignToMe")}
         </Button>
       </div>
     </section>
@@ -224,20 +220,26 @@ function CaseDecisionSection({
   onReasonChange: (reason: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const t = useTranslations();
+  const decisionLabels: Record<CaseDecision, string> = {
+    escalate: t("escalateDecision"),
+    request_verification: t("verificationDecision"),
+    false_positive: t("falsePositiveDecision")
+  };
   return (
     <section aria-labelledby="case-decision-heading">
-      <h3 id="case-decision-heading" className="text-sm font-semibold">Investigation decision</h3>
+      <h3 id="case-decision-heading" className="text-sm font-semibold">{t("investigationDecision")}</h3>
       {caseRecord.decision ? (
         <div className="mt-3 rounded-md border border-border bg-background p-3">
           <p className="text-sm font-semibold">{decisionLabels[caseRecord.decision]}</p>
           <p className="mt-1 text-sm leading-5 text-muted">{caseRecord.decision_reason}</p>
         </div>
       ) : caseRecord.status === "resolved" ? (
-        <p className="mt-3 text-sm text-muted">This case is resolved. Further status changes and decisions are unavailable.</p>
+        <p className="mt-3 text-sm text-muted">{t("resolvedCase")}</p>
       ) : (
         <form className="mt-3 space-y-3" onSubmit={onSubmit}>
           <label className="block text-sm font-medium" htmlFor="case-decision">
-            Decision
+            {t("decision")}
             <select
               id="case-decision"
               className="mt-1 h-10 w-full rounded-md border border-border bg-white px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
@@ -246,14 +248,14 @@ function CaseDecisionSection({
               disabled={!canMutate || updatePending}
               required
             >
-              <option value="">Select a decision</option>
+              <option value="">{t("selectDecision")}</option>
               {Object.entries(decisionLabels).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
               ))}
             </select>
           </label>
           <label className="block text-sm font-medium" htmlFor="case-decision-reason">
-            Reason
+            {t("reason")}
             <textarea
               id="case-decision-reason"
               className="mt-1 min-h-20 w-full rounded-md border border-border bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
@@ -269,7 +271,7 @@ function CaseDecisionSection({
             disabled={!canMutate || updatePending || !decision || !reason.trim()}
             aria-busy={updatePending}
           >
-            {updatePending ? "Recording..." : "Record decision"}
+            {updatePending ? t("recording") : t("recordDecision")}
           </Button>
         </form>
       )}
@@ -300,25 +302,27 @@ function CaseNotesSection({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   isClosed?: boolean;
 }) {
+  const t = useTranslations();
+  const locale = useLocale();
   return (
     <section aria-labelledby="case-notes-heading">
-      <h3 id="case-notes-heading" className="text-sm font-semibold">Analyst notes</h3>
-      {isDetailLoading ? <p className="mt-2 text-sm text-muted" role="status">Loading case notes...</p> : null}
+      <h3 id="case-notes-heading" className="text-sm font-semibold">{t("analystNotes")}</h3>
+      {isDetailLoading ? <p className="mt-2 text-sm text-muted" role="status">{t("loadingCaseNotes")}</p> : null}
       {isDetailError ? (
         <div className="mt-2 flex items-center gap-3 text-sm" role="alert">
-          <p className="text-danger">Case notes could not be loaded.</p>
+          <p className="text-danger">{t("caseNotesError")}</p>
           <Button type="button" variant="text" onClick={onRetryDetail}>
-            Retry
+            {t("retry")}
           </Button>
         </div>
       ) : null}
-      {!canMutate ? <p className="mt-2 text-sm text-muted">{isClosed ? "Notes are read-only after closure." : "Sign in to add notes or record case actions."}</p> : null}
+      {!canMutate ? <p className="mt-2 text-sm text-muted">{isClosed ? t("notesReadOnly") : t("signInForCaseActions")}</p> : null}
       {detail?.notes.length ? (
         <ol className="mt-3 space-y-2">
           {detail.notes.map((item) => (
             <li key={item.id} className="rounded-md border border-border bg-background p-3">
               <p className="text-xs font-semibold text-muted">
-                {item.author_name}{" - "}<time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time>
+                {item.author_name}{" - "}<time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString(locale)}</time>
               </p>
               <p className="mt-1 whitespace-pre-wrap text-sm leading-5">{item.content}</p>
             </li>
@@ -327,7 +331,7 @@ function CaseNotesSection({
       ) : null}
       {canMutate ? (
         <form className="mt-3 space-y-2" onSubmit={onSubmit}>
-          <label className="block text-sm font-medium" htmlFor="case-note-content">Add a note</label>
+          <label className="block text-sm font-medium" htmlFor="case-note-content">{t("addNote")}</label>
           <textarea
             id="case-note-content"
             className="min-h-20 w-full rounded-md border border-border bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
@@ -344,7 +348,7 @@ function CaseNotesSection({
             disabled={notePending || !note.trim()}
             aria-busy={notePending}
           >
-            {notePending ? "Saving note..." : "Add note"}
+            {notePending ? t("savingNote") : t("saveNote")}
           </Button>
         </form>
       ) : null}
@@ -359,6 +363,8 @@ function CaseFollowUpSection({ caseRecord, detail, canMutate, blocked }: {
   canMutate: boolean;
   blocked: boolean;
 }) {
+  const t = useTranslations();
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const userDataEpoch = useSessionStore((state) => state.userDataEpoch);
   const [reason, setReason] = useState("");
@@ -377,7 +383,7 @@ function CaseFollowUpSection({ caseRecord, detail, canMutate, blocked }: {
     retry: false,
     onMutate: () => setError(null),
     onSuccess: () => setReason(""),
-    onError: (failure) => setError(failure instanceof Error ? failure.message : "The case action was not saved."),
+    onError: (failure) => setError(failure instanceof Error ? failure.message : t("caseActionError")),
     onSettled: async (_data, _error, { caseId, userDataEpoch }) => {
       if (useSessionStore.getState().userDataEpoch !== userDataEpoch) return;
       await Promise.all([
@@ -390,19 +396,19 @@ function CaseFollowUpSection({ caseRecord, detail, canMutate, blocked }: {
   const disabled = !canMutate || blocked || mutation.isPending || detail?.id !== caseRecord.id || detail?.revision === undefined;
   return (
     <section aria-labelledby="case-follow-up-heading" className="space-y-3">
-      <h3 id="case-follow-up-heading" className="text-sm font-semibold">Follow-up investigation</h3>
+      <h3 id="case-follow-up-heading" className="text-sm font-semibold">{t("followUpInvestigation")}</h3>
       {detail?.follow_ups?.length ? (
         <ol className="space-y-2">
           {detail.follow_ups.map((item) => (
             <li key={item.id} className="rounded-md border border-border p-3">
-              <p className="text-sm font-semibold">{item.action === "close" ? "Case closed" : "Investigation outcome recorded"}</p>
+              <p className="text-sm font-semibold">{item.action === "close" ? t("caseClosed") : t("outcomeRecorded")}</p>
               <p className="whitespace-pre-wrap text-sm">{item.reason}</p>
-              <p className="text-xs text-muted">{item.previous_status}{" to "}{item.resulting_status}{" - "}<time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time></p>
+              <p className="text-xs text-muted">{t("statusTransition", { previous: localizedStatus(item.previous_status, t), resulting: localizedStatus(item.resulting_status, t) })}{" - "}<time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString(locale)}</time></p>
             </li>
           ))}
         </ol>
       ) : null}
-      {closed ? <p className="text-sm text-muted">This case is closed. Its decision and history are preserved.</p> : (
+      {closed ? <p className="text-sm text-muted">{t("closedCase")}</p> : (
         <form className="space-y-2" onSubmit={(event) => {
           event.preventDefault();
           if (reason.trim() && !disabled && detail?.revision !== undefined) mutation.mutate({
@@ -410,15 +416,24 @@ function CaseFollowUpSection({ caseRecord, detail, canMutate, blocked }: {
           });
         }}>
           <label className="block text-sm" htmlFor="case-follow-up-reason">
-            {hasOutcome ? "Closure reason" : caseRecord.decision === "request_verification" ? "Verification result and outcome" : "Escalation investigation outcome"}
+            {hasOutcome ? t("closureReason") : caseRecord.decision === "request_verification" ? t("verificationOutcome") : t("escalationOutcome")}
           </label>
           <textarea id="case-follow-up-reason" className="w-full rounded-md border border-border p-2" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={4000} required disabled={disabled} />
           <button type="submit" className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white disabled:opacity-60" disabled={disabled || !reason.trim()}>
-            {hasOutcome ? "Close investigation" : "Record follow-up outcome"}
+            {hasOutcome ? t("closeInvestigation") : t("recordFollowUp")}
           </button>
         </form>
       )}
       {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
     </section>
   );
+}
+
+function localizedStatus(status: CaseStatus, t: ReturnType<typeof useTranslations>) {
+  return {
+    new: t("statusNew"),
+    needs_evidence: t("statusNeedsEvidence"),
+    escalated: t("statusEscalated"),
+    resolved: t("statusResolved")
+  }[status];
 }
