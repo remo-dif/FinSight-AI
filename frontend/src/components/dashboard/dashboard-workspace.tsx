@@ -114,7 +114,7 @@ export function TriageWorkspace({ initialQueue }: { initialQueue?: InitialCaseQu
         {selectedCase ? <>
           <p className="mt-3 break-all text-lg font-semibold">{selectedCase.id}</p>
           <p className="mt-1 text-sm text-muted">{selectedCase.merchant}</p>
-          <dl className="mt-4 space-y-2 text-sm"><SummaryItem label={t("status")} value={statusLabel(selectedCase.status)} /><SummaryItem label="Assignment" value={selectedCase.assignee_name ?? "Unassigned"} /></dl>
+          <dl className="mt-4 space-y-2 text-sm"><SummaryItem label={t("status")} value={statusLabel(selectedCase.status, t)} /><SummaryItem label={t("assignment")} value={selectedCase.assignee_name ?? t("unassigned")} /></dl>
           <Link className="mt-4 inline-flex min-h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-white" href={`${locale === "en" ? "" : `/${locale}`}/cases?case=${encodeURIComponent(selectedCase.id)}` as never}>{t("openCase")}</Link>
         </> : <p className="mt-3 text-sm text-muted">{t("selectAlert")}</p>}
       </Panel>
@@ -235,36 +235,38 @@ function RequestedCaseState({
   onRetry: () => void;
   headingRef: { current: HTMLHeadingElement | null };
 }) {
+  const t = useTranslations();
   const isNotFound = error instanceof ApiError && error.status === 404;
 
   return (
     <Panel as="section" className="h-fit p-6" aria-labelledby="selected-alert-heading">
       <h2 ref={headingRef} id="selected-alert-heading" tabIndex={-1} className="scroll-mt-28 text-xs font-semibold uppercase tracking-wide text-muted">
-        Requested case
+        {t("requestedCase")}
       </h2>
-      <p className="mt-2 break-all text-xl font-semibold">{caseId ?? "No case selected"}</p>
-      {isLoading ? <p className="mt-4 text-sm text-muted" role="status">Loading the requested case...</p> : null}
+      <p className="mt-2 break-all text-xl font-semibold">{caseId ?? t("noCaseSelected")}</p>
+      {isLoading ? <p className="mt-4 text-sm text-muted" role="status">{t("loadingRequestedCase")}</p> : null}
       {!isLoading && isNotFound ? (
-        <p className="mt-4 text-sm text-danger" role="alert">This case was not found or is not available to your account.</p>
+        <p className="mt-4 text-sm text-danger" role="alert">{t("caseNotFound")}</p>
       ) : null}
       {!isLoading && error && !isNotFound ? (
         <div className="mt-4 text-sm" role="alert">
-          <p className="text-danger">The requested case could not be loaded.</p>
-          <button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>Retry</button>
+          <p className="text-danger">{t("caseCouldNotLoad")}</p>
+          <button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>{t("retry")}</button>
         </div>
       ) : null}
       {!isLoading && !error ? (
-        <p className="mt-4 text-sm text-muted">This case is not in the current list. Sign in to check whether it is available to your account.</p>
+        <p className="mt-4 text-sm text-muted">{t("caseNotCurrentList")}</p>
       ) : null}
     </Panel>
   );
 }
 
 function QueueStatus({ status, loginHref, onRetry, onSession }: { status: "demo" | "loading" | "live" | "error"; loginHref: string; onRetry: () => void; onSession: (trigger: HTMLElement) => void }) {
+  const t = useTranslations();
   return <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-panel px-4 py-3">
-    <p className="text-sm text-muted" role={status === "error" ? "alert" : "status"}>{status === "demo" ? "Demo queue. Sign in to load live cases." : status === "loading" ? "Loading live cases..." : status === "error" ? "Live cases are unavailable. No demo cases are shown." : "Live queue is active. Choose what needs attention next."}</p>
-    {status === "error" ? <button type="button" className="text-sm font-semibold text-accent underline-offset-4 hover:underline" onClick={onRetry}>Retry</button> : null}
-    {status === "demo" ? <Link className="ml-auto inline-flex min-h-9 items-center rounded-md border border-border bg-white px-3 text-sm font-semibold text-muted hover:border-accent/60 hover:text-foreground" href={loginHref as never}>Sign in</Link> : <button type="button" className="ml-auto inline-flex min-h-9 items-center rounded-md border border-border bg-white px-3 text-sm font-semibold text-muted hover:border-accent/60 hover:text-foreground" onClick={(event) => onSession(event.currentTarget)}>Session active</button>}
+    <p className="text-sm text-muted" role={status === "error" ? "alert" : "status"}>{status === "demo" ? t("demoQueue") : status === "loading" ? t("loadingLiveCases") : status === "error" ? t("liveCasesUnavailable") : t("liveQueueActive")}</p>
+    {status === "error" ? <button type="button" className="text-sm font-semibold text-accent underline-offset-4 hover:underline" onClick={onRetry}>{t("retry")}</button> : null}
+    {status === "demo" ? <Link className="ml-auto inline-flex min-h-9 items-center rounded-md border border-border bg-white px-3 text-sm font-semibold text-muted hover:border-accent/60 hover:text-foreground" href={loginHref as never}>{t("signIn")}</Link> : <button type="button" className="ml-auto inline-flex min-h-9 items-center rounded-md border border-border bg-white px-3 text-sm font-semibold text-muted hover:border-accent/60 hover:text-foreground" onClick={(event) => onSession(event.currentTarget)}>{t("sessionActive")}</button>}
   </div>;
 }
 
@@ -272,10 +274,10 @@ function CaseNavigator({ cases, selectedId, status, onRetry, onSelect }: { cases
   const t = useTranslations();
   return <Panel as="nav" className="h-fit p-3 xl:sticky xl:top-[96px]" aria-label={t("caseNavigator")}>
     <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold">{t("cases")}</h2><span className="text-xs text-muted">{cases.length}</span></div>
-    {status === "loading" && cases.length === 0 ? <p className="mt-3 text-sm text-muted" role="status">Loading cases...</p> : null}
-    {status === "error" && cases.length === 0 ? <div className="mt-3 text-sm" role="alert"><p className="text-danger">Cases are unavailable.</p><button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>Retry</button></div> : null}
-    {status === "error" && cases.length > 0 ? <div className="mt-3 text-sm" role="status"><p className="font-semibold text-warning">Refresh failed. Showing the most recently loaded cases.</p><button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>Retry</button></div> : null}
-    {status !== "loading" && status !== "error" && cases.length === 0 ? <p className="mt-3 text-sm text-muted">No cases are available.</p> : null}
+    {status === "loading" && cases.length === 0 ? <p className="mt-3 text-sm text-muted" role="status">{t("loadingCases")}</p> : null}
+    {status === "error" && cases.length === 0 ? <div className="mt-3 text-sm" role="alert"><p className="text-danger">{t("casesUnavailable")}</p><button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>{t("retry")}</button></div> : null}
+    {status === "error" && cases.length > 0 ? <div className="mt-3 text-sm" role="status"><p className="font-semibold text-warning">{t("refreshFailed")}</p><button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>{t("retry")}</button></div> : null}
+    {status !== "loading" && status !== "error" && cases.length === 0 ? <p className="mt-3 text-sm text-muted">{t("noCases")}</p> : null}
     <ul className="mt-3 space-y-2">
       {cases.map((item) => (
         <li key={item.id}>
@@ -289,7 +291,7 @@ function CaseNavigator({ cases, selectedId, status, onRetry, onSelect }: { cases
             <span className="mt-1 block break-words text-xs font-medium text-foreground">{item.category}</span>
             <span className="mt-2 block break-all text-xs text-muted">{item.id}</span>
             <span className="mt-1 block text-xs text-muted">
-              {statusLabel(item.status)} · {item.assignee_name ?? "Unassigned"}
+              {statusLabel(item.status, t)} · {item.assignee_name ?? t("unassigned")}
             </span>
           </button>
         </li>
@@ -311,10 +313,11 @@ function WorkspaceToolbar({
   loginHref: string;
   onDrawerChange: (drawer: ToolDrawer, trigger?: HTMLElement) => void;
 }) {
+  const t = useTranslations();
   const tools: Array<{ id: Exclude<ToolDrawer, null>; label: string; icon: typeof UserCheck }> = [
-    { id: "session", label: queueStatus !== "demo" ? "Session active" : "Sign in", icon: UserCheck },
-    { id: "copilot", label: "Ask copilot", icon: MessageSquareText },
-    { id: "upload", label: "Upload evidence", icon: FileUp }
+    { id: "session", label: queueStatus !== "demo" ? t("sessionActive") : t("signIn"), icon: UserCheck },
+    { id: "copilot", label: t("askCopilot"), icon: MessageSquareText },
+    { id: "upload", label: t("uploadEvidence"), icon: FileUp }
   ];
 
   return (
@@ -322,16 +325,16 @@ function WorkspaceToolbar({
       <div className="flex flex-wrap items-center gap-3">
         <p className="text-sm text-muted" role={queueStatus === "error" ? "status" : undefined}>
           {queueStatus === "demo"
-            ? "Demo queue. Sign in to load live cases."
+            ? t("demoQueue")
             : queueStatus === "loading"
-              ? "Loading live cases..."
+              ? t("loadingLiveCases")
               : queueStatus === "error"
-                ? "Live cases are unavailable. No demo cases are shown."
-                : "Live queue is active. Select an alert to review evidence and record a decision."}
+                ? t("liveCasesUnavailable")
+                : t("liveQueueDecision")}
         </p>
         {queueStatus === "error" ? (
           <button type="button" className="text-sm font-semibold text-accent underline-offset-4 hover:underline" onClick={onRetry}>
-            Retry
+            {t("retry")}
           </button>
         ) : null}
       </div>
@@ -395,7 +398,7 @@ function AlertDetailPanel({
           <div className="min-w-0">
             <h2 ref={headingRef} id="selected-alert-heading" tabIndex={-1} className="scroll-mt-28 text-xs font-semibold uppercase tracking-wide text-muted">{t("selectedAlert")}</h2>
             <p className="mt-2 break-words text-xl font-semibold leading-tight">
-              {caseRecord?.merchant ?? "No alert selected"}
+              {caseRecord?.merchant ?? t("noAlertSelected")}
             </p>
             <p className="mt-2 break-all text-xs text-muted">
               <span className="font-semibold text-foreground">{t("caseId")}</span>{" "}
@@ -405,26 +408,26 @@ function AlertDetailPanel({
         </div>
 
         <dl className="mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-          <SummaryItem label="Status" value={caseRecord ? statusLabel(caseRecord.status) : "--"} />
-          <SummaryItem label="Assignment" value={caseRecord?.assignee_name ?? "Unassigned"} />
+          <SummaryItem label={t("status")} value={caseRecord ? statusLabel(caseRecord.status, t) : "--"} />
+          <SummaryItem label={t("assignment")} value={caseRecord?.assignee_name ?? t("unassigned")} />
         </dl>
       </div>
 
       <div className="space-y-5 p-4">
         <section aria-labelledby="signal-heading">
           <h3 id="signal-heading" className="text-sm font-semibold">{t("whyFlagged")}</h3>
-          <p className="mt-1 text-base font-semibold">{caseRecord?.category ?? "Awaiting selection"}</p>
+          <p className="mt-1 text-base font-semibold">{caseRecord?.category ?? t("awaitingSelection")}</p>
           <p className="mt-2 text-sm leading-6 text-muted">
-            {caseRecord?.description ?? "Select a case to review its transaction context and record an investigation."}
+            {caseRecord?.description ?? t("selectCaseForInvestigation")}
           </p>
         </section>
 
         <section aria-labelledby="financial-context-heading">
           <h3 id="financial-context-heading" className="text-sm font-semibold">{t("financialContext")}</h3>
           <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
-            <SummaryItem label="Exposure" value={caseRecord ? formatAmount(caseRecord, locale) : "--"} />
-            <SummaryItem label="Posted" value={caseRecord?.posted_at ?? "--"} />
-            <SummaryItem label="Detection source" value={caseRecord?.source ?? "--"} />
+            <SummaryItem label={t("exposure")} value={caseRecord ? formatAmount(caseRecord, locale) : "--"} />
+            <SummaryItem label={t("posted")} value={caseRecord?.posted_at ?? "--"} />
+            <SummaryItem label={t("detectionSource")} value={caseRecord?.source ?? "--"} />
           </dl>
         </section>
 
@@ -436,11 +439,11 @@ function AlertDetailPanel({
               className="text-sm font-semibold text-accent underline-offset-4 hover:underline"
               onClick={(event) => onDrawerChange("upload", event.currentTarget)}
             >
-              Upload to Document Library
+              {t("uploadDocument")}
             </button>
           </div>
           <p className="mt-2 text-sm leading-6 text-muted">
-            Case-linked document status is not available in this view. Documents uploaded here are stored in the Document Library and are not attached to this case.
+            {t("caseLinkedDocumentsUnavailable")}
           </p>
         </section>
 
@@ -478,11 +481,12 @@ function ContextDrawer({
   onClose: () => void;
   triggerRef: { current: HTMLElement | null };
 }) {
+  const t = useTranslations();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titles = {
-    session: "Analyst session",
-    copilot: "Investigation copilot",
-    upload: "Evidence ingestion"
+    session: t("analystSession"),
+    copilot: t("investigationCopilot"),
+    upload: t("evidenceIngestion")
   };
 
   useEffect(() => {
@@ -507,7 +511,7 @@ function ContextDrawer({
             type="button"
             className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-white text-muted hover:text-foreground"
             onClick={() => dialogRef.current?.close()}
-            aria-label="Close panel"
+            aria-label={t("closePanel")}
           >
             <X aria-hidden className="h-4 w-4" />
           </button>
@@ -522,14 +526,15 @@ function ContextDrawer({
 }
 
 function DrawerPanelLoading() {
-  return <div className="h-48 animate-pulse rounded-lg bg-border/50" role="status"><span className="sr-only">Loading panel</span></div>;
+  const t = useTranslations();
+  return <div className="h-48 animate-pulse rounded-lg bg-border/50" role="status"><span className="sr-only">{t("loadingPanel")}</span></div>;
 }
 
-function statusLabel(status: InvestigationCase["status"]) {
+function statusLabel(status: InvestigationCase["status"], t: ReturnType<typeof useTranslations>) {
   return {
-    new: "New",
-    needs_evidence: "Needs evidence",
-    escalated: "Escalated",
-    resolved: "Resolved"
+    new: t("statusNew"),
+    needs_evidence: t("statusNeedsEvidence"),
+    escalated: t("statusEscalated"),
+    resolved: t("statusResolved")
   }[status];
 }
