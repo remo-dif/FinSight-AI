@@ -8,7 +8,9 @@ function deferred<T>() {
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 }
-const tokens = (access_token: string) => Response.json({ access_token, refresh_token: "synthetic-refresh", token_type: "bearer" });
+// Browser sessions rotate through an HttpOnly cookie, so the backend
+// intentionally omits a usable refresh token from the JSON body.
+const tokens = (access_token: string) => Response.json({ access_token, refresh_token: "", token_type: "bearer" });
 const originalFetch = globalThis.fetch;
 test.afterEach(() => { globalThis.fetch = originalFetch; useSessionStore.getState().clearSession(); });
 
@@ -47,6 +49,13 @@ test("normal rotations remain single-flight within the same session", async () =
   gate.resolve(tokens("rotated-token"));
   expect(await Promise.all([first, second])).toEqual([true, true]);
   expect(useSessionStore.getState().accessToken).toBe("rotated-token");
+});
+
+test("a malformed successful refresh response clears the session", async () => {
+  useSessionStore.getState().setAccessToken("expired-token");
+  globalThis.fetch = async () => Response.json({});
+  expect(await restoreSession()).toBe(false);
+  expect(useSessionStore.getState().accessToken).toBeNull();
 });
 
 test("an old flight cannot absorb or clear a newer session's refresh flight", async () => {

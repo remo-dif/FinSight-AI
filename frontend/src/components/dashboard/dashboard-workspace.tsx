@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   FileUp,
   MessageSquareText,
@@ -41,6 +42,15 @@ const UploadPanel = dynamic(
 
 type ToolDrawer = "session" | "copilot" | "upload" | null;
 
+function useLoginHref() {
+  const locale = useLocale();
+  const pathname = usePathname() || "/";
+  const searchParams = useSearchParams();
+  const query = searchParams.toString();
+  const destination = `${pathname}${query ? `?${query}` : ""}`;
+  return `${localizePath("/login", locale)}?returnTo=${encodeURIComponent(destination)}`;
+}
+
 function useCaseQueue(initialQueue?: InitialCaseQueue) {
   const token = useSessionStore((state) => state.accessToken);
   const userDataEpoch = useSessionStore((state) => state.userDataEpoch);
@@ -52,7 +62,9 @@ function useCaseQueue(initialQueue?: InitialCaseQueue) {
   const hasServerSession = Boolean(serverCases) || initialQueue?.status === "unavailable";
   const hasSession = Boolean(token) || hasServerSession;
   const cases = useQuery({
-    queryKey: caseListQueryKey(),
+    // Partition authenticated data by ownership. Prefix invalidations still
+    // match this key, while an account change cannot retain the prior queue.
+    queryKey: [...caseListQueryKey(), userDataEpoch],
     queryFn: () => fetchCases(50),
     enabled: Boolean(token),
     initialData: serverCases,
@@ -76,6 +88,7 @@ function useCaseQueue(initialQueue?: InitialCaseQueue) {
 export function TriageWorkspace({ initialQueue }: { initialQueue?: InitialCaseQueue }) {
   const t = useTranslations();
   const locale = useLocale();
+  const loginHref = useLoginHref();
   const { cases, queueStatus, activeCases } = useCaseQueue(initialQueue);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawer, setDrawer] = useState<ToolDrawer>(null);
@@ -86,7 +99,7 @@ export function TriageWorkspace({ initialQueue }: { initialQueue?: InitialCaseQu
   );
 
   return <div className="space-y-4">
-    <QueueStatus status={queueStatus} onRetry={() => void cases.refetch()} onSession={(trigger) => { drawerTriggerRef.current = trigger; setDrawer("session"); }} />
+    <QueueStatus status={queueStatus} loginHref={loginHref} onRetry={() => void cases.refetch()} onSession={(trigger) => { drawerTriggerRef.current = trigger; setDrawer("session"); }} />
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
       <div className="min-w-0">
         <TransactionsTable
@@ -112,6 +125,7 @@ export function TriageWorkspace({ initialQueue }: { initialQueue?: InitialCaseQu
 
 export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQueue?: InitialCaseQueue; initialSelectedId?: string }) {
   const locale = useLocale();
+  const loginHref = useLoginHref();
   const { token, cases, queueStatus, activeCases, userDataEpoch } = useCaseQueue(initialQueue);
   // Explicit navigation is a request to resolve an ID under the current session.
   // A case selected from the loaded queue belongs to that queue's session.
@@ -169,6 +183,7 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
         queueStatus={queueStatus}
         onRetry={() => void cases.refetch()}
         drawer={drawer}
+        loginHref={loginHref}
         onDrawerChange={changeDrawer}
       />
 
@@ -245,11 +260,11 @@ function RequestedCaseState({
   );
 }
 
-function QueueStatus({ status, onRetry, onSession }: { status: "demo" | "loading" | "live" | "error"; onRetry: () => void; onSession: (trigger: HTMLElement) => void }) {
+function QueueStatus({ status, loginHref, onRetry, onSession }: { status: "demo" | "loading" | "live" | "error"; loginHref: string; onRetry: () => void; onSession: (trigger: HTMLElement) => void }) {
   return <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-panel px-4 py-3">
     <p className="text-sm text-muted" role={status === "error" ? "alert" : "status"}>{status === "demo" ? "Demo queue. Sign in to load live cases." : status === "loading" ? "Loading live cases..." : status === "error" ? "Live cases are unavailable. No demo cases are shown." : "Live queue is active. Choose what needs attention next."}</p>
     {status === "error" ? <button type="button" className="text-sm font-semibold text-accent underline-offset-4 hover:underline" onClick={onRetry}>Retry</button> : null}
-    <button type="button" className="ml-auto inline-flex min-h-9 items-center rounded-md border border-border bg-white px-3 text-sm font-semibold text-muted hover:border-accent/60 hover:text-foreground" onClick={(event) => onSession(event.currentTarget)}>{status === "demo" ? "Sign in" : "Session active"}</button>
+    {status === "demo" ? <Link className="ml-auto inline-flex min-h-9 items-center rounded-md border border-border bg-white px-3 text-sm font-semibold text-muted hover:border-accent/60 hover:text-foreground" href={loginHref as never}>Sign in</Link> : <button type="button" className="ml-auto inline-flex min-h-9 items-center rounded-md border border-border bg-white px-3 text-sm font-semibold text-muted hover:border-accent/60 hover:text-foreground" onClick={(event) => onSession(event.currentTarget)}>Session active</button>}
   </div>;
 }
 
@@ -287,11 +302,13 @@ function WorkspaceToolbar({
   queueStatus,
   onRetry,
   drawer,
+  loginHref,
   onDrawerChange
 }: {
   queueStatus: "demo" | "loading" | "live" | "error";
   onRetry: () => void;
   drawer: ToolDrawer;
+  loginHref: string;
   onDrawerChange: (drawer: ToolDrawer, trigger?: HTMLElement) => void;
 }) {
   const tools: Array<{ id: Exclude<ToolDrawer, null>; label: string; icon: typeof UserCheck }> = [
@@ -322,6 +339,9 @@ function WorkspaceToolbar({
         {tools.map((tool) => {
           const Icon = tool.icon;
           const active = drawer === tool.id;
+          if (tool.id === "session" && queueStatus === "demo") {
+            return <Link key={tool.id} className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-white px-3 text-sm font-semibold text-muted transition hover:border-accent/60 hover:text-foreground" href={loginHref as never}><Icon aria-hidden className="h-4 w-4" />{tool.label}</Link>;
+          }
           return (
             <button
               key={tool.id}

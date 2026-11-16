@@ -19,10 +19,9 @@ test("display preserves decimal strings, signs, precision and currency units", a
     return json(route, 200, { ...record, notes: [] });
   });
   await page.goto("/cases");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("link", { name: "Sign in", exact: true }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type=submit]").click();
-  await expect(page.getByText("Live investigation data is active.")).toBeVisible();
-  await page.getByRole("button", { name: "Close panel" }).click();
+  await expect(page.getByText(/Live queue is active/)).toBeVisible();
   const selected = page.getByRole("region", { name: "Selected alert" });
   for (const record of records) {
     const button = page.getByRole("navigation", { name: "Case navigator" }).getByRole("button").filter({ hasText: record.id });

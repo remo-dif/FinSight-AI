@@ -9,12 +9,13 @@ import {
   mockRefreshFailure
 } from "../fixtures/api";
 
-async function submitLogin(page: import("@playwright/test").Page) {
-  await page.getByRole("button", { name: "Sign in" }).click();
+async function submitLogin(page: import("@playwright/test").Page, openSession = true) {
+  await page.getByRole("link", { name: "Sign in" }).click();
   await page
     .getByRole("region", { name: "Analyst session" })
     .locator("form button[type='submit']")
     .click();
+  if (openSession) await page.getByRole("button", { name: "Session active" }).click();
 }
 
 test("valid login enables live dashboard data and logout clears the session", async ({ page, isMobile }) => {
@@ -250,9 +251,10 @@ test("invalid login reports the API error and keeps demo mode", async ({ page, i
   await mockLogin(page, 401, { detail: "Invalid email or password" });
 
   await page.goto("/cases");
-  await submitLogin(page);
+  await submitLogin(page, false);
 
   await expect(page.getByText("Invalid email or password")).toBeVisible();
+  await page.goBack();
   await expect(page.getByText("Demo queue. Sign in to load live cases.")).toBeVisible();
   await expect(page.getByText("Live investigation data is active.")).toBeHidden();
 });

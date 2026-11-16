@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { analystTokens, json } from "./fixtures/api";
+import { analystTokens, json, mockDashboardData } from "./fixtures/api";
 
 test("renders a distinct triage workspace", async ({ page }) => {
   await page.goto("/");
@@ -42,14 +42,15 @@ test("does not persist bearer tokens after analyst sign in", async ({ page, isMo
   await page.route("**/api/auth/login", async (route) => {
     await json(route, 200, analystTokens);
   });
+  await mockDashboardData(page);
 
   await page.goto("/cases");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("link", { name: "Sign in" }).click();
   await page
     .getByRole("region", { name: "Analyst session" })
     .locator("form button[type='submit']")
     .click();
-  await expect(page.getByText("Live investigation data is active.")).toBeVisible();
+  await expect(page.getByText(/Live queue is active/)).toBeVisible();
 
   const stored = await page.evaluate(() => localStorage.getItem("finsight-session"));
   expect(stored).not.toContain("test-access-token");

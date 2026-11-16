@@ -2,9 +2,8 @@ import { expect, test } from "@playwright/test";
 import { json, liveTransactions, mockDashboardData, mockLogin, mockRefreshFailure } from "./fixtures/api";
 
 async function signInFromCases(page: import("@playwright/test").Page) {
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("link", { name: "Sign in" }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
-  await page.getByRole("button", { name: "Close panel" }).click();
 }
 
 test("Triage opens a shareable selected case in the Cases workspace", async ({ page }) => {
@@ -122,7 +121,7 @@ test("Evidence exposes the authenticated document library, global upload, and do
   }]));
 
   await page.goto("/evidence");
-  await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
+  await signInFromCases(page);
 
   await expect(page.getByRole("heading", { name: "Document Library", exact: true })).toBeVisible();
   await expect(page.getByText("statement.pdf").first()).toBeVisible();
@@ -166,7 +165,7 @@ test("a successful upload refreshes the authenticated document library and expos
   });
 
   await page.goto("/evidence");
-  await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
+  await signInFromCases(page);
   await expect(page.getByRole("list", { name: "Documents" }).getByText("statement.pdf")).toBeVisible();
   await page.getByRole("region", { name: "Document Library" }).getByRole("button", { name: "Load more" }).click();
   await expect(page.getByRole("list", { name: "Documents" }).getByRole("listitem")).toHaveCount(101);
@@ -191,7 +190,7 @@ test("a failed upload leaves the current document library unchanged", async ({ p
   });
 
   await page.goto("/evidence");
-  await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
+  await signInFromCases(page);
   await expect(page.getByRole("list", { name: "Documents" }).getByText("statement.pdf")).toBeVisible();
   await page.locator("input[type='file']").setInputFiles({ name: "bad.pdf", mimeType: "application/pdf", buffer: Buffer.from("invalid") });
   await page.getByRole("button", { name: "Upload", exact: true }).click();

@@ -25,14 +25,13 @@ test("primary workspace controls are reachable by keyboard", async ({ page, isMo
 test("forms, status regions, and alert queue expose stable accessible names", async ({ page }) => {
   await page.goto("/cases");
 
-  const sessionTrigger = page.getByRole("button", { name: "Sign in" });
+  const sessionTrigger = page.getByRole("link", { name: "Sign in" });
   await sessionTrigger.click();
-  await expect(page.getByRole("dialog", { name: "Analyst session" })).toBeVisible();
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Fcases$/);
   await expect(page.getByRole("region", { name: "Analyst session" })).toBeVisible();
   await expect(page.getByLabel("Email")).toBeVisible();
   await expect(page.getByLabel("Password")).toBeVisible();
-  await page.getByRole("button", { name: "Close panel" }).click();
-  await expect(sessionTrigger).toBeFocused();
+  await page.goBack();
 
   await page.getByRole("button", { name: "Ask copilot" }).click();
   await expect(page.getByRole("dialog", { name: "Investigation copilot" })).toBeVisible();
@@ -48,24 +47,20 @@ test("forms, status regions, and alert queue expose stable accessible names", as
   await expect(page.getByRole("navigation", { name: "Case navigator" })).toBeVisible();
 });
 
-test("session drawer contains and restores keyboard focus", async ({ page }) => {
+test("dedicated login is reachable and keyboard operable", async ({ page }) => {
   await page.goto("/cases");
-  const trigger = page.getByRole("button", { name: "Sign in", exact: true });
+  const trigger = page.getByRole("link", { name: "Sign in", exact: true });
   await trigger.focus();
   await page.keyboard.press("Enter");
 
-  const dialog = page.getByRole("dialog", { name: "Analyst session" });
-  await expect(dialog).toBeVisible();
-  await expect(page.getByRole("region", { name: "Analyst session" })).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "Close panel" })).toBeVisible();
-
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Fcases$/);
+  const login = page.getByRole("region", { name: "Analyst session" });
+  await expect(login).toBeVisible();
+  await login.getByLabel("Email").focus();
   await page.keyboard.press("Tab");
-  expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+  expect(await login.evaluate((element) => element.contains(document.activeElement))).toBe(true);
   await page.keyboard.press("Shift+Tab");
-  expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);
-
-  await dialog.getByRole("button", { name: "Close panel" }).click();
-  await expect(trigger).toBeFocused();
+  expect(await login.evaluate((element) => element.contains(document.activeElement))).toBe(true);
 });
 
 test("keyboard focus has a visible indicator", async ({ page }) => {

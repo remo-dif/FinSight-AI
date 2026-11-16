@@ -2,12 +2,11 @@ import { expect, test } from "@playwright/test";
 import { json, mockDashboardData, mockLogin } from "../fixtures/api";
 
 async function signIn(page: import("@playwright/test").Page) {
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("link", { name: "Sign in" }).click();
   await page
     .getByRole("region", { name: "Analyst session" })
     .locator("form button[type='submit']")
     .click();
-  await page.getByRole("button", { name: "Close panel" }).click();
 }
 
 test("CSV currency selection is explicit, actionable and reset for each file", async ({ page }) => {

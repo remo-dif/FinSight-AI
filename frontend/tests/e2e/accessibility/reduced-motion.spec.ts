@@ -1,12 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { json, mockLogin, mockRefreshFailure } from "../fixtures/api";
+import { json, mockDashboardData, mockLogin, mockRefreshFailure } from "../fixtures/api";
 
 test("reduced motion preserves focus, dialogs, navigation, and page geometry", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await mockRefreshFailure(page);
   await page.goto("/cases");
 
-  const sessionTrigger = page.getByRole("button", { name: "Sign in", exact: true });
+  const sessionTrigger = page.getByRole("link", { name: "Sign in", exact: true });
   await sessionTrigger.focus();
   const focusStyle = await sessionTrigger.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -16,10 +16,10 @@ test("reduced motion preserves focus, dialogs, navigation, and page geometry", a
   expect(Number.parseFloat(focusStyle.outlineWidth)).toBeGreaterThan(0);
 
   await page.keyboard.press("Enter");
-  const dialog = page.getByRole("dialog", { name: "Analyst session" });
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "Close panel" }).click();
-  await expect(sessionTrigger).toBeFocused();
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Fcases$/);
+  await expect(page.getByRole("region", { name: "Analyst session" })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
 
   const geometry = await page.evaluate(() => ({
     horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,
@@ -45,18 +45,18 @@ test("loading animations are disabled when reduced motion is requested", async (
   await page.emulateMedia({ reducedMotion: "reduce" });
   await mockLogin(page);
   await mockRefreshFailure(page);
+  await mockDashboardData(page);
   await page.route("**/api/uploads", async (route) => {
     await blocked;
     await json(route, 200, { status: "accepted", imported: 1, indexed: 1 });
   });
   await page.goto("/cases");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("link", { name: "Sign in", exact: true }).click();
   const auth = page.getByRole("region", { name: "Analyst session" });
   await auth.getByLabel("Email", { exact: true }).fill("analyst@example.test");
   await auth.getByLabel("Password", { exact: true }).fill("Synthetic-password-42");
   await auth.locator("form button[type='submit']").click();
-  await expect(page.getByText("Live investigation data is active.")).toBeVisible();
-  await page.getByRole("dialog", { name: "Analyst session" }).getByRole("button", { name: "Close panel" }).click();
+  await expect(page.getByText(/Live queue is active/)).toBeVisible();
   await page.getByRole("button", { name: "Upload evidence" }).click();
 
   const upload = page.getByRole("dialog", { name: "Evidence ingestion" });

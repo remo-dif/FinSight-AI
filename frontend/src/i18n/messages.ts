@@ -4,6 +4,15 @@ export type MessageKey = keyof typeof messages.en;
 const english = {
   appName: "FinSight AI",
   appTagline: "Fraud operations",
+  loginPageTitle: "Sign in to FinSight AI",
+  loginPageDescription: "Use your analyst account to access live cases, documents, and investigation tools.",
+  loginCheckingSession: "Checking your current session...",
+  continueWithoutSigningIn: "Continue with demo data",
+  registerPageTitle: "Create your FinSight AI account",
+  registerPageDescription: "Create an analyst account, then sign in to access live investigation data.",
+  alreadyHaveAccount: "Already have an account?",
+  needAccount: "Need an account?",
+  registrationComplete: "Registration processed. Sign in with your credentials.",
   language: "Language",
   skipToDashboard: "Skip to dashboard",
   sidebarNavigation: "Sidebar navigation",
@@ -147,6 +156,15 @@ const english = {
 } as const satisfies Record<string, string>;
 
 const italian: Partial<Record<keyof typeof english, string>> = {
+  loginPageTitle: "Accedi a FinSight AI",
+  loginPageDescription: "Usa il tuo account analista per accedere a casi, documenti e strumenti di indagine in tempo reale.",
+  loginCheckingSession: "Verifica della sessione corrente...",
+  continueWithoutSigningIn: "Continua con i dati dimostrativi",
+  registerPageTitle: "Crea il tuo account FinSight AI",
+  registerPageDescription: "Crea un account analista, quindi accedi ai dati di indagine in tempo reale.",
+  alreadyHaveAccount: "Hai già un account?",
+  needAccount: "Ti serve un account?",
+  registrationComplete: "Registrazione elaborata. Accedi con le tue credenziali.",
   signedInSuccess: "Accesso effettuato.",
   statusNew: "Nuovo",
   statusNeedsEvidence: "Richiede evidenze",

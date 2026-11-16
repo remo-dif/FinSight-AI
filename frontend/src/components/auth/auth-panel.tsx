@@ -1,6 +1,8 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
+import Link from "next/link";
+import type { Route } from "next";
 import { LogIn, LogOut, UserPlus } from "lucide-react";
 import { FormEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -25,13 +27,27 @@ function logoutFailureMessage(error: unknown) {
   return "Sign-out could not be confirmed. Your refresh session may remain active. Retry sign out or clear only this browser session.";
 }
 
-export function AuthPanel() {
+export function AuthPanel({
+  registrationEnabled = false,
+  initialMode = "login",
+  showForm = false,
+  loginHref = "/login",
+  onSignedIn,
+  onRegistered
+}: {
+  registrationEnabled?: boolean;
+  initialMode?: "login" | "register";
+  showForm?: boolean;
+  loginHref?: string;
+  onSignedIn?: () => void;
+  onRegistered?: (message: string) => void;
+} = {}) {
   const t = useTranslations();
   const accessToken = useSessionStore((state) => state.accessToken);
   const setAccessToken = useSessionStore((state) => state.setAccessToken);
   const clearSession = useSessionStore((state) => state.clearSession);
   const userDataEpoch = useSessionStore((state) => state.userDataEpoch);
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -40,9 +56,14 @@ export function AuthPanel() {
   const [logoutFailed, setLogoutFailed] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const authenticationInFlight = useRef(false);
+  const currentPassword = useRef("");
+  const submittedPassword = useRef("");
 
-  function authenticationFailure(error: unknown, fallback: string, submittedPassword: string) {
-    const redact = (text: string) => submittedPassword ? text.split(submittedPassword).join("[redacted]") : text;
+  function authenticationFailure(error: unknown, fallback: string) {
+    const redact = (text: string) => [...new Set([currentPassword.current, submittedPassword.current])].reduce(
+      (safe, secret) => secret ? safe.split(secret).join("[redacted]") : safe,
+      text
+    );
     const errors: Record<string, string> = {};
     if (error instanceof ApiError) {
       for (const issue of error.validationIssues) {
@@ -54,8 +75,8 @@ export function AuthPanel() {
       }
     }
     setFieldErrors(errors);
-    announce(redact(error instanceof Error ? error.message : fallback), "alert");
     const first = ["full_name", "email", "password"].find(field => errors[field]);
+    announce(first ? errors[first] : redact(error instanceof Error ? error.message : fallback), "alert");
     if (first) document.getElementById(`auth-${first}`)?.focus();
     setPassword("");
   }
@@ -76,24 +97,33 @@ export function AuthPanel() {
     onSuccess: (data) => {
       setAccessToken(data.access_token);
       announce(t("signedInSuccess"));
+      onSignedIn?.();
     },
-    onError: (error, credentials) => authenticationFailure(error, "Sign in failed.", credentials.password),
+    onError: (error) => authenticationFailure(error, "Sign in failed."),
     onSettled: () => {
       authenticationInFlight.current = false;
+      currentPassword.current = "";
+      submittedPassword.current = "";
     }
   });
 
   const registerMutation = useMutation({
     mutationFn: (credentials: { email: string; password: string; fullName: string }) => register(credentials.email, credentials.password, credentials.fullName),
     onSuccess: (data) => {
+      if (onRegistered) {
+        onRegistered(data.message);
+        return;
+      }
       setMode("login");
       setFieldErrors({});
       setPassword("");
       announce(data.message);
     },
-    onError: (error, credentials) => authenticationFailure(error, "Registration failed.", credentials.password),
+    onError: (error) => authenticationFailure(error, "Registration failed."),
     onSettled: () => {
       authenticationInFlight.current = false;
+      currentPassword.current = "";
+      submittedPassword.current = "";
     }
   });
 
@@ -120,6 +150,7 @@ export function AuthPanel() {
     event.preventDefault();
     if (authenticationInFlight.current || loginMutation.isPending || registerMutation.isPending) return;
     authenticationInFlight.current = true;
+    submittedPassword.current = password;
     announce(null);
     setFieldErrors({});
     if (mode === "login") {
@@ -169,9 +200,9 @@ export function AuthPanel() {
         </Button>
       ) : null}
 
-      {!accessToken ? (
+      {!accessToken && showForm ? (
         <form className="mt-4 space-y-3" onSubmit={submit}>
-          <div className="grid gap-2 sm:grid-cols-2">
+          {registrationEnabled ? <div className="grid gap-2 sm:grid-cols-2">
             <button
               type="button"
               className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${mode === "login" ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:text-foreground"}`}
@@ -190,11 +221,14 @@ export function AuthPanel() {
             >
               {t("register")}
             </button>
-          </div>
+          </div> : null}
           {[
             ...(mode === "register" ? [{ field: "full_name", label: t("fullName"), type: "text", purpose: "name", value: fullName, change: setFullName }] : []),
             { field: "email", label: t("email"), type: "email", purpose: mode === "login" ? "username" : "email", value: email, change: setEmail },
-            { field: "password", label: t("password"), type: "password", purpose: mode === "login" ? "current-password" : "new-password", value: password, change: setPassword }
+            { field: "password", label: t("password"), type: "password", purpose: mode === "login" ? "current-password" : "new-password", value: password, change: (value: string) => {
+              currentPassword.current = value;
+              setPassword(value);
+            } }
           ].map(({ field, label, type, purpose, value, change }) => (
             <div key={field}>
               <label className="block text-sm font-medium" htmlFor={`auth-${field}`}>{label}</label>
@@ -225,6 +259,11 @@ export function AuthPanel() {
                   : t("createAccount")}
           </Button>
         </form>
+      ) : !accessToken ? (
+        <Link className="mt-4 inline-flex min-h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-white" href={loginHref as Route}>
+          <LogIn aria-hidden className="h-4 w-4" />
+          {t("signIn")}
+        </Link>
       ) : null}
 
       {message ? (

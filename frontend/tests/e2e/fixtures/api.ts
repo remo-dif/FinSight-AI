@@ -3,7 +3,7 @@ import type { CaseUpdate, InvestigationCase } from "@/lib/api";
 
 export const analystTokens = {
   access_token: "test-access-token",
-  refresh_token: "test-refresh-token",
+  refresh_token: "",
   token_type: "bearer"
 };
 

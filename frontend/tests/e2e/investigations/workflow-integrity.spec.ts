@@ -3,10 +3,9 @@ import { json, liveTransactions, mockDashboardData, mockLogin } from "../fixture
 
 async function openLiveCase(page: Page) {
   await page.goto("/cases");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("link", { name: "Sign in" }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
-  await expect(page.getByText("Live investigation data is active.")).toBeVisible();
-  await page.getByRole("button", { name: "Close panel" }).click();
+  await expect(page.getByText(/Live queue is active/)).toBeVisible();
   return page.getByRole("region", { name: "Selected alert" });
 }
 

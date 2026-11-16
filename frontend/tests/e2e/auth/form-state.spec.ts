@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { activateControl, json, mockRefreshFailure } from "../fixtures/api";
+import { activateControl, analystTokens, json, mockRefreshFailure } from "../fixtures/api";
 
 test("authentication starts empty with a helpful email example and reflows on mobile", async ({ page, isMobile }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await mockRefreshFailure(page);
   await page.goto("/");
-  await activateControl(page.getByRole("button", { name: "Sign in", exact: true }), isMobile);
+  await activateControl(page.getByRole("link", { name: "Sign in", exact: true }), isMobile);
 
   const auth = page.getByRole("region", { name: "Analyst session" });
   const email = auth.getByLabel("Email", { exact: true });
@@ -14,10 +14,11 @@ test("authentication starts empty with a helpful email example and reflows on mo
   await expect(email).toHaveAttribute("placeholder", "name@example.com");
   await expect(password).toHaveValue("");
 
-  await activateControl(auth.getByRole("button", { name: "Register", exact: true }), isMobile);
-  await expect(auth.getByLabel("Full name", { exact: true })).toHaveValue("");
-  await expect(email).toHaveValue("");
-  await expect(auth.getByLabel("Password", { exact: true })).toHaveValue("");
+  await page.goto("/register");
+  const registration = page.getByRole("region", { name: "Analyst session" });
+  await expect(registration.getByLabel("Full name", { exact: true })).toHaveValue("");
+  await expect(registration.getByLabel("Email", { exact: true })).toHaveValue("");
+  await expect(registration.getByLabel("Password", { exact: true })).toHaveValue("");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
@@ -33,10 +34,10 @@ test("authentication announces pending state and ignores duplicate form submissi
       await json(route, 401, { detail: "Invalid credentials" });
       return;
     }
-    await json(route, 200, { access_token: "test-access-token" });
+    await json(route, 200, analystTokens);
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("link", { name: "Sign in", exact: true }).click();
 
   const auth = page.getByRole("region", { name: "Analyst session" });
   await auth.getByLabel("Email", { exact: true }).fill("analyst@example.test");
@@ -67,5 +68,6 @@ test("authentication announces pending state and ignores duplicate form submissi
   await submit.click();
   await retry;
   await expect.poll(() => attempts).toBe(2);
-  await expect(auth.getByRole("status")).toContainText("Signed in");
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("region", { name: "Analyst session" })).toHaveCount(0);
 });

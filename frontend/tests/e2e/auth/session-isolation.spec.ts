@@ -79,16 +79,16 @@ test("failed refresh drops A's SSR data, documents and transcript before B signs
     await expect.soft(page.getByText("Private answer A", { exact: true })).toHaveCount(0, { timeout: 1500 });
 
     await page.getByRole("button", { name: "Close panel" }).click();
-    // Accept either label so a stale SSR shell does not prevent the B login probe.
-    await page.getByRole("button", { name: /^(Sign in|Session active)$/ }).click();
+    await page.getByRole("link", { name: "Sign in", exact: true }).click();
     const auth = page.getByRole("region", { name: "Analyst session" });
     await auth.getByLabel("Email").fill("synthetic-b@example.test");
     await auth.getByLabel("Password").fill("synthetic-password-only");
     await auth.locator("form button[type='submit']").click();
     await bQueueStarted.wait;
-    await page.getByRole("button", { name: "Close panel" }).click();
     await expect.soft(page.getByText("CASE-SSR-A", { exact: true })).toHaveCount(0, { timeout: 1500 });
-    await expect(page.getByText("CASE-LIVE-A", { exact: true })).toHaveCount(0);
+    // The returnTo URL may still name the requested case while it is
+    // re-authorized for B, but A's queue control must be gone immediately.
+    await expect(page.getByRole("button", { name: /CASE-LIVE-A/ })).toHaveCount(0);
     bQueue.release();
     await expect(page.getByRole("button", { name: /CASE-B-ONLY/ }).first()).toBeVisible();
     await page.getByRole("button", { name: "Ask copilot" }).click();
@@ -178,13 +178,12 @@ test("B resolves the same case link without exposing A's delayed detail", async 
     await page.getByRole("button", { name: "Load more documents" }).click();
     await expect(page.getByText("Sign in to select your uploaded documents.")).toBeVisible();
     await page.getByRole("button", { name: "Close panel" }).click();
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await page.getByRole("link", { name: "Sign in", exact: true }).click();
     const auth = page.getByRole("region", { name: "Analyst session" });
     await auth.getByLabel("Email").fill("synthetic-b@example.test");
     await auth.getByLabel("Password").fill("synthetic-password-only");
     await auth.locator("form button[type='submit']").click();
     await bDetailStarted.wait;
-    await page.getByRole("button", { name: "Close panel" }).click();
     await expect(page).toHaveURL(/case=CASE-SHARED/);
     const staleResponse = page.waitForResponse((response) => response.url().endsWith("/api/cases/CASE-SHARED") &&
       response.request().headers().authorization === "Bearer synthetic-a");

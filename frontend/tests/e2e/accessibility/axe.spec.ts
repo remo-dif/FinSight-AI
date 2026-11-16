@@ -45,6 +45,9 @@ type AxeWindow = Window & {
 
 async function scan(page: Page, state: string, waitForStable = true, diagnoseContrast = false) {
   if (waitForStable) await page.waitForTimeout(250);
+  // Next applies route metadata independently from the page body during
+  // client navigation. Scan only after the destination document title exists.
+  await expect.poll(() => page.title()).not.toBe("");
   if (!(await page.evaluate(() => Boolean((window as AxeWindow).axe)))) {
     await page.addScriptTag({ path: axePath });
   }
@@ -165,11 +168,12 @@ test("axe-core WCAG scans cover the reported workspace states", async ({ page, i
   await scan(page, "anonymous workspace immediate", false);
   await scan(page, "anonymous workspace settled");
 
-  await activateControl(page.getByRole("button", { name: "Sign in", exact: true }), isMobile);
-  const auth = page.getByRole("region", { name: "Analyst session" });
+  await activateControl(page.getByRole("link", { name: "Sign in", exact: true }), isMobile);
+  let auth = page.getByRole("region", { name: "Analyst session" });
   await scan(page, "login");
 
-  await activateControl(auth.getByRole("button", { name: "Register", exact: true }), isMobile);
+  await activateControl(page.getByRole("link", { name: "Create account", exact: true }), isMobile);
+  auth = page.getByRole("region", { name: "Analyst session" });
   await scan(page, "registration");
   await page.route("**/api/auth/register", (route) => json(route, 422, {
     detail: [{ loc: ["body", "password"], msg: "Synthetic validation error", input: "synthetic-password" }]
@@ -178,13 +182,14 @@ test("axe-core WCAG scans cover the reported workspace states", async ({ page, i
   await expect(auth.getByRole("alert")).toBeVisible();
   await scan(page, "registration field validation");
 
-  await activateControl(auth.getByRole("button", { name: "Sign in", exact: true }), isMobile);
   await mockRefreshFailure(page);
   await mockLogin(page);
   await mockDashboardData(page);
+  await activateControl(page.getByRole("link", { name: "Sign in", exact: true }), isMobile);
+  await expect(page).toHaveURL(/\/login/);
+  auth = page.getByRole("region", { name: "Analyst session" });
   await activateControl(auth.locator("form button[type='submit']"), isMobile);
-  await expect(page.getByText("Live investigation data is active.")).toBeVisible();
-  await activateControl(page.getByRole("button", { name: "Close panel" }), isMobile);
+  await expect(page.getByText("Live queue is active. Choose what needs attention next.")).toBeVisible();
   await activateControl(page.getByRole("link", { name: "Cases", exact: true }), isMobile);
   await expect(page.getByRole("region", { name: "Selected alert" })).toContainText("CASE-9001");
   await scan(page, "live case immediate", false);

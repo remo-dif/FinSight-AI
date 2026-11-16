@@ -70,7 +70,9 @@ test("an offline mutation resumes with the rotated token of the same session", a
   try {
     useSessionStore.getState().setAccessToken("synthetic-a");
     globalThis.fetch = async (input, init) => {
-      if (String(input).endsWith("/refresh")) return Response.json({ access_token: "synthetic-a-rotated" });
+      if (String(input).endsWith("/refresh")) {
+        return Response.json({ access_token: "synthetic-a-rotated", refresh_token: "", token_type: "bearer" });
+      }
       sends.push({ authorization: new Headers(init?.headers).get("Authorization"), body: init?.body });
       return Response.json({});
     };

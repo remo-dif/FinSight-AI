@@ -30,12 +30,11 @@ for (const failure of chatFailures) {
     );
 
     await page.goto("/cases");
-    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.getByRole("link", { name: "Sign in" }).click();
     await page
       .getByRole("region", { name: "Analyst session" })
       .locator("form button[type='submit']")
       .click();
-    await page.getByRole("button", { name: "Close panel" }).click();
     await page.getByRole("button", { name: "Ask copilot" }).click();
     await page.getByRole("button", { name: "Send message" }).click();
 
@@ -52,7 +51,7 @@ test("dashboard API failures do not fall back to demo cases for an authenticated
   );
 
   await page.goto("/cases");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("link", { name: "Sign in" }).click();
   await page
     .getByRole("region", { name: "Analyst session" })
     .locator("form button[type='submit']")
@@ -76,7 +75,7 @@ test("case queue distinguishes loading and empty live states", async ({ page, is
   });
 
   await page.goto("/cases");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("link", { name: "Sign in", exact: true }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
   await expect(page.getByText("Loading cases...", { exact: true })).toBeVisible();
 
@@ -137,10 +136,9 @@ test("failed refresh keeps previously loaded cases available", async ({ page, is
   });
 
   await page.goto("/cases");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("link", { name: "Sign in", exact: true }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
   await expect(page.getByRole("button", { name: "CASE-CACHED" })).toBeVisible();
-  await page.getByRole("button", { name: "Close panel" }).click();
 
   await page.getByRole("button", { name: "Assign to me" }).click();
   await expect(page.getByText("Refresh failed. Showing the most recently loaded cases.")).toBeVisible();
@@ -177,13 +175,11 @@ test("upload authorization failures are visible to analysts", async ({ page, isM
   );
 
   await page.goto("/cases");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("link", { name: "Sign in" }).click();
   await page
     .getByRole("region", { name: "Analyst session" })
     .locator("form button[type='submit']")
     .click();
-
-  await page.getByRole("button", { name: "Close panel" }).click();
   await page.getByRole("button", { name: "Upload evidence" }).click();
   const fileInput = page.locator("input[type='file']");
   await fileInput.setInputFiles({
