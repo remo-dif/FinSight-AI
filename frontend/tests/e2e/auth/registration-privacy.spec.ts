@@ -20,9 +20,14 @@ for (const scenario of [
     await page.goto("/register");
     expect((await refreshResponse).status()).toBe(401);
     const panel = page.getByRole("region", { name: "Analyst session" });
-    await panel.getByLabel("Full name", { exact: true }).fill("Synthetic Analyst");
     await panel.getByLabel("Email", { exact: true }).fill(scenario.email);
+    await expect(panel.getByLabel("Email", { exact: true })).toHaveValue(scenario.email);
     await panel.getByLabel("Password", { exact: true }).fill("Synthetic-registration-password-42");
+    await expect(panel.getByLabel("Password", { exact: true })).toHaveValue("Synthetic-registration-password-42");
+    // WebKit credential autofill may update adjacent fields; enter the
+    // non-credential profile field after those updates have settled.
+    await panel.getByLabel("Full name", { exact: true }).fill("Synthetic Analyst");
+    await expect(panel.getByLabel("Full name", { exact: true })).toHaveValue("Synthetic Analyst");
     const responsePromise = page.waitForResponse((response) =>
       response.request().method() === "POST" && new URL(response.url()).pathname === "/api/auth/register"
     );
@@ -35,7 +40,7 @@ for (const scenario of [
       full_name: "Synthetic Analyst"
     });
     await expect(page).toHaveURL(/\/login\?returnTo=%2F&registered=1$/);
-    await expect(page.getByRole("status")).toContainText("Registration processed");
+    await expect(page.getByRole("status").filter({ hasText: "Registration processed" })).toBeVisible();
     await expect(page.getByText("Live investigation data is active.")).toHaveCount(0);
     expect(loginRequests).toBe(0);
     expect(registrationRequests).toBe(1);
