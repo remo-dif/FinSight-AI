@@ -8,7 +8,9 @@ function deferred<T>() {
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 }
-const tokens = (access_token: string) => Response.json({ access_token, refresh_token: "synthetic-refresh", token_type: "bearer" });
+// Browser sessions rotate through an HttpOnly cookie, so the backend
+// intentionally omits a usable refresh token from the JSON body.
+const tokens = (access_token: string) => Response.json({ access_token, refresh_token: "", token_type: "bearer" });
 const originalFetch = globalThis.fetch;
 test.afterEach(() => { globalThis.fetch = originalFetch; useSessionStore.getState().clearSession(); });
 

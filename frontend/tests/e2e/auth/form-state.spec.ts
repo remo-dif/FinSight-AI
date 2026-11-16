@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { activateControl, json, mockRefreshFailure } from "../fixtures/api";
+import { activateControl, analystTokens, json, mockRefreshFailure } from "../fixtures/api";
 
 test("authentication starts empty with a helpful email example and reflows on mobile", async ({ page, isMobile }) => {
   await page.setViewportSize({ width: 375, height: 812 });
@@ -34,7 +34,7 @@ test("authentication announces pending state and ignores duplicate form submissi
       await json(route, 401, { detail: "Invalid credentials" });
       return;
     }
-    await json(route, 200, { access_token: "test-access-token" });
+    await json(route, 200, analystTokens);
   });
   await page.goto("/");
   await page.getByRole("link", { name: "Sign in", exact: true }).click();

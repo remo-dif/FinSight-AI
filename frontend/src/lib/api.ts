@@ -175,7 +175,7 @@ function parseTokenResponse(value: unknown): TokenResponse {
   const response = value as Partial<TokenResponse>;
   if (
     typeof response.access_token !== "string" || response.access_token.trim() === "" ||
-    typeof response.refresh_token !== "string" || response.refresh_token.trim() === "" ||
+    typeof response.refresh_token !== "string" ||
     typeof response.token_type !== "string" || response.token_type.trim() === ""
   ) {
     throw new ApiError("The authentication server returned an invalid response. Please try again.");
