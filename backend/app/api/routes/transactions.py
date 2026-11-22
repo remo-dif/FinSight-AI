@@ -9,9 +9,26 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.repositories.transactions import TransactionRepository
 from app.schemas.finance import MonthlySummary, TransactionCreate, TransactionResponse
+from app.schemas.risk import RiskSignal
 from app.services.analytics import FinanceAnalyticsService
+from app.services.risk_analysis import MAX_RISK_RECORDS, RiskAnalysisService
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
+
+
+@router.get("/risk-signals", response_model=list[RiskSignal])
+def risk_signals(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    start_date: Annotated[date, Query()],
+    end_date: Annotated[date, Query()],
+    max_records: Annotated[int, Query(ge=1, le=MAX_RISK_RECORDS)] = 1000,
+):
+    service = RiskAnalysisService(TransactionRepository(db))
+    try:
+        return service.evaluate(user.id, start_date, end_date, max_records)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
 
 @router.get("", response_model=list[TransactionResponse])

@@ -82,6 +82,26 @@ class TransactionRepository:
         query = query.order_by(Transaction.posted_at.desc()).offset(offset).limit(limit)
         return list(self.db.scalars(query))
 
+    def list_for_risk_analysis(
+        self,
+        user_id: UUID,
+        start_date: date,
+        end_date: date,
+        limit: int,
+    ) -> list[Transaction]:
+        """Return a bounded, user-scoped risk window plus one overflow sentinel."""
+        query = (
+            select(Transaction)
+            .where(
+                Transaction.user_id == user_id,
+                Transaction.posted_at >= start_date,
+                Transaction.posted_at <= end_date,
+            )
+            .order_by(Transaction.posted_at, Transaction.id)
+            .limit(limit + 1)
+        )
+        return list(self.db.scalars(query))
+
     def monthly_summary(
         self, user_id: UUID, month: str, currency: str | None = None
     ) -> dict[str, Decimal]:
