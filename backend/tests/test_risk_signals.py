@@ -75,6 +75,20 @@ def test_signal_ids_are_unique_per_instance_and_stable_across_input_order():
     assert [signal.signal_id for signal in first] == [signal.signal_id for signal in second]
 
 
+def test_signal_ids_canonicalize_equivalent_decimal_representations():
+    short_scale = [
+        transaction("decimal-1", "2026-01-01", "Vendor", "-10.0"),
+        transaction("decimal-2", "2026-01-02", "Vendor", "-10.0"),
+    ]
+    long_scale = [replace(row, amount=Decimal("-10.00")) for row in short_scale]
+
+    first = by_type(evaluate_risk_signals(short_scale), "duplicate_payment_candidate")
+    second = by_type(evaluate_risk_signals(long_scale), "duplicate_payment_candidate")
+
+    assert first[0].model_dump(exclude={"signal_id"}) == second[0].model_dump(exclude={"signal_id"})
+    assert first[0].signal_id == second[0].signal_id
+
+
 def test_amount_deviation_uses_prior_same_merchant_currency_history():
     rows = [
         transaction(f"history-{index}", f"2026-01-0{index + 1}", "Vendor", "-10.00")

@@ -1,3 +1,4 @@
+import json
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -63,14 +64,22 @@ def _signal_id(
     context: Iterable[object],
     rows: Iterable[RiskTransaction],
 ) -> str:
-    identity = "|".join(
-        [
-            signal_type,
-            "1",
-            observed_at.isoformat(),
-            *(str(value) for value in context),
-            *(str(row.id) for row in rows),
-        ]
+    def canonical(value: object) -> str:
+        if isinstance(value, Decimal):
+            return format(value.normalize(), "f")
+        return str(value)
+
+    identity = json.dumps(
+        {
+            "context": [canonical(value) for value in context],
+            "observed_at": observed_at.isoformat(),
+            "rule_version": "1",
+            "signal_type": signal_type,
+            "transaction_ids": [str(row.id) for row in rows],
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
     )
     return f"{signal_type}_v1_{uuid5(NAMESPACE_URL, identity)}"
 
