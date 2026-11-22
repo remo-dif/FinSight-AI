@@ -17,7 +17,7 @@ The implemented LangGraph flow is supervisor -> one financial specialist -> revi
 
 RAG retrieval is a service call before graph execution, not a separate graph agent. Although retrieved chunks enter `AgentState`, the financial `_evidence` generation path sends claim IDs rather than document excerpts to the LLM. Authenticated document Q&A is implemented as a separate service/API path with user-owned document selection and validated citation references; it is not another graph agent. Categorization currently belongs to an ingestion service, not an independent agent.
 
-Chat messages are persisted, but previous turns are not loaded into the financial graph or document-Q&A model context. The implementation therefore does not claim conversational memory.
+Financial-chat turns are persisted after generation. The document-Q&A branch returns its response without persisting that turn. Neither path loads previous turns into the financial graph or document-Q&A model context, so the implementation does not claim conversational memory.
 
 ## Routing Contract
 

@@ -7,7 +7,7 @@ Baseline: clean branch at the fetched `origin/master` commit after PR #6 was ver
 
 > **Historical audit.** The findings and executed test counts below describe the
 > 2026-10-31 baseline. Since that audit, authenticated document Q&A, validated
-> citation references and a server-enforced retrieval score floor have been added.
+> citation references and a score floor enforced on the document-Q&A path have been added.
 > OCR and reranking remain deferred; current capability boundaries are summarized
 > in the repository README.
 
@@ -131,7 +131,7 @@ workflow was inspected but not run. No workflow changes were necessary.
 | pgvector retrieval | Internal infrastructure. Chat invokes retrieval, but every current public specialist tool result includes `_evidence`; the answer path selects supported financial claim IDs and the reviewer renders those facts. The retrieved excerpts are not used to ground the current public financial answer. |
 | Document-grounded Q&A | At this audit date, not user-accessible. The current repository exposes authenticated document Q&A through dedicated API and chat paths. |
 | Retrieved-document citations | At this audit date, not exposed. The current repository validates returned citation identities against retrieved, authorized chunks; semantic support is still not independently verified. |
-| Minimum relevance threshold | At this audit date, not implemented. The current repository enforces a server-side score floor, but it is not calibrated as an answer-quality threshold. |
+| Minimum relevance threshold | At this audit date, not implemented. The current document-Q&A path enforces a server-side score floor, but it is not calibrated as an answer-quality threshold; the financial graph's retrieval call does not apply it. |
 | OCR | Not integrated into ingestion. Image uploads are validated and represented by metadata placeholders; scanned PDFs with no extractable text can require OCR. The container includes the Tesseract executable, but the ingestion path does not invoke it. |
 | Evaluation/observability | Internal utilities. The synthetic evaluation runner reports 18 cases: 15 passed, 0 failed and 3 partial for unsupported answer capability. Semantic faithfulness and document-citation correctness are unset, not measured. Structured AI-operation telemetry is not equivalent to full OpenTelemetry tracing. |
 
@@ -167,9 +167,12 @@ integration tests ran against the disposable services rather than mocks.
 
 ## 8. Remaining risks and deferred work
 
-- Document-grounded Q&A, source citations, relevance filtering and OCR remain unimplemented.
-- The three partial synthetic evaluation cases remain capability gaps; no semantic faithfulness or
-  document-citation correctness score is available.
+- At this audit checkpoint, document-grounded Q&A, source citations, relevance filtering and OCR
+  were unimplemented. The current repository implements the first three for the document-Q&A path;
+  OCR remains absent, citation identity is not semantic verification, and the score floor is not
+  calibrated for answer quality or applied to the financial graph's retrieval call.
+- At this audit checkpoint, the three partial synthetic evaluation cases represented capability
+  gaps; the historical result is not evidence about the later document-Q&A implementation.
 - Existing bcrypt hashes remain supported without migration for passwords within the policy.
   Recovery for passwords that may previously have exceeded bcrypt's 72-byte input limit is not
   addressed.

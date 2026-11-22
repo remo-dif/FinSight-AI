@@ -12,7 +12,7 @@ FinSight-AI is a portfolio application for transaction analysis and investigatio
 - Transaction normalization, categorization, and storage.
 - Financial analytics tools exposed only through controlled backend functions.
 - Financial chat with application-controlled keyword routing and tool execution. The model selects permitted financial claim IDs; it does not choose or execute database tools through function calling.
-- User-scoped RAG indexing/retrieval for uploaded text, with an authenticated document-Q&A API and chat mode. A server-enforced similarity floor filters retrieval, but it is not calibrated as an answer-quality threshold. Returned citation references are validated against retrieved, authorized chunks; semantic support is not independently verified. Automatic indexing of case notes remains planned.
+- User-scoped RAG indexing/retrieval for uploaded text, with an authenticated document-Q&A API and chat mode. The document-Q&A path enforces a server-side similarity floor, but it is not calibrated as an answer-quality threshold; the separate financial-graph retrieval call does not apply that floor. Returned citation references are validated against retrieved, authorized chunks; semantic support is not independently verified. Automatic indexing of case notes remains planned.
 - Deterministic monthly summaries/comparisons, category/merchant spending, anomaly heuristics, repeated-charge estimates and budget estimates.
 - Responsive investigation workspace, case controls, chat and upload experiences. Downloadable report generation is not a public endpoint.
 

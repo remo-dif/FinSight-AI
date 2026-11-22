@@ -3,7 +3,8 @@
 > **Historical baseline.** This report records the 2026-10-29 implementation
 > checkpoint and its executed results; later capabilities do not retroactively change
 > those measurements. The current repository now exposes authenticated document Q&A
-> with validated citation references and a server-enforced retrieval score floor. OCR,
+> with validated citation references and a score floor enforced on that Q&A path. The
+> financial graph's separate retrieval call does not apply the floor. OCR,
 > reranking and conversational-memory context remain unimplemented. The 18 RAG cases
 > and 14 document-QA cases are synthetic regression fixtures, not statistically
 > meaningful evidence of production answer quality or fraud-detection accuracy.
@@ -34,8 +35,8 @@ Links below refer to the implementation checkpoint, not inferred dependency capa
 | Provider configuration | Implemented; live behavior insufficiently tested: [client/circuit policy](https://github.com/remo-dif/FinSight-AI/blob/2e51c7a5f5c8cd456da12030f09575bf3a91ba26/backend/app/core/openai_resilience.py#L76), configured OpenAI chat and embedding models. All new automated calls are mocked. Explicit local hash embeddings are a separate configured mode, not a remote-provider fallback. |
 | Document parsing | Text PDF and CSV implemented/tested; image validation/metadata implemented, not OCR: [extraction](https://github.com/remo-dif/FinSight-AI/blob/2e51c7a5f5c8cd456da12030f09575bf3a91ba26/backend/app/services/document_ingestion.py#L510) indexes image dimensions/placeholder text, not recognized image content. Scanned PDF OCR is not implemented. |
 | Embedding/indexing | Implemented and tested: [preparation](https://github.com/remo-dif/FinSight-AI/blob/2e51c7a5f5c8cd456da12030f09575bf3a91ba26/backend/app/services/document_ingestion.py#L228) and embedding records preserve source/owner/model/dimensions. Providers run before persistence transactions. |
-| Vector retrieval | At this checkpoint, retrieval used pgvector cosine search or SQLite cosine ranking with user/model/dimension filters and no relevance cutoff/reranker. The current repository adds a server-enforced score floor; a reranker remains absent. |
-| LangGraph/context | Implemented and tested: [workflow](https://github.com/remo-dif/FinSight-AI/blob/2e51c7a5f5c8cd456da12030f09575bf3a91ba26/backend/app/agents/orchestrator.py#L88) routes to six financial specialists. Retrieved text is present in state, but the financial generation path deliberately bypasses document prose. Previous chat messages are persisted, not loaded into model context. |
+| Vector retrieval | At this checkpoint, retrieval used pgvector cosine search or SQLite cosine ranking with user/model/dimension filters and no relevance cutoff/reranker. The current repository enforces a score floor in the document-Q&A path; the financial graph's separate retrieval call still omits a minimum score. A reranker remains absent. |
+| LangGraph/context | Implemented and tested: [workflow](https://github.com/remo-dif/FinSight-AI/blob/2e51c7a5f5c8cd456da12030f09575bf3a91ba26/backend/app/agents/orchestrator.py#L88) routes to six financial specialists. Retrieved text is present in state, but the financial generation path deliberately bypasses document prose. Previous financial-chat messages are persisted, not loaded into model context. |
 | Answer generation/review | At this checkpoint, the public workflow supported financial claim selection and deterministic rendering but not document Q&A. The current repository additionally exposes document Q&A as a separate authenticated service path. |
 | Citations | At this checkpoint, only transaction references existed. The current document-Q&A path validates returned citation identities against retrieved authorized chunks and exposes citations in the UI; this is not independent semantic verification. |
 | Persistence/audit | Implemented and tested: two chat messages and `ai.chat` audit are persisted after provider calls. Full tool evidence, selected documents, token usage and prompts are not persisted as chat artifacts. No tracing platform is required. |
