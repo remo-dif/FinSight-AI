@@ -30,6 +30,27 @@ module.exports = {
       to: { dependencyTypes: ["npm-dev"] },
     },
     {
+      name: "components-not-to-app",
+      comment: "Reusable components must not depend on route entry points.",
+      severity: "error",
+      from: { path: "^src/components/" },
+      to: { path: "^src/app/" },
+    },
+    {
+      name: "libraries-not-to-components",
+      comment: "Libraries and state modules must remain independent of the UI layer.",
+      severity: "error",
+      from: { path: "^src/(lib|store)/" },
+      to: { path: "^src/components/" },
+    },
+    {
+      name: "i18n-not-to-components",
+      comment: "Shared i18n configuration must not depend on feature components.",
+      severity: "error",
+      from: { path: "^src/i18n/" },
+      to: { path: "^src/components/" },
+    },
+    {
       name: "no-orphans",
       comment: "Warn about source modules that are not imported by another source module.",
       severity: "warn",
