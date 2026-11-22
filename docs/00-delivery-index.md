@@ -4,7 +4,7 @@ This repository implements the requested output order as concrete code and suppo
 
 1. Requirements Analysis: [01-requirements-analysis.md](./01-requirements-analysis.md)
 2. Architecture Review: [02-architecture-review.md](./02-architecture-review.md)
-3. Multi-Agent Architecture: [03-agent-architecture.md](./03-agent-architecture.md)
+3. Deterministic Agent Graph Architecture: [03-agent-architecture.md](./03-agent-architecture.md)
 4. LangGraph Graph Design: [04-langgraph-design.md](./04-langgraph-design.md)
 5. UX/UI Design: [05-ux-ui-design.md](./05-ux-ui-design.md)
 6. Frontend Architecture: [10-frontend-architecture.md](./10-frontend-architecture.md)

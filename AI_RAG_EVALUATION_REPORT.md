@@ -1,5 +1,13 @@
 # AI/RAG evaluation and observability baseline
 
+> **Historical baseline.** This report records the 2026-10-29 implementation
+> checkpoint and its executed results; later capabilities do not retroactively change
+> those measurements. The current repository now exposes authenticated document Q&A
+> with validated citation references and a server-enforced retrieval score floor. OCR,
+> reranking and conversational-memory context remain unimplemented. The 18 RAG cases
+> and 14 document-QA cases are synthetic regression fixtures, not statistically
+> meaningful evidence of production answer quality or fraud-detection accuracy.
+
 Date: 2026-10-29. Branch: `feature/ai-rag-evaluation`.
 Base: latest `origin/master`, `a1ac9fb`, confirmed as the default branch after fetch.
 Implementation checkpoint: `2e51c7a5f5c8cd456da12030f09575bf3a91ba26`.
@@ -24,12 +32,12 @@ Links below refer to the implementation checkpoint, not inferred dependency capa
 | --- | --- |
 | Authentication/session ownership | Implemented and tested: [chat route](https://github.com/remo-dif/FinSight-AI/blob/2e51c7a5f5c8cd456da12030f09575bf3a91ba26/backend/app/api/routes/chat.py#L24) checks ownership before generation and again before persistence. Existing authorization regressions remain intact. |
 | Provider configuration | Implemented; live behavior insufficiently tested: [client/circuit policy](https://github.com/remo-dif/FinSight-AI/blob/2e51c7a5f5c8cd456da12030f09575bf3a91ba26/backend/app/core/openai_resilience.py#L76), configured OpenAI chat and embedding models. All new automated calls are mocked. Explicit local hash embeddings are a separate configured mode, not a remote-provider fallback. |
-| Document parsing | Text PDF and CSV implemented/tested; image OCR partially implemented: [extraction](https://github.com/remo-dif/FinSight-AI/blob/2e51c7a5f5c8cd456da12030f09575bf3a91ba26/backend/app/services/document_ingestion.py#L510) indexes image dimensions/placeholder text, not recognized image content. Scanned PDF OCR is not implemented. |
+| Document parsing | Text PDF and CSV implemented/tested; image validation/metadata implemented, not OCR: [extraction](https://github.com/remo-dif/FinSight-AI/blob/2e51c7a5f5c8cd456da12030f09575bf3a91ba26/backend/app/services/document_ingestion.py#L510) indexes image dimensions/placeholder text, not recognized image content. Scanned PDF OCR is not implemented. |
 | Embedding/indexing | Implemented and tested: [preparation](https://github.com/remo-dif/FinSight-AI/blob/2e51c7a5f5c8cd456da12030f09575bf3a91ba26/backend/app/services/document_ingestion.py#L228) and embedding records preserve source/owner/model/dimensions. Providers run before persistence transactions. |
-| Vector retrieval | Implemented and tested: [retrieval](https://github.com/remo-dif/FinSight-AI/blob/2e51c7a5f5c8cd456da12030f09575bf3a91ba26/backend/app/services/rag.py#L97) uses pgvector cosine search or SQLite cosine ranking with user/model/dimension filters. No relevance cutoff/reranker exists. |
+| Vector retrieval | At this checkpoint, retrieval used pgvector cosine search or SQLite cosine ranking with user/model/dimension filters and no relevance cutoff/reranker. The current repository adds a server-enforced score floor; a reranker remains absent. |
 | LangGraph/context | Implemented and tested: [workflow](https://github.com/remo-dif/FinSight-AI/blob/2e51c7a5f5c8cd456da12030f09575bf3a91ba26/backend/app/agents/orchestrator.py#L88) routes to six financial specialists. Retrieved text is present in state, but the financial generation path deliberately bypasses document prose. Previous chat messages are persisted, not loaded into model context. |
-| Answer generation/review | Financial mode implemented and tested: [claim selection](https://github.com/remo-dif/FinSight-AI/blob/2e51c7a5f5c8cd456da12030f09575bf3a91ba26/backend/app/services/llm.py#L30) sends only allowed fact keys; [review](https://github.com/remo-dif/FinSight-AI/blob/2e51c7a5f5c8cd456da12030f09575bf3a91ba26/backend/app/services/financial_review.py#L44) replaces invalid prose/IDs with deterministic financial explanations. General document Q&A is not implemented in this public workflow. |
-| Citations | Partially implemented: transaction references exist in `tool_results._evidence`; no document claim-to-source citation contract exists. The [chat UI](https://github.com/remo-dif/FinSight-AI/blob/2e51c7a5f5c8cd456da12030f09575bf3a91ba26/frontend/src/components/assistant/chat-panel.tsx#L40) displays answer/review, not the structured reference metadata. |
+| Answer generation/review | At this checkpoint, the public workflow supported financial claim selection and deterministic rendering but not document Q&A. The current repository additionally exposes document Q&A as a separate authenticated service path. |
+| Citations | At this checkpoint, only transaction references existed. The current document-Q&A path validates returned citation identities against retrieved authorized chunks and exposes citations in the UI; this is not independent semantic verification. |
 | Persistence/audit | Implemented and tested: two chat messages and `ai.chat` audit are persisted after provider calls. Full tool evidence, selected documents, token usage and prompts are not persisted as chat artifacts. No tracing platform is required. |
 
 ## 2. End-to-end findings

@@ -1,7 +1,9 @@
 # FinSight-AI
 
-Portfolio application for an AI-assisted fraud investigation workspace. Local and CI
-checks provide evidence for individual features, not production readiness.
+Portfolio application for an AI-assisted financial fraud-risk investigation workspace.
+The current detection layer provides explainable, rule-based anomaly indicators; it does
+not determine that fraud occurred or claim measured fraud-detection accuracy. Local and
+CI checks provide evidence for individual features, not production readiness.
 
 **Deployment status:** the previous AWS account is closed. No AWS infrastructure is
 currently asserted operational or verified. AWS diagrams/workflows preserve historical

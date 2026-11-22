@@ -2,17 +2,17 @@
 
 ## Product Goal
 
-FinSight-AI is a portfolio application for transaction analysis and investigation-case review. Its current chat answers financial queries using transaction tools. General document question answering, document citations and OCR are not implemented public capabilities.
+FinSight-AI is a portfolio application for transaction analysis and investigation-case review. Its current chat answers financial queries using deterministic transaction tools and exposes authenticated question answering over user-owned documents. The application surfaces fraud-risk indicators for analyst review; it does not determine that fraud occurred or claim measured fraud-detection accuracy. OCR is not implemented.
 
 ## Functional Requirements
 
-- User authentication with JWT, persisted refresh-token rotation and bcrypt password hashing. Role-check helpers exist; uploads enforce USER/ADMIN roles, while case, transaction and chat routes use active-user authentication and user ownership rather than a separate analyst-role policy.
+- User authentication with PyJWT-backed JWTs, persisted refresh-token rotation and bcrypt password hashing. Role-check helpers exist; uploads enforce USER/ADMIN roles, while case, transaction and chat routes use active-user authentication and user ownership rather than a separate analyst-role policy.
 - Explicit-currency transaction ingestion from CSV; PDF text extraction and embedding storage do not create transaction rows.
 - PDF, PNG, JPG and JPEG upload validation. Text-based PDFs can be indexed; images currently produce a dimensions/metadata placeholder, not OCR text.
 - Transaction normalization, categorization, and storage.
 - Financial analytics tools exposed only through controlled backend functions.
 - Financial chat with application-controlled keyword routing and tool execution. The model selects permitted financial claim IDs; it does not choose or execute database tools through function calling.
-- Internal user-scoped RAG indexing/retrieval for uploaded text. Retrieval uses top-K similarity ranking without a minimum relevance threshold. General document answers, document citations and automatic indexing of case notes remain planned.
+- User-scoped RAG indexing/retrieval for uploaded text, with an authenticated document-Q&A API and chat mode. A server-enforced similarity floor filters retrieval, but it is not calibrated as an answer-quality threshold. Returned citation references are validated against retrieved, authorized chunks; semantic support is not independently verified. Automatic indexing of case notes remains planned.
 - Deterministic monthly summaries/comparisons, category/merchant spending, anomaly heuristics, repeated-charge estimates and budget estimates.
 - Responsive investigation workspace, case controls, chat and upload experiences. Downloadable report generation is not a public endpoint.
 
@@ -34,7 +34,7 @@ FinSight-AI is a portfolio application for transaction analysis and investigatio
 
 ## Risks
 
-- Financial hallucination risk is mitigated by tool-only data access and reviewer agent checks.
+- Financial hallucination risk is mitigated by application-selected tools, immutable evidence snapshots and deterministic review. This guarantee applies to the financial workflow, not arbitrary document prose.
 - File-upload attack surface is mitigated with extension, MIME, size, path, and parsing controls.
 - Privacy risk is mitigated with audit logs, scoped queries, and planned field-level encryption for sensitive document text.
 - Categorization accuracy requires iterative improvement using user corrections.

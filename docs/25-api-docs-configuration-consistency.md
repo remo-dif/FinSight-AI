@@ -5,6 +5,12 @@ Audit date: 2026-10-31
 Branch: `chore/api-docs-consistency`
 Baseline: clean branch at the fetched `origin/master` commit after PR #6 was verified merged.
 
+> **Historical audit.** The findings and executed test counts below describe the
+> 2026-10-31 baseline. Since that audit, authenticated document Q&A, validated
+> citation references and a server-enforced retrieval score floor have been added.
+> OCR and reranking remain deferred; current capability boundaries are summarized
+> in the repository README.
+
 ## 1. Findings
 
 - The README already linked to this report, but the report file did not exist. This change
@@ -123,14 +129,14 @@ workflow was inspected but not run. No workflow changes were necessary.
 | Transaction evidence references | Returned in financial tool results. These are transaction references, not document citations. |
 | PDF/CSV ingestion | User-accessible. CSVs import transactions; text-based PDFs are extracted and indexed. |
 | pgvector retrieval | Internal infrastructure. Chat invokes retrieval, but every current public specialist tool result includes `_evidence`; the answer path selects supported financial claim IDs and the reviewer renders those facts. The retrieved excerpts are not used to ground the current public financial answer. |
-| Document-grounded Q&A | Not currently user-accessible. There is no public document-Q&A route or active public answer path grounded in retrieved excerpts. |
-| Retrieved-document citations | Not implemented/exposed. No document citation contract appears in the public chat response. |
-| Minimum relevance threshold | Not implemented. Retrieval ranks a bounded set of results; no minimum score cutoff is enforced. |
+| Document-grounded Q&A | At this audit date, not user-accessible. The current repository exposes authenticated document Q&A through dedicated API and chat paths. |
+| Retrieved-document citations | At this audit date, not exposed. The current repository validates returned citation identities against retrieved, authorized chunks; semantic support is still not independently verified. |
+| Minimum relevance threshold | At this audit date, not implemented. The current repository enforces a server-side score floor, but it is not calibrated as an answer-quality threshold. |
 | OCR | Not integrated into ingestion. Image uploads are validated and represented by metadata placeholders; scanned PDFs with no extractable text can require OCR. The container includes the Tesseract executable, but the ingestion path does not invoke it. |
 | Evaluation/observability | Internal utilities. The synthetic evaluation runner reports 18 cases: 15 passed, 0 failed and 3 partial for unsupported answer capability. Semantic faithfulness and document-citation correctness are unset, not measured. Structured AI-operation telemetry is not equivalent to full OpenTelemetry tracing. |
 
-Accordingly, document Q&A, retrieved-document citations, a relevance threshold and OCR remain
-deferred. No RAG feature was added in this audit.
+Accordingly, document Q&A, retrieved-document citations, a relevance threshold and OCR were
+deferred at this audit checkpoint. No RAG feature was added by that historical change.
 
 ## 7. Test commands and actual results
 
