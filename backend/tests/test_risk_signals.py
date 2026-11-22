@@ -1,5 +1,7 @@
 from dataclasses import replace
+from datetime import UTC, datetime
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 
@@ -23,7 +25,7 @@ def test_duplicate_candidate_normalizes_merchant_and_respects_date_and_currency(
     signals = by_type(evaluate_risk_signals(rows), "duplicate_payment_candidate")
 
     assert len(signals) == 1
-    assert signals[0].signal_id == "duplicate_payment_candidate_v1"
+    assert signals[0].signal_id.startswith("duplicate_payment_candidate_v1_")
     assert signals[0].transaction_ids == [rows[0].id, rows[1].id]
     assert signals[0].fraud_determination is False
     assert signals[0].thresholds == {"window_days": 3}
@@ -57,6 +59,22 @@ def test_daily_velocity_is_currency_scoped_and_deterministic():
     assert set(velocity[0].transaction_ids) == {rows[0].id, rows[1].id, rows[2].id}
 
 
+def test_signal_ids_are_unique_per_instance_and_stable_across_input_order():
+    rows = [
+        transaction(f"eur-{index}", "2026-04-03", f"E{index}", "-10.00") for index in range(3)
+    ] + [
+        transaction(f"usd-{index}", "2026-04-03", f"U{index}", "-10.00", "USD")
+        for index in range(3)
+    ]
+
+    first = by_type(evaluate_risk_signals(rows), "daily_velocity")
+    second = by_type(evaluate_risk_signals(list(reversed(rows))), "daily_velocity")
+
+    assert len(first) == 2
+    assert len({signal.signal_id for signal in first}) == 2
+    assert [signal.signal_id for signal in first] == [signal.signal_id for signal in second]
+
+
 def test_amount_deviation_uses_prior_same_merchant_currency_history():
     rows = [
         transaction(f"history-{index}", f"2026-01-0{index + 1}", "Vendor", "-10.00")
@@ -83,6 +101,16 @@ def test_amount_deviation_abstains_when_history_is_insufficient():
     ]
 
     assert not by_type(evaluate_risk_signals(rows), "amount_deviation")
+
+
+def test_amount_deviation_requires_amount_strictly_above_threshold():
+    history = [
+        transaction(f"threshold-history-{index}", f"2026-01-0{index + 1}", "Vendor", "-10")
+        for index in range(4)
+    ]
+    threshold = transaction("exact-threshold", "2026-01-10", "Vendor", "-30")
+
+    assert not by_type(evaluate_risk_signals([*history, threshold]), "amount_deviation")
 
 
 def test_new_merchant_requires_prior_currency_scoped_history():
@@ -143,11 +171,52 @@ def test_conflicting_positive_and_negative_records_with_same_identifier_fail_clo
         evaluate_risk_signals([income, payment])
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "exception", "message"),
+    [
+        ("id", "not-a-uuid", TypeError, "identifiers"),
+        ("posted_at", datetime(2026, 1, 1, tzinfo=UTC), TypeError, "posting dates"),
+        ("merchant", None, TypeError, "merchants"),
+        ("merchant", "  ", ValueError, "merchants"),
+        ("currency", None, TypeError, "currencies"),
+        ("currency", "  ", ValueError, "currencies"),
+    ],
+)
+def test_malformed_transaction_fields_fail_closed(field, value, exception, message):
+    row = replace(transaction("malformed", "2026-01-01", "Vendor", "-10.00"), **{field: value})
+
+    with pytest.raises(exception, match=message):
+        evaluate_risk_signals([row])
+
+
+def test_missing_transaction_fields_fail_closed():
+    class MissingFields:
+        id = uuid4()
+
+    with pytest.raises(TypeError, match="posting dates"):
+        evaluate_risk_signals([MissingFields()])
+
+
+def test_currency_is_normalized_before_grouping():
+    rows = [
+        transaction("currency-1", "2026-01-01", "A", "-10", " eur "),
+        transaction("currency-2", "2026-01-01", "B", "-10", "EUR"),
+        transaction("currency-3", "2026-01-01", "C", "-10", "eur"),
+    ]
+
+    velocity = by_type(evaluate_risk_signals(rows), "daily_velocity")
+
+    assert len(velocity) == 1
+    assert velocity[0].evidence["currency"] == "EUR"
+
+
 @pytest.mark.parametrize("amount", [Decimal("NaN"), Decimal("Infinity"), 10.0])
 def test_non_finite_or_non_decimal_transaction_amounts_fail_closed(amount):
     row = replace(transaction("invalid-amount", "2026-01-01", "Vendor", "-10.00"), amount=amount)
 
-    with pytest.raises(ValueError, match="finite Decimal"):
+    expected = TypeError if isinstance(amount, float) else ValueError
+    message = "Decimal" if expected is TypeError else "finite Decimal"
+    with pytest.raises(expected, match=message):
         evaluate_risk_signals([row])
 
 

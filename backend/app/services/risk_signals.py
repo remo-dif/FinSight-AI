@@ -6,7 +6,7 @@ from decimal import Decimal
 from heapq import heappop, heappush
 from itertools import groupby
 from typing import Protocol
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from app.schemas.risk import RiskSignal
 
@@ -53,12 +53,53 @@ def _merchant_display(value: str) -> str:
     return " ".join(value.split())
 
 
+def _currency_key(value: str) -> str:
+    return value.strip().upper()
+
+
+def _signal_id(
+    signal_type: str,
+    observed_at: date,
+    context: Iterable[object],
+    rows: Iterable[RiskTransaction],
+) -> str:
+    identity = "|".join(
+        [
+            signal_type,
+            "1",
+            observed_at.isoformat(),
+            *(str(value) for value in context),
+            *(str(row.id) for row in rows),
+        ]
+    )
+    return f"{signal_type}_v1_{uuid5(NAMESPACE_URL, identity)}"
+
+
 def _payments(rows: Iterable[RiskTransaction]) -> list[RiskTransaction]:
     unique: dict[UUID, RiskTransaction] = {}
     for row in rows:
-        if not isinstance(row.amount, Decimal) or not row.amount.is_finite():
+        identifier = getattr(row, "id", None)
+        posted_at = getattr(row, "posted_at", None)
+        merchant = getattr(row, "merchant", None)
+        amount = getattr(row, "amount", None)
+        currency = getattr(row, "currency", None)
+        if not isinstance(identifier, UUID):
+            raise TypeError("Transaction identifiers must be UUID values")
+        if type(posted_at) is not date:
+            raise TypeError("Transaction posting dates must be date values")
+        if not isinstance(merchant, str):
+            raise TypeError("Transaction merchants must be strings")
+        if not merchant.strip():
+            raise ValueError("Transaction merchants must be non-empty strings")
+        if not isinstance(currency, str):
+            raise TypeError("Transaction currencies must be strings")
+        if not currency.strip():
+            raise ValueError("Transaction currencies must be non-empty strings")
+        if not isinstance(amount, Decimal):
+            raise TypeError("Transaction amounts must be Decimal values")
+        if not amount.is_finite():
             raise ValueError("Transaction amounts must be finite Decimal values")
-        existing = unique.get(row.id)
+        existing = unique.get(identifier)
         if existing is not None and (
             existing.posted_at,
             existing.merchant,
@@ -66,7 +107,7 @@ def _payments(rows: Iterable[RiskTransaction]) -> list[RiskTransaction]:
             existing.currency,
         ) != (row.posted_at, row.merchant, row.amount, row.currency):
             raise ValueError("Conflicting transaction records share the same identifier")
-        unique.setdefault(row.id, row)
+        unique.setdefault(identifier, row)
     return sorted(
         (row for row in unique.values() if row.amount < 0),
         key=lambda row: (row.posted_at, str(row.id)),
@@ -90,7 +131,9 @@ def _references(
 def _duplicate_signals(rows: list[RiskTransaction], config: RiskSignalConfig) -> list[RiskSignal]:
     grouped: dict[tuple[str, Decimal, str], list[RiskTransaction]] = defaultdict(list)
     for row in rows:
-        grouped[(_merchant_key(row.merchant), abs(row.amount), row.currency)].append(row)
+        grouped[(_merchant_key(row.merchant), abs(row.amount), _currency_key(row.currency))].append(
+            row
+        )
 
     signals: list[RiskSignal] = []
     for (merchant, amount, currency), candidates in sorted(grouped.items()):
@@ -112,7 +155,12 @@ def _duplicate_signals(rows: list[RiskTransaction], config: RiskSignalConfig) ->
 def _duplicate_signal(rows, merchant, amount, currency, config) -> RiskSignal:
     references = _references(rows, config, terminal=rows[-1])
     return RiskSignal(
-        signal_id="duplicate_payment_candidate_v1",
+        signal_id=_signal_id(
+            "duplicate_payment_candidate",
+            rows[-1].posted_at,
+            (merchant, amount, currency),
+            rows,
+        ),
         signal_type="duplicate_payment_candidate",
         observed_at=rows[-1].posted_at,
         explanation=(
@@ -138,7 +186,7 @@ def _duplicate_signal(rows, merchant, amount, currency, config) -> RiskSignal:
 def _velocity_signals(rows: list[RiskTransaction], config: RiskSignalConfig) -> list[RiskSignal]:
     grouped: dict[tuple[date, str], list[RiskTransaction]] = defaultdict(list)
     for row in rows:
-        grouped[(row.posted_at, row.currency)].append(row)
+        grouped[(row.posted_at, _currency_key(row.currency))].append(row)
     signals: list[RiskSignal] = []
     for (day, currency), items in sorted(grouped.items()):
         if len(items) < config.velocity_minimum_payments:
@@ -146,7 +194,7 @@ def _velocity_signals(rows: list[RiskTransaction], config: RiskSignalConfig) -> 
         references = _references(items, config)
         signals.append(
             RiskSignal(
-                signal_id="daily_velocity_v1",
+                signal_id=_signal_id("daily_velocity", day, (currency,), items),
                 signal_type="daily_velocity",
                 observed_at=day,
                 explanation=(
@@ -199,7 +247,7 @@ def _amount_deviation_signals(
 ) -> list[RiskSignal]:
     grouped: dict[tuple[str, str], list[RiskTransaction]] = defaultdict(list)
     for row in rows:
-        grouped[(_merchant_key(row.merchant), row.currency)].append(row)
+        grouped[(_merchant_key(row.merchant), _currency_key(row.currency))].append(row)
 
     signals: list[RiskSignal] = []
     for (merchant, currency), items in sorted(grouped.items()):
@@ -211,12 +259,17 @@ def _amount_deviation_signals(
                 baseline = history.value()
                 for row in day_items:
                     observed = abs(row.amount)
-                    if baseline <= 0 or observed < baseline * config.amount_multiplier:
+                    if baseline <= 0 or observed <= baseline * config.amount_multiplier:
                         continue
                     references = _references([*history_references, row], config, terminal=row)
                     signals.append(
                         RiskSignal(
-                            signal_id="merchant_amount_deviation_v1",
+                            signal_id=_signal_id(
+                                "amount_deviation",
+                                row.posted_at,
+                                (merchant, currency),
+                                (row,),
+                            ),
                             signal_type="amount_deviation",
                             observed_at=row.posted_at,
                             explanation=(
@@ -252,7 +305,7 @@ def _new_merchant_signals(
 ) -> list[RiskSignal]:
     by_currency: dict[str, list[RiskTransaction]] = defaultdict(list)
     for row in rows:
-        by_currency[row.currency].append(row)
+        by_currency[_currency_key(row.currency)].append(row)
 
     signals: list[RiskSignal] = []
     for currency, items in sorted(by_currency.items()):
@@ -269,7 +322,12 @@ def _new_merchant_signals(
                 for merchant, row in sorted(first_today.items()):
                     signals.append(
                         RiskSignal(
-                            signal_id="new_merchant_v1",
+                            signal_id=_signal_id(
+                                "new_merchant",
+                                row.posted_at,
+                                (merchant, currency),
+                                (row,),
+                            ),
                             signal_type="new_merchant",
                             observed_at=row.posted_at,
                             explanation=(
