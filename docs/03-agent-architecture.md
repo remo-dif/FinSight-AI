@@ -1,4 +1,4 @@
-# 3. Multi-Agent Architecture
+# 3. Deterministic Agent Graph Architecture
 
 ## Supervisor Pattern
 
@@ -15,7 +15,9 @@ The implemented LangGraph flow is supervisor -> one financial specialist -> revi
 - Recurring specialist: repeated-charge estimates; verified subscription cadence is not guaranteed.
 - Reviewer: validates the canonical financial evidence and renders permitted facts deterministically.
 
-RAG retrieval is a service call before graph execution, not a separate graph agent. Although retrieved chunks enter `AgentState`, the financial `_evidence` generation path sends claim IDs rather than document excerpts to the LLM. Document question answering, document citations and dedicated document/report agents remain planned. Categorization currently belongs to an ingestion service, not an independent agent.
+RAG retrieval is a service call before graph execution, not a separate graph agent. Although retrieved chunks enter `AgentState`, the financial `_evidence` generation path sends claim IDs rather than document excerpts to the LLM. Authenticated document Q&A is implemented as a separate service/API path with user-owned document selection and validated citation references; it is not another graph agent. Categorization currently belongs to an ingestion service, not an independent agent.
+
+Financial-chat turns are persisted after generation. The document-Q&A branch returns its response without persisting that turn. Neither path loads previous turns into the financial graph or document-Q&A model context, so the implementation does not claim conversational memory.
 
 ## Routing Contract
 
@@ -37,4 +39,4 @@ Every public financial chat response passes the reviewer. It checks:
 - Currency, reporting period, amounts, totals and transaction references are consistent.
 - Selected claim IDs are complete and supported; invalid selections use a deterministic explanation, while invalid evidence is rejected.
 
-This gate does not validate arbitrary document claims, document citations, general professional advice or every possible sensitive-data disclosure. The model has no direct SQL/database tool. User isolation is enforced by authenticated, user-scoped application queries rather than by a reviewer promise.
+This gate does not validate arbitrary document claims, general professional advice or every possible sensitive-data disclosure. Document Q&A has a separate citation-reference validator and abstention path, but `grounded=false` explicitly means semantic support has not been independently established. The model has no direct SQL/database tool. User isolation is enforced by authenticated, user-scoped application queries rather than by a reviewer promise.
