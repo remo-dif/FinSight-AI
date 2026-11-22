@@ -1,8 +1,9 @@
 from typing import Annotated
 from uuid import UUID
 
+import jwt
 from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response, status
-from jose import JWTError, jwt
+from jwt.exceptions import InvalidTokenError
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -81,7 +82,7 @@ def _request_refresh(payload: RefreshTokenRequest, request: Request | None, lega
                 or UUID(str(access.get("sid"))) != family_id
             ):
                 raise ValueError
-        except (ValueError, JWTError):
+        except (ValueError, InvalidTokenError):
             raise invalid_refresh_token_error() from None
     token = unique_cookie(request, _cookie_name("refresh", family_id))
     if not token:

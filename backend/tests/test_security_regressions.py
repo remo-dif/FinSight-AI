@@ -4,9 +4,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
+import jwt
 import pytest
 from fastapi import HTTPException, UploadFile, status
-from jose import jwt
 from pydantic import ValidationError
 
 from app.core.config import Settings
