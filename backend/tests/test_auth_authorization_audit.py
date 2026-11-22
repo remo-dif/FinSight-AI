@@ -2,8 +2,8 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import httpx
+import jwt
 import pytest
-from jose import jwt
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool

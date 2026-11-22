@@ -7,10 +7,11 @@ from typing import Annotated, Any
 from uuid import UUID, uuid4
 
 import bcrypt
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from fastapi.security.utils import get_authorization_scheme_param
-from jose import JWTError, jwt
+from jwt.exceptions import InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from starlette.requests import Request
@@ -144,7 +145,7 @@ def decode_refresh_token(token: str) -> dict[str, Any]:
             raise credentials_error
         UUID(str(payload.get("sub")))
         return payload
-    except (JWTError, ValueError):
+    except (InvalidTokenError, ValueError):
         raise credentials_error from None
 
 
@@ -173,7 +174,7 @@ def get_current_user(
         if payload.get("type") != TokenType.ACCESS.value:
             raise credentials_error
         user_id = UUID(str(payload.get("sub")))
-    except (JWTError, ValueError):
+    except (InvalidTokenError, ValueError):
         raise credentials_error from None
 
     if payload.get("sid") is not None:
@@ -207,7 +208,7 @@ async def get_current_user_async(
         if payload.get("type") != TokenType.ACCESS.value:
             raise credentials_error
         user_id = UUID(str(payload.get("sub")))
-    except (JWTError, ValueError):
+    except (InvalidTokenError, ValueError):
         raise credentials_error from None
 
     if payload.get("sid") is not None:
