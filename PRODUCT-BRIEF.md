@@ -2,169 +2,171 @@
 
 ## Decision
 
-**Conditional GO: validate as a narrow, design-partner B2B pilot before building a
-self-service SaaS.**
+**Conditional GO for a narrowly scoped, team-based B2B pilot.**
 
-The repository already supports a credible investigation loop: authenticated ingestion,
-user-scoped cases and documents, explainable risk signals, auditable decisions, and
-grounded document Q&A. It does not yet support the commercial and operational contract of
-a multi-tenant SaaS. The next milestone should prove that a small fraud-operations team
-will repeatedly use this workflow on real, permitted data. Billing, broad integrations,
-and a public launch should follow that evidence, not precede it.
+FinSight-AI targets small professional fraud-investigation and payment-operations teams.
+The pilot supports one organization per user, 2-5 users per organization, and only the
+`organization_admin` and `reviewer` roles. It is a controlled design-partner pilot, not a
+self-service SaaS launch or a claim of production readiness.
 
-## 1. Who this is for
+This direction is a commercial hypothesis. Team tenancy is not required to interview
+customers or demonstrate the existing single-user workflow. Engineering should not begin
+until customer discovery confirms that shared queues and evidence are important enough to
+justify the additional authorization and migration risk.
 
-The initial customer is a **fraud or payment-operations lead at a small regulated fintech,
-payment provider, marketplace, or specialist consultancy** with roughly 2-10 reviewers.
-They receive transaction exports and supporting documents, but lack the volume or budget
-for an enterprise fraud platform and currently coordinate investigations through CSVs,
-shared folders, spreadsheets, and ticketing tools.
+## Evidence classification
 
-This is not initially for retail consumers, banks with established detection stacks, or
-teams requiring real-time payment blocking.
+### Verified repository facts
 
-## 2. Pain and current workaround
+- Authentication, rotating refresh-token families, user-scoped transactions, uploads,
+  cases, RAG retrieval, document Q&A, chat, and risk signals exist.
+- Case decisions and transitions are auditable, but current ownership is individual-user
+  based and the repository has no reliable tenant membership model.
+- Risk signals are explainable heuristics; they do not determine fraud or demonstrate
+  measured detection accuracy.
+- Upload extraction and embedding are request-bound; there is no durable production job
+  workflow.
+- CI, container builds, and security checks exist. There is no currently verified live
+  production environment.
+- No organization provisioning, invitations, team RBAC, automated billing, customer
+  retention controls, or customer-facing case/audit export is implemented.
 
-The target team repeatedly has to:
+### Estimates
 
-1. assemble transaction and document evidence from disconnected files;
-2. explain why an item was flagged;
-3. record a defensible decision and follow-up notes;
-4. avoid leaking one customer's evidence into another investigation;
-5. reproduce the reasoning later for internal review.
+The effort ranges and sequencing are documented in
+`docs/product/micro-saas-implementation-gates.md`. They are engineering estimates, not
+delivery commitments.
 
-The repository demonstrates these mechanics, but the frequency, cost, and willingness to
-pay are not yet evidenced by users or revenue. Customer discovery must quantify cases per
-week, minutes per case, rework rate, audit preparation effort, and current tool spend.
+### Commercial hypotheses
 
-## 3. Why now
+- Small professional teams will pay for a shared, explainable investigation workflow.
+- Shared evidence and audit history reduce handling time and rework enough to justify a
+  dedicated product.
+- CSV and text-PDF inputs are sufficient for an initial pilot.
+- Two design partners can be recruited without first building team tenancy.
 
-- Smaller teams want AI assistance but cannot accept opaque autonomous decisions.
-- FinSight-AI's deterministic tool boundary, validated citations, ownership checks, and
-  audit trail align with a human-in-the-loop adoption path.
-- The existing code can support an assisted pilot without first building real-time bank
-  connectivity or an autonomous fraud engine.
+None of these hypotheses is demonstrated by repository code or automated tests.
 
-The opportunity is workflow compression and evidence quality, not a claim of superior
-fraud-detection accuracy.
+## Target customer and problem
 
-## 4. Ten-star version
+The initial customer is a fraud or payment-operations lead at a small fintech, payment
+provider, marketplace, or specialist consultancy with 2-5 reviewers. The team currently
+assembles transaction and document evidence across CSV files, shared folders,
+spreadsheets, and ticketing tools, then records and reconstructs investigation decisions
+manually.
 
-A reviewer opens a tenant-isolated queue populated from existing payment and document
-sources, sees calibrated and explainable signals, assembles evidence with an AI copilot,
-records a policy-compliant decision, and exports a complete audit package. Team leads can
-assign work, configure policies, measure handling time and outcomes, and integrate the
-workflow with their case-management and data systems.
+The product promise is a secure, shared investigation workflow with explainable signals,
+grounded evidence, and an auditable decision history. It is not real-time fraud prevention,
+autonomous decisioning, or a substitute for a customer's compliance program.
 
-## 5. Pilot MVP
+## Approved pilot requirements
 
-The smallest pilot that tests the thesis is:
+- One manually provisioned organization per user; a user cannot switch organizations.
+- 2-5 users per organization.
+- Exactly two roles: `organization_admin` and `reviewer`.
+- Essential invitation creation, acceptance, expiry, and revocation.
+- Organization-scoped transactions, cases, notes, decisions, uploads, embeddings, RAG,
+  chat, risk analysis, audit attribution, and exports.
+- CSV transaction ingestion and text-PDF evidence; current image metadata behavior remains
+  accurately described and OCR is not promised.
+- Shared triage, case review, evidence, and grounded document Q&A.
+- Manual plan and organization administration without routine operator access to customer
+  content.
+- Fixed platform policies and limits for the pilot once approved; customers do not
+  configure retention or custom roles.
+- A verified deployment and controlled onboarding process before real customer data.
 
-- one organization with 2-5 invited reviewers;
-- explicit organization membership and tenant-scoped authorization;
-- CSV transaction ingestion plus text-PDF evidence;
-- bounded, explainable risk signals and a review queue;
-- case assignment, notes, decision history, and closure;
-- grounded Q&A over explicitly selected owned documents;
-- an exportable case summary and audit history;
-- background processing with visible job state and safe retry;
-- basic operational telemetry, usage limits, retention controls, and admin support tools;
-- a manually provisioned plan with usage metering, without self-service billing.
+## Concierge-first validation
 
-The current code supplies much of the investigation core. The missing pilot-critical
-capabilities are organization tenancy, invitations/RBAC, asynchronous ingestion,
-production observability, retention/export controls, and a verified deployment.
+Before building team tenancy, run customer discovery and a no-customer-data or explicitly
+authorized demonstration of the existing workflow. Manual steps may replace automation:
 
-## 6. Anti-goals
+- founder-led organization and account setup;
+- manually agreed CSV/PDF templates;
+- manually scheduled onboarding and support;
+- manually assigned plan limits;
+- human-reviewed case/audit export generation during validation, using synthetic or
+  contractually permitted data and without granting routine operator content access.
 
-The pilot will not include:
+Concierge operation can defer billing, generalized configuration, an operator console,
+and broad ingestion automation. It cannot replace tenant isolation, access revocation,
+retention/deletion enforcement, incident response, or verified deployment when real
+customer data is processed.
 
-- autonomous fraud determinations or automatic payment blocking;
-- measured fraud-detection claims without a representative labelled dataset;
-- bank aggregation or broad third-party integrations;
-- OCR for every document type;
-- graph intelligence, configurable controls, or data workspaces merely because navigation
-  placeholders exist;
-- enterprise SSO, custom model hosting, mobile-native applications, or global deployment;
-- self-service pricing and billing before repeat usage is demonstrated;
-- compliance certification claims.
+## Mandatory policy decisions before real customer data
 
-## 7. Success criteria
+The following remain unresolved and block controlled use of real customer data:
 
-Run a 4-6 week pilot with at least two design partners. Continue investment only if:
+1. data retention period and deletion SLA;
+2. data residency region;
+3. maximum membership revocation propagation time;
+4. case/audit export format and availability;
+5. storage, upload, seat, and AI usage limits;
+6. support and incident-response procedures without routine operator content access.
 
-- at least 3 reviewers complete 20 or more real permitted cases each;
-- median time from import to first review-ready case is under 10 minutes;
-- median active handling time improves by at least 30% against the customer's baseline;
+Recommended options, alternatives, trade-offs, owners, and exact blocking effects are in
+`docs/product/organization-tenancy-capability.md`. Recommendations are not approved
+policy values.
+
+## Pilot success criteria
+
+Run a 4-6 week controlled pilot with at least two design partners only after the mandatory
+policies and security/deployment gates are satisfied. Continue investment only if:
+
+- at least 3 reviewers complete 20 or more permitted cases each;
+- median import-to-review-ready time is under 10 minutes;
+- median active handling time improves by at least 30% from the partner's measured
+  baseline;
 - at least 70% of opened cases reach a recorded decision in FinSight-AI;
 - at least 50% of weekly active reviewers return in three separate weeks;
-- zero cross-tenant disclosure or unauthorized evidence access occurs;
-- at least one partner commits to a paid continuation or signed pilot extension.
+- no cross-tenant disclosure or unauthorized evidence access occurs;
+- at least one partner commits to a paid continuation or signed extension.
 
-Guardrails: track AI correction/rejection rate, unsupported-answer rate, ingestion failure
-rate, p95 job duration, support interventions, provider cost per completed case, and every
-authorization or retention incident.
+Track AI correction/rejection rate, unsupported-answer rate, ingestion failure rate, p95
+processing duration, support interventions, provider cost per completed case, and every
+authorization, retention, or deletion incident. These thresholds are proposed validation
+criteria, not evidence already achieved.
 
-## Repository-grounded readiness
+## Pilot anti-goals
 
-### Strong foundations
+- Organization switching or membership in multiple organizations.
+- Custom roles, enterprise SSO, SCIM, or directory synchronization.
+- Automated billing, invoicing, taxes, or self-service plan changes.
+- Customer-configurable retention or advanced organization lifecycle management.
+- Routine operator access to customer content or a content-bearing operator console.
+- Autonomous fraud determinations or payment blocking.
+- Bank aggregation, broad third-party integrations, or real-time event ingestion.
+- General OCR, entity-graph intelligence, configurable policy workspaces, or global
+  deployment.
+- Compliance certification or measured fraud-detection claims.
 
-- Modular Next.js/FastAPI/PostgreSQL architecture with migrations and CI.
-- Rotating refresh-token families, scoped queries, rate limiting, and security regression
-  coverage.
-- User-scoped transactions, uploads, RAG retrieval, cases, and risk signals.
-- Explainable deterministic indicators and application-controlled AI tool execution.
-- Auditable case workflow and validated document citations.
-- Container builds, security scans, and immutable image publication.
+## Future capabilities, explicitly deferred
 
-### Blocking gaps for a paid pilot
+- Multi-organization membership and organization switching.
+- Custom permissions and larger teams.
+- Automated subscription lifecycle and billing.
+- Customer-configurable retention, legal hold, and regional placement.
+- Just-in-time break-glass support access, if later justified and separately approved.
+- Open-banking connectivity, broader parsers, OCR, graph analysis, and advanced reporting.
 
-- No organization or tenant membership model; current ownership is individual-user based.
-- No invitation flow or reliable analyst/admin team RBAC.
-- No verified live hosting environment or production operations evidence.
-- Upload extraction and embeddings remain request-bound; no durable worker/job contract.
-- No email ownership verification, password reset, or operator-grade account recovery.
-- No customer-facing retention, deletion, or case-export workflow.
-- No full tracing, alerting, support console, or tenant-level usage/cost controls.
-- No evidence of user demand, retention, pricing acceptance, or live-model quality on a
-  representative customer dataset.
+Deferral is not a permanent architectural prohibition. The pilot schema and APIs must
+avoid assumptions that make future migration unnecessarily destructive.
 
-### Non-blocking until after pilot evidence
+## Readiness and critical challenge
 
-- Automated subscriptions and invoicing.
-- Open-banking connectivity and real-time event ingestion.
-- OCR breadth and institution-specific parsers beyond pilot inputs.
-- Entity graph and configurable policy workspaces.
-- Enterprise SSO and advanced reporting.
+The repository has a strong investigation core, but the collaboration model is not yet
+implemented. Existing case assignment does not establish team authorization, and the
+current risk model provides review indicators rather than a shared detection pipeline.
 
-## Founder review score
+For one developer, the complete pilot foundation is a multi-month effort. Building it
+before customer discovery is disproportionate to the currently unvalidated commercial
+opportunity. The correct sequence is:
 
-| Signal | Score | Evidence |
-| --- | ---: | --- |
-| Problem clarity | 7/10 | The investigation workflow and safety boundaries are explicit. |
-| Product completeness | 5/10 | Core loop exists; team and operational capabilities do not. |
-| Usage/retention evidence | 0/10 | No production users or cohort evidence in the repository. |
-| Revenue evidence | 0/10 | No pricing, contracts, billing, or paid pilots. |
-| Technical defensibility | 6/10 | Trust-oriented evidence and authorization design are useful but copyable. |
-| Distribution advantage | 1/10 | No demonstrated acquisition channel or partner pipeline. |
-| Overall readiness | 4/10 | Ready for discovery and a controlled pilot build, not public SaaS launch. |
+1. resolve Gate 0 policies and recruit qualified design partners;
+2. validate the existing workflow with synthetic or contractually permitted inputs;
+3. obtain explicit evidence that team collaboration is required;
+4. only then authorize organization-tenancy implementation.
 
-## The one move with the highest leverage
-
-Recruit two design partners and run the existing workflow manually with representative,
-contractually permitted CSV/PDF inputs before expanding the feature surface. The product
-thesis is validated only if reviewers repeatedly complete cases faster and trust the
-evidence trail enough to pay.
-
-## Next decision gate
-
-Proceed to an implementation-ready capability plan only after confirming:
-
-1. a named initial customer segment;
-2. two reachable design partners;
-3. their weekly case volume and current handling-time baseline;
-4. required roles, retention period, data region, and deployment constraints;
-5. a pilot price or explicit paid-continuation criterion.
-
-If these cannot be established, stop commercial feature work and retain FinSight-AI as a
-portfolio/reference implementation.
+If partner discovery does not confirm recurring team usage and willingness to pay, stop
+commercial feature work and retain FinSight-AI as a portfolio/reference implementation or
+re-scope it to a single-user product.
