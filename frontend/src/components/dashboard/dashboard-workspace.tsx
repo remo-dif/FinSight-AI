@@ -6,13 +6,18 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   FileUp,
+  Inbox,
+  LoaderCircle,
   MessageSquareText,
+  RefreshCw,
+  TriangleAlert,
   UserCheck,
   X
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatAmount, TransactionsTable } from "@/components/dashboard/transactions-table";
 import { CaseWorkflow } from "@/components/dashboard/case-workflow";
+import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import {
   ApiError,
@@ -100,7 +105,9 @@ export function TriageWorkspace({ initialQueue }: { initialQueue?: InitialCaseQu
 
   return <div className="space-y-4">
     <QueueStatus status={queueStatus} loginHref={loginHref} onRetry={() => void cases.refetch()} onSession={(trigger) => { drawerTriggerRef.current = trigger; setDrawer("session"); }} />
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+    {activeCases.length === 0 && queueStatus !== "demo" ? (
+      <QueueStatePanel workspace="triage" status={queueStatus} onRetry={() => void cases.refetch()} />
+    ) : <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
       <div className="min-w-0">
         <TransactionsTable
           transactions={activeCases}
@@ -118,7 +125,7 @@ export function TriageWorkspace({ initialQueue }: { initialQueue?: InitialCaseQu
           <Link className="mt-4 inline-flex min-h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-white" href={`${locale === "en" ? "" : `/${locale}`}/cases?case=${encodeURIComponent(selectedCase.id)}` as never}>{t("openCase")}</Link>
         </> : <p className="mt-3 text-sm text-muted">{t("selectAlert")}</p>}
       </Panel>
-    </div>
+    </div>}
     {drawer ? <ContextDrawer drawer={drawer} onClose={() => setDrawer(null)} triggerRef={drawerTriggerRef} /> : null}
   </div>;
 }
@@ -177,6 +184,8 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
     setDrawer(next);
   }
 
+  const showQueueState = !selectedId && activeCases.length === 0 && queueStatus !== "demo";
+
   return (
     <div className="space-y-4">
       <WorkspaceToolbar
@@ -184,10 +193,13 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
         onRetry={() => void cases.refetch()}
         drawer={drawer}
         loginHref={loginHref}
+        hasCaseContext={!showQueueState}
         onDrawerChange={changeDrawer}
       />
 
-      <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+      {showQueueState ? (
+        <QueueStatePanel workspace="cases" status={queueStatus} onRetry={() => void cases.refetch()} />
+      ) : <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
         <CaseNavigator cases={activeCases} selectedId={selectedCase?.id} status={queueStatus} onRetry={() => void cases.refetch()} onSelect={(caseRecord) => {
           setSelection({ id: caseRecord.id, epoch: userDataEpoch });
           setFocusDetailRequested(true);
@@ -209,7 +221,7 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
             headingRef={detailHeadingRef}
           />
         )}
-      </div>
+      </div>}
 
       {drawer ? (
         <ContextDrawer
@@ -305,19 +317,23 @@ function WorkspaceToolbar({
   onRetry,
   drawer,
   loginHref,
+  hasCaseContext,
   onDrawerChange
 }: {
   queueStatus: "demo" | "loading" | "live" | "error";
   onRetry: () => void;
   drawer: ToolDrawer;
   loginHref: string;
+  hasCaseContext: boolean;
   onDrawerChange: (drawer: ToolDrawer, trigger?: HTMLElement) => void;
 }) {
   const t = useTranslations();
   const tools: Array<{ id: Exclude<ToolDrawer, null>; label: string; icon: typeof UserCheck }> = [
     { id: "session", label: queueStatus !== "demo" ? t("sessionActive") : t("signIn"), icon: UserCheck },
-    { id: "copilot", label: t("askCopilot"), icon: MessageSquareText },
-    { id: "upload", label: t("uploadEvidence"), icon: FileUp }
+    ...(hasCaseContext ? [
+      { id: "copilot" as const, label: t("askCopilot"), icon: MessageSquareText },
+      { id: "upload" as const, label: t("uploadEvidence"), icon: FileUp }
+    ] : [])
   ];
 
   return (
@@ -364,6 +380,51 @@ function WorkspaceToolbar({
         })}
       </div>
     </div>
+  );
+}
+
+function QueueStatePanel({
+  workspace,
+  status,
+  onRetry
+}: {
+  workspace: "triage" | "cases";
+  status: "loading" | "live" | "error";
+  onRetry: () => void;
+}) {
+  const t = useTranslations();
+  const loading = status === "loading";
+  const failed = status === "error";
+  const Icon = loading ? LoaderCircle : failed ? TriangleAlert : Inbox;
+  const title = loading
+    ? t("loadingCases")
+    : failed
+      ? t("casesUnavailable")
+      : workspace === "triage"
+        ? t("emptyTriageTitle")
+        : t("emptyCasesTitle");
+  const description = loading
+    ? t("loadingQueueDescription")
+    : failed
+      ? t("emptyQueueErrorDescription")
+      : workspace === "triage"
+        ? t("emptyTriageDescription")
+        : t("emptyCasesDescription");
+
+  return (
+    <Panel as="section" className="px-5 py-12 text-center" aria-labelledby={`${workspace}-queue-state-heading`}>
+      <span className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${failed ? "bg-danger/10 text-danger" : "bg-accent/10 text-accent"}`}>
+        <Icon aria-hidden className={`h-7 w-7 ${loading ? "animate-spin" : ""}`} />
+      </span>
+      <h2 id={`${workspace}-queue-state-heading`} className="mt-4 text-lg font-semibold">{title}</h2>
+      <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-muted">{description}</p>
+      {!loading ? (
+        <Button type="button" variant={failed ? "primary" : "secondary"} className="mt-5" onClick={onRetry}>
+          <RefreshCw aria-hidden className="h-4 w-4" />
+          {failed ? t("retry") : t("refresh")}
+        </Button>
+      ) : null}
+    </Panel>
   );
 }
 

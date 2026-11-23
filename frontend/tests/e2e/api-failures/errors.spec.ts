@@ -60,12 +60,13 @@ test("dashboard API failures do not fall back to demo cases for an authenticated
   await expect(page.getByText("Live cases are unavailable. No demo cases are shown.")).toBeVisible();
   await expect(page.getByText("Cases are unavailable.", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "CASE-1042" })).toHaveCount(0);
-  await expect(page.getByRole("navigation", { name: "Case navigator" }).getByRole("button", { name: "Retry" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Case navigator" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Cases are unavailable." }).getByRole("button", { name: "Retry" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ask copilot" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Upload evidence" })).toHaveCount(0);
 });
 
-test("case queue distinguishes loading and empty live states", async ({ page, isMobile }) => {
-  test.skip(isMobile, "queue state transitions are viewport-independent and covered on desktop");
-
+test("case queue distinguishes loading and empty live states", async ({ page }) => {
   await mockLogin(page);
   let release!: () => void;
   const blocked = new Promise<void>((resolve) => { release = resolve; });
@@ -80,9 +81,18 @@ test("case queue distinguishes loading and empty live states", async ({ page, is
   await expect(page.getByText("Loading cases...", { exact: true })).toBeVisible();
 
   release();
-  await expect(page.getByText("No cases are available.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "No cases need attention" })).toBeVisible();
+  await expect(page.getByText("No case selected")).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Case navigator" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Ask copilot" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Upload evidence" })).toHaveCount(0);
   await expect(page.getByRole("table")).toHaveCount(0);
   await expect(page.getByRole("list", { name: "Fraud cases" })).toHaveCount(0);
+
+  await page.getByRole("link", { name: "Triage", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "No alerts need triage" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Next investigation" })).toHaveCount(0);
+  await expect(page.getByRole("table")).toHaveCount(0);
 });
 
 test("failed refresh keeps previously loaded cases available", async ({ page, isMobile }) => {
