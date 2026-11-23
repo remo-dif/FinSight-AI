@@ -1,7 +1,7 @@
 "use client";
 
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { FileText, RefreshCw } from "lucide-react";
+import { FileText, FileUp, RefreshCw } from "lucide-react";
 import { ChatPanel } from "@/components/assistant/chat-panel";
 import { AuthPanel } from "@/components/auth/auth-panel";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ export function EvidenceWorkspace() {
     retry: false
   });
   const items = documents.data?.pages.flat() ?? [];
+  const isEmpty = !documents.isPending && !documents.isError && items.length === 0;
 
   if (!token) {
     return <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -38,7 +39,7 @@ export function EvidenceWorkspace() {
     </div>;
   }
 
-  return <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+  return <div className={`grid gap-4 ${isEmpty ? "" : "xl:grid-cols-[minmax(0,1fr)_420px]"}`}>
     <div className="space-y-4">
       <Panel as="section" className="p-3 sm:p-4" aria-labelledby="document-library-heading">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -60,15 +61,29 @@ export function EvidenceWorkspace() {
         </div>
         {documents.isPending ? <p className="mt-6 text-sm text-muted" role="status">{t("loadingDocuments")}</p> : null}
         {documents.isError ? <div className="mt-6" role="alert"><p className="text-sm font-medium text-danger">{t("documentLibraryError")}</p><Button type="button" variant="text" className="mt-2" onClick={() => void documents.refetch()}>{t("retry")}</Button></div> : null}
-        {!documents.isPending && !documents.isError && items.length === 0 ? <p className="mt-6 rounded-md border border-dashed border-border p-5 text-sm text-muted">{t("noDocuments")}</p> : null}
+        {isEmpty ? <div className="mt-6 rounded-lg border border-dashed border-border bg-background px-5 py-10 text-center">
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-accent/10 text-accent">
+            <FileUp aria-hidden className="h-7 w-7" />
+          </span>
+          <h3 className="mt-4 text-lg font-semibold">{t("emptyDocumentLibraryTitle")}</h3>
+          <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-muted">{t("emptyDocumentLibraryDescription")}</p>
+          <Button
+            type="button"
+            className="mt-5"
+            onClick={() => document.querySelector<HTMLInputElement>("#upload-panel input[type='file']")?.click()}
+          >
+            <FileUp aria-hidden className="h-4 w-4" />
+            {t("chooseFirstDocument")}
+          </Button>
+        </div> : null}
         {items.length > 0 ? <ul className="mt-4 divide-y divide-border" aria-label={t("documents")}>{items.map((document) => <li key={document.id} className="flex items-center gap-3 py-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent"><FileText aria-hidden className="h-4 w-4" /></span>
           <div className="min-w-0 flex-1"><p className="break-all text-sm font-semibold">{document.filename}</p><p className="mt-1 text-xs text-muted"><span className="capitalize">{document.status}</span>{" · "}<time dateTime={document.created_at}>{formatDate(document.created_at, locale, { dateStyle: "medium", timeStyle: "short" })}</time></p></div>
         </li>)}</ul> : null}
         {documents.hasNextPage ? <Button type="button" variant="secondary" size="touch" className="mt-4 w-full sm:w-auto" onClick={() => void documents.fetchNextPage()} disabled={documents.isFetchingNextPage}>{documents.isFetchingNextPage ? t("loadingMore") : t("loadMore")}</Button> : null}
       </Panel>
-      <UploadPanel />
+      <div id="upload-panel"><UploadPanel /></div>
     </div>
-    <ChatPanel initialMode="document_qa" />
+    {!isEmpty ? <ChatPanel initialMode="document_qa" /> : null}
   </div>;
 }

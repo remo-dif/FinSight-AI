@@ -137,6 +137,25 @@ test("Evidence does not present demo documents while signed out", async ({ page 
   await expect(page.getByRole("list", { name: "Documents" })).toHaveCount(0);
 });
 
+test("Evidence presents document creation before document Q&A when the library is empty", async ({ page }) => {
+  await mockRefreshFailure(page);
+  await mockLogin(page);
+  await page.route("**/api/uploads**", async (route) => json(route, 200, []));
+
+  await page.goto("/evidence");
+  await signInFromCases(page);
+
+  await expect(page.getByRole("heading", { name: "Add your first document" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Choose your first document" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Upload to Document Library" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Investigation copilot" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Document Q&A" })).toHaveCount(0);
+
+  const fileChooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Choose your first document" }).click();
+  await fileChooser;
+});
+
 test("a successful upload refreshes the authenticated document library and exposes processing state", async ({ page }) => {
   await mockRefreshFailure(page);
   await mockLogin(page);
