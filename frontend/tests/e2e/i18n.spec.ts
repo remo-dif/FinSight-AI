@@ -53,8 +53,9 @@ test.describe("internationalization", () => {
 
     await expect(page.getByText("Coda dimostrativa. Accedi per caricare i casi in tempo reale.")).toBeVisible();
     await expect(page.getByRole("link", { name: "Accedi", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Chiedi a Copilot" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Chiedi a Copilot" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Carica evidenze" })).toBeVisible();
+    await page.getByRole("navigation", { name: "Navigatore dei casi" }).getByRole("button").first().click();
     await expect(page.getByText("Stato", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Assegnazione", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Esposizione", { exact: true })).toBeVisible();

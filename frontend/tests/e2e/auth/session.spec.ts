@@ -27,9 +27,9 @@ test("valid login enables live dashboard data and logout clears the session", as
   await submitLogin(page);
 
   await expect(page.getByText("Live investigation data is active.")).toBeVisible();
-  const selectedAlert = page.getByRole("region", { name: "Selected alert" });
-  await expect(selectedAlert.getByText("CASE-9001", { exact: true })).toBeVisible();
-  await expect(selectedAlert).toContainText("Wire mule cluster");
+  const liveCase = page.getByRole("navigation", { name: "Case navigator" }).getByRole("button", { name: /CASE-9001/ });
+  await expect(liveCase).toBeVisible();
+  await expect(liveCase).toContainText("Wire mule cluster");
 
   const logoutResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" && new URL(response.url()).pathname === "/api/auth/logout"

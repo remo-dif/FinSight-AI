@@ -9,6 +9,7 @@ async function openAuthenticatedCase(page: import("@playwright/test").Page) {
   await page.goto("/cases");
   await page.getByRole("link", { name: "Sign in", exact: true }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
+  await page.getByRole("navigation", { name: "Case navigator" }).getByRole("button", { name: /CASE-9001/ }).click();
   await expect(page.getByRole("region", { name: "Selected alert" })).toContainText("CASE-9001");
 }
 

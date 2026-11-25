@@ -20,6 +20,9 @@ test("reduced motion preserves focus, dialogs, navigation, and page geometry", a
   await expect(page.getByRole("region", { name: "Analyst session" })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
+  if ((page.viewportSize()?.width ?? 1280) < 768) {
+    await page.getByRole("navigation", { name: "Case navigator" }).getByRole("button").first().click();
+  }
 
   const geometry = await page.evaluate(() => ({
     horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,

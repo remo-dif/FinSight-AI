@@ -15,11 +15,14 @@ async function openCase(page: Page) {
   await expect(page.getByText(/Live queue is active/)).toBeVisible();
   const selected = page.getByRole("region", { name: "Selected alert" });
   await expect(page.getByText("Live queue is active. Select an alert to review evidence and record a decision.")).toBeVisible();
+  await selectCase(page, liveTransactions[0].id);
   await expect(selected).toContainText(liveTransactions[0].id);
   return selected;
 }
 
 async function selectCase(page: Page, id: string) {
+  const returnToList = page.getByRole("button", { name: "View case list" });
+  if (await returnToList.isVisible()) await returnToList.click();
   const button = page.getByRole("navigation", { name: "Case navigator" }).getByRole("button").filter({ hasText: id });
   await button.focus();
   await page.keyboard.press("Enter");
@@ -140,6 +143,7 @@ test("follow-up drafts and captured revisions stay with their intended case", as
   await expect(page.getByText(/Live queue is active/)).toBeVisible();
   const selected = page.getByRole("region", { name: "Selected alert" });
   await expect(page.getByText("Live queue is active. Select an alert to review evidence and record a decision.")).toBeVisible();
+  await selectCase(page, records[0].id);
   await expect(selected).toContainText(records[0].id);
   await selected.getByLabel("Escalation investigation outcome").fill("A draft");
   await selectCase(page, records[1].id);

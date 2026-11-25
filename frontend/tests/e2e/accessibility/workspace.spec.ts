@@ -92,9 +92,15 @@ test("each case has one native navigator control", async ({ page }) => {
   const caseButton = navigator.getByRole("button").filter({ hasText: "CASE-1038" });
   await caseButton.focus();
   await page.keyboard.press("Enter");
-  await expect(caseButton).toHaveAttribute("aria-current", "true");
   await expect(page).toHaveURL(/case=CASE-1038/);
   await expect(page.getByRole("region", { name: "Selected alert" })).toContainText("CASE-1038");
+  const returnToList = page.getByRole("button", { name: "View case list" });
+  if (await returnToList.isVisible()) {
+    await returnToList.click();
+    await expect(caseButton).toBeFocused();
+    return;
+  }
+  await expect(caseButton).toHaveAttribute("aria-current", "true");
 });
 
 test("mobile case selection moves focus directly to the detail", async ({ page }) => {

@@ -132,7 +132,7 @@ export function TriageWorkspace({ initialQueue }: { initialQueue?: InitialCaseQu
 }
 
 export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQueue?: InitialCaseQueue; initialSelectedId?: string }) {
-  const locale = useLocale();
+  const t = useTranslations();
   const loginHref = useLoginHref();
   const { token, cases, queueStatus, activeCases, userDataEpoch } = useCaseQueue(initialQueue);
   // Explicit navigation is a request to resolve an ID under the current session.
@@ -147,6 +147,8 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
   const drawerTriggerRef = useRef<HTMLElement | null>(null);
   const detailHeadingRef = useRef<HTMLHeadingElement>(null);
   const navigatorHeadingRef = useRef<HTMLHeadingElement>(null);
+  const listPosition = useRef<{ id: string; top: number } | null>(null);
+  const restoreList = useRef(false);
   const visibleDrawer = drawer === "copilot" && !token ? null : drawer;
   useEffect(() => {
     if (!token && drawer === "copilot") setDrawer(null);
@@ -166,6 +168,7 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
   useEffect(() => {
     function syncFromHistory() {
       const caseId = new URL(window.location.href).searchParams.get("case");
+      restoreList.current = !caseId;
       setSelection({ id: caseId, epoch: null });
       setFocusDetailRequested(Boolean(caseId));
     }
@@ -185,17 +188,40 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
     setFocusDetailRequested(false);
   }, [focusDetailRequested, selectedId]);
 
+  useEffect(() => {
+    if (selectedId || !restoreList.current) return;
+    restoreList.current = false;
+    const heading = navigatorHeadingRef.current;
+    const previous = listPosition.current;
+    const button = Array.from(heading?.closest("nav")?.querySelectorAll<HTMLButtonElement>("[data-case-id]") ?? [])
+      .find((item) => item.dataset.caseId === previous?.id);
+    if (button && previous) {
+      button.focus({ preventScroll: true });
+      window.scrollTo({ top: previous.top });
+      if (button.getBoundingClientRect().top < (document.querySelector("header")?.getBoundingClientRect().bottom ?? 0) ||
+          button.getBoundingClientRect().bottom > window.innerHeight) {
+        button.scrollIntoView({ block: "center" });
+      }
+    } else {
+      heading?.focus();
+      heading?.scrollIntoView({ block: "start" });
+    }
+  }, [selectedId]);
+
   function changeDrawer(next: ToolDrawer, trigger?: HTMLElement) {
     if (next && trigger) drawerTriggerRef.current = trigger;
     setDrawer(next);
   }
 
   function returnToCaseList() {
-    const heading = navigatorHeadingRef.current;
-    if (!heading) return;
-    heading.focus({ preventScroll: true });
-    const headerBottom = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
-    window.scrollBy({ top: heading.getBoundingClientRect().top - headerBottom - 16 });
+    if (selectedId && listPosition.current?.id !== selectedId) {
+      listPosition.current = { id: selectedId, top: 0 };
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.delete("case");
+    window.history.pushState(null, "", url);
+    restoreList.current = true;
+    setSelection({ id: null, epoch: null });
   }
 
   const showQueueState = !selectedId && activeCases.length === 0 && queueStatus !== "demo";
@@ -214,12 +240,18 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
 
       {showQueueState ? (
         <QueueStatePanel workspace="cases" status={queueStatus} onRetry={() => void cases.refetch()} />
-      ) : <div className="grid min-w-0 gap-4 md:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]">
+      ) : <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+        <div className={selectedId ? "hidden xl:sticky xl:top-[96px] xl:block" : "xl:sticky xl:top-[96px]"}>
         <CaseNavigator headingRef={navigatorHeadingRef} cases={activeCases} selectedId={selectedCase?.id} status={queueStatus} onRetry={() => void cases.refetch()} onSelect={(caseRecord) => {
+          if (!selectedId) listPosition.current = { id: caseRecord.id, top: window.scrollY };
           setSelection({ id: caseRecord.id, epoch: userDataEpoch });
           setFocusDetailRequested(true);
-          window.history.pushState(null, "", localizePath(`/cases?case=${encodeURIComponent(caseRecord.id)}`, locale));
+          const url = new URL(window.location.href);
+          url.searchParams.set("case", caseRecord.id);
+          if (url.href !== window.location.href) window.history.pushState(null, "", url);
         }} />
+        </div>
+        <div className={selectedId ? "min-w-0" : "hidden min-w-0 xl:block"}>
         {selectedCase ? (
           <AlertDetailPanel
             caseRecord={selectedCase}
@@ -228,7 +260,11 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
             headingRef={detailHeadingRef}
             onReturnToList={returnToCaseList}
           />
-        ) : (
+        ) : selectedId ? (
+          <div>
+          <Button type="button" variant="secondary" size="touch" className="mb-3 xl:hidden" onClick={returnToCaseList}>
+            <ArrowLeft aria-hidden className="h-4 w-4" />{t("viewCaseList")}
+          </Button>
           <RequestedCaseState
             caseId={selectedId}
             isLoading={queueStatus === "loading" || requestedCase.fetchStatus === "fetching"}
@@ -236,7 +272,9 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
             onRetry={() => void requestedCase.refetch()}
             headingRef={detailHeadingRef}
           />
-        )}
+          </div>
+        ) : null}
+        </div>
       </div>}
 
       {visibleDrawer ? (
@@ -300,29 +338,18 @@ function QueueStatus({ status, loginHref, onRetry, onSession }: { status: "demo"
 
 function CaseNavigator({ headingRef, cases, selectedId, status, onRetry, onSelect }: { headingRef: { current: HTMLHeadingElement | null }; cases: InvestigationCase[]; selectedId?: string; status: "demo" | "loading" | "live" | "error"; onRetry: () => void; onSelect: (item: InvestigationCase) => void }) {
   const t = useTranslations();
-  const listRef = useRef<HTMLUListElement>(null);
-  useEffect(() => {
-    const list = listRef.current;
-    if (!list || !selectedId || window.matchMedia("(min-width: 768px)").matches) return;
-    const selected = list.querySelector<HTMLElement>('[aria-current="true"]');
-    if (!selected) return;
-    const listBox = list.getBoundingClientRect();
-    const selectedBox = selected.getBoundingClientRect();
-    if (selectedBox.left < listBox.left || selectedBox.right > listBox.right) {
-      list.scrollLeft += selectedBox.left - listBox.left;
-    }
-  }, [selectedId]);
-  return <Panel as="nav" className="h-fit min-w-0 p-3 md:sticky md:top-[96px]" aria-label={t("caseNavigator")}>
+  return <Panel as="nav" className="min-w-0 p-3 xl:max-h-[calc(100dvh-112px)] xl:overflow-y-auto" aria-label={t("caseNavigator")}>
     <div className="flex items-center justify-between gap-2"><h2 ref={headingRef} id="case-list-heading" tabIndex={-1} className="scroll-mt-28 text-sm font-semibold">{t("cases")}</h2><span className="text-xs text-muted">{cases.length}</span></div>
     {status === "loading" && cases.length === 0 ? <p className="mt-3 text-sm text-muted" role="status">{t("loadingCases")}</p> : null}
     {status === "error" && cases.length === 0 ? <div className="mt-3 text-sm" role="alert"><p className="text-danger">{t("casesUnavailable")}</p><button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>{t("retry")}</button></div> : null}
     {status === "error" && cases.length > 0 ? <div className="mt-3 text-sm" role="status"><p className="font-semibold text-warning">{t("refreshFailed")}</p><button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>{t("retry")}</button></div> : null}
     {status !== "loading" && status !== "error" && cases.length === 0 ? <p className="mt-3 text-sm text-muted">{t("noCases")}</p> : null}
-    <ul ref={listRef} className="mt-3 flex gap-2 overflow-x-auto pb-2 md:block md:divide-y md:divide-border md:overflow-visible md:border-t md:pb-0">
+    <ul className="mt-3 divide-y divide-border border-t">
       {cases.map((item) => (
-        <li key={item.id} className="w-64 shrink-0 md:w-auto">
+        <li key={item.id}>
           <button
             type="button"
+            data-case-id={item.id}
             className={`h-full w-full min-w-0 rounded-md border-l-[3px] px-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 md:my-1 md:h-auto ${item.id === selectedId ? "border-accent bg-accent/10" : "border-transparent hover:bg-background"}`}
             aria-current={item.id === selectedId ? "true" : undefined}
             onClick={() => onSelect(item)}
@@ -505,7 +532,7 @@ function AlertDetailPanel({
               <span className="select-text">{caseRecord?.id ?? "--"}</span>
             </p>
           </div>
-          <Button type="button" variant="secondary" size="touch" className="shrink-0 md:hidden" onClick={onReturnToList}>
+          <Button type="button" variant="secondary" size="touch" className="shrink-0 xl:hidden" onClick={onReturnToList}>
             <ArrowLeft aria-hidden className="h-4 w-4" />{t("viewCaseList")}
           </Button>
         </div>

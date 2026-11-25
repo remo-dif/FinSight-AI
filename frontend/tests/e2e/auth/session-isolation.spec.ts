@@ -75,10 +75,9 @@ test("failed refresh drops A's SSR data, documents and transcript before B signs
     await page.getByRole("button", { name: "Send message" }).click();
     await request;
     await page.getByRole("button", { name: "Load more documents" }).click();
-    await expect(page.getByText("Sign in to select your uploaded documents.")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Investigation copilot" })).toHaveCount(0);
     await expect.soft(page.getByText("Private answer A", { exact: true })).toHaveCount(0, { timeout: 1500 });
 
-    await page.getByRole("button", { name: "Close panel" }).click();
     await page.getByRole("link", { name: "Sign in", exact: true }).click();
     const auth = page.getByRole("region", { name: "Analyst session" });
     await auth.getByLabel("Email").fill("synthetic-b@example.test");
@@ -90,6 +89,8 @@ test("failed refresh drops A's SSR data, documents and transcript before B signs
     // re-authorized for B, but A's queue control must be gone immediately.
     await expect(page.getByRole("button", { name: /CASE-LIVE-A/ })).toHaveCount(0);
     bQueue.release();
+    const returnToList = page.getByRole("button", { name: "View case list" });
+    if (await returnToList.isVisible()) await returnToList.click();
     await expect(page.getByRole("button", { name: /CASE-B-ONLY/ }).first()).toBeVisible();
     await page.getByRole("button", { name: "Ask copilot" }).click();
     await page.getByRole("button", { name: "Document Q&A" }).click();
@@ -176,8 +177,7 @@ test("B resolves the same case link without exposing A's delayed detail", async 
     await page.getByRole("button", { name: "Ask copilot" }).click();
     await page.getByRole("button", { name: "Document Q&A" }).click();
     await page.getByRole("button", { name: "Load more documents" }).click();
-    await expect(page.getByText("Sign in to select your uploaded documents.")).toBeVisible();
-    await page.getByRole("button", { name: "Close panel" }).click();
+    await expect(page.getByRole("dialog", { name: "Investigation copilot" })).toHaveCount(0);
     await page.getByRole("link", { name: "Sign in", exact: true }).click();
     const auth = page.getByRole("region", { name: "Analyst session" });
     await auth.getByLabel("Email").fill("synthetic-b@example.test");
