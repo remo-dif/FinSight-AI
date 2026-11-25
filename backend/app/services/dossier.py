@@ -67,7 +67,7 @@ def _canonical_value(value: Any) -> Any:
             raise ValueError("Dossier contains a non-finite monetary value")
         return format(value, "f")
     if isinstance(value, float):
-        raise ValueError("Dossier cannot serialize binary floating-point values")
+        raise TypeError("Dossier cannot serialize binary floating-point values")
     if value is None or isinstance(value, (bool, int)):
         return value
     raise TypeError(f"Unsupported dossier value: {type(value).__name__}")
@@ -107,7 +107,11 @@ def build_snapshot(db: Session, case_id: UUID, owner_id: UUID) -> dict[str, Any]
             for signal in evaluate_risk_signals(
                 rows, RiskSignalConfig(max_transaction_references=MAX_SIGNAL_TRANSACTIONS)
             )
-            if case_id in signal.transaction_ids
+            if (
+                signal.transaction_ids[-1] == case_id
+                if signal.signal_type == "amount_deviation"
+                else case_id in signal.transaction_ids
+            )
         ]
     signals.sort(key=lambda item: (item["observed_at"], item["signal_type"], item["signal_id"]))
 
@@ -138,7 +142,11 @@ def build_snapshot(db: Session, case_id: UUID, owner_id: UUID) -> dict[str, Any]
     audit = list(
         db.scalars(
             select(AuditLog)
-            .where(AuditLog.action.like("case.%"))
+            .where(
+                AuditLog.action.like("case.%"),
+                ~AuditLog.action.like("case.dossier_export%"),
+                AuditLog.metadata_json["case_id"].as_string() == str(case_id),
+            )
             .order_by(AuditLog.created_at, AuditLog.id)
         )
     )
@@ -207,8 +215,6 @@ def build_snapshot(db: Session, case_id: UUID, owner_id: UUID) -> dict[str, Any]
                 "metadata": event.metadata_json,
             }
             for event in audit
-            if event.metadata_json.get("case_id") == str(case_id)
-            and not event.action.startswith("case.dossier_export")
         ],
     }
 

@@ -22,6 +22,7 @@ RUN pip install --no-cache-dir --upgrade pip "setuptools>=78.1.1" \
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY app ./app
+COPY scripts ./scripts
 
 RUN groupadd --gid 10001 finsight \
     && useradd --uid 10001 --gid 10001 --no-log-init --create-home \

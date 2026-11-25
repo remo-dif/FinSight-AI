@@ -216,14 +216,17 @@ function extractErrorMessage(body: unknown, fallback: string) {
   return fallback;
 }
 
-async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, readBody = false) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS);
   const abortRequest = () => controller.abort();
 
   init.signal?.addEventListener("abort", abortRequest, { once: true });
   try {
-    return await fetch(input, { ...init, signal: controller.signal });
+    const response = await fetch(input, { ...init, signal: controller.signal });
+    if (!readBody) return response;
+    const body = await response.arrayBuffer();
+    return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
   } catch (error) {
     if (controller.signal.aborted && !init.signal?.aborted) {
       throw new ApiError("The request timed out. The server may have completed it.", undefined, "timeout");
@@ -294,7 +297,7 @@ async function requestWithToken(path: string, init: ApiFetchInit | undefined, to
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(requestInit.headers ?? {})
     }
-  });
+  }, Boolean(init?.rawResponse));
 }
 
 function assertUserDataEpoch(expectedUserDataEpoch: number | undefined) {

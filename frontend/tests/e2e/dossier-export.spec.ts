@@ -55,3 +55,23 @@ test("dossier buttons disable during preparation and report an API error", async
   await expect(page.getByRole("alert").filter({ hasText: "Export unavailable" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Export dossier (PDF)" })).toBeEnabled();
 });
+
+test("a stalled response body times out and enables the download buttons again", async ({ page }) => {
+  await openAuthenticatedCase(page);
+  await page.evaluate(() => {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = (input, init) => {
+      if (!String(input).endsWith("/api/cases/CASE-9001/dossier.pdf")) return originalFetch(input, init);
+      const body = new ReadableStream({
+        start(controller) {
+          init?.signal?.addEventListener("abort", () => controller.error(new DOMException("Aborted", "AbortError")), { once: true });
+        }
+      });
+      return Promise.resolve(new Response(body, { status: 200, headers: { "Content-Type": "application/pdf" } }));
+    };
+  });
+  await page.getByRole("button", { name: "Export dossier (PDF)" }).click();
+  await expect(page.getByRole("button", { name: "Preparing dossier..." })).toBeDisabled();
+  await expect(page.getByRole("alert").filter({ hasText: "timed out" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("button", { name: "Export dossier (PDF)" })).toBeEnabled();
+});

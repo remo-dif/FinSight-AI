@@ -16,7 +16,8 @@ from app.repositories.transactions import TransactionRepository
 from app.schemas.finance import TransactionCreate
 from app.services.risk_signals import evaluate_risk_signals
 
-DEMO_EMAIL = "synthetic-demo@finsight.invalid"
+DEMO_EMAIL = "synthetic-demo@demo.finsight.ai"
+LEGACY_DEMO_EMAIL = "synthetic-demo@finsight.invalid"
 DEMO_PASSWORD = "SyntheticDemo2026!"  # Development only; never use on a deployed instance.
 DEMO_ID = uuid5(NAMESPACE_URL, "finsight-ai/synthetic-demo/v1")
 SOURCE = "synthetic_demo_v1"
@@ -73,9 +74,12 @@ def ensure_development() -> None:
 def seed() -> dict[str, int]:
     ensure_development()
     with SessionLocal() as db:
-        user = db.scalar(select(User).where(User.email == DEMO_EMAIL))
-        if user is not None and user.id != DEMO_ID:
+        user = db.get(User, DEMO_ID)
+        email_owner = db.scalar(select(User).where(User.email == DEMO_EMAIL))
+        if email_owner is not None and email_owner.id != DEMO_ID:
             raise RuntimeError("Demo email is already owned by a different account")
+        if user is not None and user.email not in {DEMO_EMAIL, LEGACY_DEMO_EMAIL}:
+            raise RuntimeError("Demo account identifier is already owned by a different account")
         try:
             if user is None:
                 user = User(
@@ -86,6 +90,8 @@ def seed() -> dict[str, int]:
                 )
                 db.add(user)
                 db.flush()
+            elif user.email == LEGACY_DEMO_EMAIL:
+                user.email = DEMO_EMAIL
             existing = {
                 row.description
                 for row in db.scalars(

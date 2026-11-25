@@ -10,11 +10,13 @@ from uuid import uuid4
 import httpx
 import pdfplumber
 import pytest
+from fastapi import Response
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import app.models  # noqa: F401
+from app.api.routes.auth import login
 from app.api.routes.cases import export_dossier_json, export_dossier_pdf
 from app.core.config import settings
 from app.core.database import Base, get_db
@@ -24,9 +26,10 @@ from app.models.audit import AuditLog
 from app.models.case import CaseNote, InvestigationCase
 from app.models.finance import Transaction, UploadedFile
 from app.models.user import User
+from app.schemas.auth import LoginRequest
+from app.services.dossier import FORMAT_VERSION, canonical_bytes
 from app.services.ingestion import IngestionService
 from app.services.risk_signals import evaluate_risk_signals
-from app.services.dossier import FORMAT_VERSION, canonical_bytes
 from scripts import seed_demo
 from scripts.seed_demo import demo_transactions, ensure_development
 
@@ -78,7 +81,7 @@ def test_canonical_bytes_sort_keys_lists_are_explicit_and_reject_floats():
         canonical_bytes(first).decode("utf-8")
         == '{"a":"Café","date":"2026-05-04","items":[1,2],"z":"1.20"}'
     )
-    with pytest.raises(ValueError, match="floating-point"):
+    with pytest.raises(TypeError, match="floating-point"):
         canonical_bytes({"bad": 1.0})
     with pytest.raises(ValueError, match="non-finite"):
         canonical_bytes({"bad": Decimal("NaN")})
@@ -192,6 +195,77 @@ def test_exports_make_no_outbound_connection(db: Session, monkeypatch):
     assert export_dossier_pdf(transaction.id, user, db).body.startswith(b"%PDF-")
 
 
+def test_audit_trail_selects_only_requested_case(db: Session):
+    user, transaction = add_case(db)
+    db.add_all(
+        [
+            AuditLog(
+                action="case.note_added",
+                user_id=user.id,
+                metadata_json={"case_id": str(transaction.id)},
+            ),
+            AuditLog(
+                action="case.note_added", user_id=user.id, metadata_json={"case_id": str(uuid4())}
+            ),
+            AuditLog(
+                action="case.dossier_export_pdf",
+                user_id=user.id,
+                metadata_json={"case_id": str(transaction.id)},
+            ),
+        ]
+    )
+    db.commit()
+    events = json.loads(export_dossier_json(transaction.id, user, db).body)["audit_events"]
+    assert [event["action"] for event in events] == ["case.note_added"]
+    assert events[0]["metadata"]["case_id"] == str(transaction.id)
+
+
+def test_amount_deviation_applies_to_observed_payment_only(db: Session):
+    user, baseline = add_case(db)
+    baseline.amount = Decimal("-10.00")
+    db.add_all(
+        [
+            Transaction(
+                user_id=user.id,
+                posted_at=date(2026, 5, day),
+                merchant="Caffè Milano",
+                description="Baseline",
+                amount=Decimal(f"-{day + 7}.00"),
+                currency="EUR",
+                category="Food",
+                source="csv",
+            )
+            for day in (5, 6, 7, 8)
+        ]
+    )
+    anomalous = Transaction(
+        user_id=user.id,
+        posted_at=date(2026, 5, 9),
+        merchant="Caffè Milano",
+        description="Observed outlier",
+        amount=Decimal("-400.00"),
+        currency="EUR",
+        category="Food",
+        source="csv",
+    )
+    db.add(anomalous)
+    db.flush()
+    db.add(InvestigationCase(transaction_id=anomalous.id))
+    db.commit()
+
+    baseline_signals = json.loads(export_dossier_json(baseline.id, user, db).body)["risk_signals"][
+        "results"
+    ]
+    observed_signals = json.loads(export_dossier_json(anomalous.id, user, db).body)["risk_signals"][
+        "results"
+    ]
+    assert all(item["signal_type"] != "amount_deviation" for item in baseline_signals)
+    deviations = [item for item in observed_signals if item["signal_type"] == "amount_deviation"]
+    assert len(deviations) == 1
+    assert deviations[0]["transaction_ids"][-1] == str(anomalous.id)
+    assert str(baseline.id) in deviations[0]["transaction_ids"]
+
+
 @pytest.mark.asyncio
 async def test_http_owner_and_other_user_access(db: Session):
     owner, transaction = add_case(db)
@@ -256,6 +330,15 @@ def test_seed_is_repeatable_and_preserves_unrelated_rows(db: Session, monkeypatc
     assert db.get(Transaction, transaction.id).amount == original[1]
     assert db.get(Transaction, transaction.id).merchant == original[2]
     assert db.get(User, unrelated.id) is not None
+    credentials = LoginRequest(email=seed_demo.DEMO_EMAIL, password=seed_demo.DEMO_PASSWORD)
+    assert login(credentials, Response(), db).access_token
+
+    seeded_user = db.get(User, seed_demo.DEMO_ID)
+    seeded_user.email = seed_demo.LEGACY_DEMO_EMAIL
+    db.commit()
+    assert seed_demo.seed()["created"] == 0
+    db.refresh(seeded_user)
+    assert seeded_user.email == seed_demo.DEMO_EMAIL
 
 
 def test_manual_csv_uses_existing_ingestion_and_rules():
