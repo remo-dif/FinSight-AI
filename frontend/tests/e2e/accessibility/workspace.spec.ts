@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockDashboardData, mockLogin, mockRefreshFailure } from "../fixtures/api";
 
 test("primary workspace controls are reachable by keyboard", async ({ page, isMobile }) => {
   test.skip(isMobile, "keyboard traversal is covered on desktop");
@@ -23,6 +24,9 @@ test("primary workspace controls are reachable by keyboard", async ({ page, isMo
 });
 
 test("forms, status regions, and alert queue expose stable accessible names", async ({ page }) => {
+  await mockRefreshFailure(page);
+  await mockLogin(page);
+  await mockDashboardData(page);
   await page.goto("/cases");
 
   const sessionTrigger = page.getByRole("link", { name: "Sign in" });
@@ -31,7 +35,7 @@ test("forms, status regions, and alert queue expose stable accessible names", as
   await expect(page.getByRole("region", { name: "Analyst session" })).toBeVisible();
   await expect(page.getByLabel("Email")).toBeVisible();
   await expect(page.getByLabel("Password")).toBeVisible();
-  await page.goBack();
+  await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
 
   await page.getByRole("button", { name: "Ask copilot" }).click();
   await expect(page.getByRole("dialog", { name: "Investigation copilot" })).toBeVisible();

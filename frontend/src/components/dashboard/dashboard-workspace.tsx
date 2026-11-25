@@ -147,6 +147,10 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
   const drawerTriggerRef = useRef<HTMLElement | null>(null);
   const detailHeadingRef = useRef<HTMLHeadingElement>(null);
   const navigatorHeadingRef = useRef<HTMLHeadingElement>(null);
+  const visibleDrawer = drawer === "copilot" && !token ? null : drawer;
+  useEffect(() => {
+    if (!token && drawer === "copilot") setDrawer(null);
+  }, [token, drawer]);
   const queuedCase = useMemo(() => activeCases.find((item) => item.id === selectedId), [activeCases, selectedId]);
   const requestedCase = useQuery({
     queryKey: caseDetailQueryKey(selectedId ?? "none"),
@@ -201,9 +205,10 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
       <WorkspaceToolbar
         queueStatus={queueStatus}
         onRetry={() => void cases.refetch()}
-        drawer={drawer}
+        drawer={visibleDrawer}
         loginHref={loginHref}
         hasCaseContext={!showQueueState}
+        canUseCopilot={Boolean(token)}
         onDrawerChange={changeDrawer}
       />
 
@@ -234,9 +239,9 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
         )}
       </div>}
 
-      {drawer ? (
+      {visibleDrawer ? (
         <ContextDrawer
-          drawer={drawer}
+          drawer={visibleDrawer}
           onClose={() => setDrawer(null)}
           triggerRef={drawerTriggerRef}
         />
@@ -342,6 +347,7 @@ function WorkspaceToolbar({
   drawer,
   loginHref,
   hasCaseContext,
+  canUseCopilot,
   onDrawerChange
 }: {
   queueStatus: "demo" | "loading" | "live" | "error";
@@ -349,13 +355,14 @@ function WorkspaceToolbar({
   drawer: ToolDrawer;
   loginHref: string;
   hasCaseContext: boolean;
+  canUseCopilot: boolean;
   onDrawerChange: (drawer: ToolDrawer, trigger?: HTMLElement) => void;
 }) {
   const t = useTranslations();
   const tools: Array<{ id: Exclude<ToolDrawer, null>; label: string; icon: typeof UserCheck }> = [
     { id: "session", label: queueStatus !== "demo" ? t("sessionActive") : t("signIn"), icon: UserCheck },
     ...(hasCaseContext ? [
-      { id: "copilot" as const, label: t("askCopilot"), icon: MessageSquareText },
+      ...(canUseCopilot ? [{ id: "copilot" as const, label: t("askCopilot"), icon: MessageSquareText }] : []),
       { id: "upload" as const, label: t("uploadEvidence"), icon: FileUp }
     ] : [])
   ];
