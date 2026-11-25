@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
+  ArrowLeft,
   FileUp,
   Inbox,
   LoaderCircle,
@@ -145,6 +146,7 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
   const [drawer, setDrawer] = useState<ToolDrawer>(null);
   const drawerTriggerRef = useRef<HTMLElement | null>(null);
   const detailHeadingRef = useRef<HTMLHeadingElement>(null);
+  const navigatorHeadingRef = useRef<HTMLHeadingElement>(null);
   const queuedCase = useMemo(() => activeCases.find((item) => item.id === selectedId), [activeCases, selectedId]);
   const requestedCase = useQuery({
     queryKey: caseDetailQueryKey(selectedId ?? "none"),
@@ -184,6 +186,14 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
     setDrawer(next);
   }
 
+  function returnToCaseList() {
+    const heading = navigatorHeadingRef.current;
+    if (!heading) return;
+    heading.focus({ preventScroll: true });
+    const headerBottom = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+    window.scrollBy({ top: heading.getBoundingClientRect().top - headerBottom - 16 });
+  }
+
   const showQueueState = !selectedId && activeCases.length === 0 && queueStatus !== "demo";
 
   return (
@@ -199,8 +209,8 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
 
       {showQueueState ? (
         <QueueStatePanel workspace="cases" status={queueStatus} onRetry={() => void cases.refetch()} />
-      ) : <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-        <CaseNavigator cases={activeCases} selectedId={selectedCase?.id} status={queueStatus} onRetry={() => void cases.refetch()} onSelect={(caseRecord) => {
+      ) : <div className="grid min-w-0 gap-4 md:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]">
+        <CaseNavigator headingRef={navigatorHeadingRef} cases={activeCases} selectedId={selectedCase?.id} status={queueStatus} onRetry={() => void cases.refetch()} onSelect={(caseRecord) => {
           setSelection({ id: caseRecord.id, epoch: userDataEpoch });
           setFocusDetailRequested(true);
           window.history.pushState(null, "", localizePath(`/cases?case=${encodeURIComponent(caseRecord.id)}`, locale));
@@ -211,6 +221,7 @@ export function CasesWorkspace({ initialQueue, initialSelectedId }: { initialQue
             canMutate={Boolean(token)}
             onDrawerChange={changeDrawer}
             headingRef={detailHeadingRef}
+            onReturnToList={returnToCaseList}
           />
         ) : (
           <RequestedCaseState
@@ -282,28 +293,29 @@ function QueueStatus({ status, loginHref, onRetry, onSession }: { status: "demo"
   </div>;
 }
 
-function CaseNavigator({ cases, selectedId, status, onRetry, onSelect }: { cases: InvestigationCase[]; selectedId?: string; status: "demo" | "loading" | "live" | "error"; onRetry: () => void; onSelect: (item: InvestigationCase) => void }) {
+function CaseNavigator({ headingRef, cases, selectedId, status, onRetry, onSelect }: { headingRef: { current: HTMLHeadingElement | null }; cases: InvestigationCase[]; selectedId?: string; status: "demo" | "loading" | "live" | "error"; onRetry: () => void; onSelect: (item: InvestigationCase) => void }) {
   const t = useTranslations();
-  return <Panel as="nav" className="h-fit p-3 xl:sticky xl:top-[96px]" aria-label={t("caseNavigator")}>
-    <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold">{t("cases")}</h2><span className="text-xs text-muted">{cases.length}</span></div>
+  return <Panel as="nav" className="h-fit min-w-0 p-3 md:sticky md:top-[96px]" aria-label={t("caseNavigator")}>
+    <div className="flex items-center justify-between gap-2"><h2 ref={headingRef} id="case-list-heading" tabIndex={-1} className="scroll-mt-28 text-sm font-semibold">{t("cases")}</h2><span className="text-xs text-muted">{cases.length}</span></div>
     {status === "loading" && cases.length === 0 ? <p className="mt-3 text-sm text-muted" role="status">{t("loadingCases")}</p> : null}
     {status === "error" && cases.length === 0 ? <div className="mt-3 text-sm" role="alert"><p className="text-danger">{t("casesUnavailable")}</p><button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>{t("retry")}</button></div> : null}
     {status === "error" && cases.length > 0 ? <div className="mt-3 text-sm" role="status"><p className="font-semibold text-warning">{t("refreshFailed")}</p><button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>{t("retry")}</button></div> : null}
     {status !== "loading" && status !== "error" && cases.length === 0 ? <p className="mt-3 text-sm text-muted">{t("noCases")}</p> : null}
-    <ul className="mt-3 space-y-2">
+    <ul className="mt-3 divide-y divide-border border-t border-border">
       {cases.map((item) => (
         <li key={item.id}>
           <button
             type="button"
-            className={`w-full rounded-md border p-3 text-left transition ${item.id === selectedId ? "border-accent bg-accent/10" : "border-border bg-white hover:border-accent/60"}`}
+            className={`my-1 w-full min-w-0 rounded-md border-l-[3px] px-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 ${item.id === selectedId ? "border-accent bg-accent/10" : "border-transparent hover:bg-background"}`}
             aria-current={item.id === selectedId ? "true" : undefined}
             onClick={() => onSelect(item)}
           >
             <span className="block break-words text-sm font-semibold leading-5">{item.merchant}</span>
-            <span className="mt-1 block break-words text-xs font-medium text-foreground">{item.category}</span>
+            <span className="mt-1 block break-words text-xs text-muted">{item.category}</span>
             <span className="mt-2 block break-all text-xs text-muted">{item.id}</span>
-            <span className="mt-1 block text-xs text-muted">
-              {statusLabel(item.status, t)} · {item.assignee_name ?? t("unassigned")}
+            <span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+              <span className="rounded-full border border-border bg-white px-2 py-0.5 font-semibold text-foreground">{statusLabel(item.status, t)}</span>
+              <span className="text-muted">{item.assignee_name ?? t("unassigned")}</span>
             </span>
           </button>
         </li>
@@ -438,12 +450,14 @@ function AlertDetailPanel({
   caseRecord,
   canMutate,
   onDrawerChange,
-  headingRef
+  headingRef,
+  onReturnToList
 }: {
   caseRecord?: InvestigationCase;
   canMutate: boolean;
   onDrawerChange: (drawer: ToolDrawer, trigger?: HTMLElement) => void;
   headingRef: { current: HTMLHeadingElement | null };
+  onReturnToList: () => void;
 }) {
   const t = useTranslations();
   const locale = useLocale();
@@ -459,62 +473,60 @@ function AlertDetailPanel({
   });
 
   return (
-    <Panel id="selected-alert-panel" as="section" className="p-0 xl:sticky xl:top-[96px] xl:max-h-[calc(100vh-120px)] xl:overflow-y-auto" aria-labelledby="selected-alert-heading">
-      <div className="border-b border-border p-4">
+    <Panel id="selected-alert-panel" as="section" className="min-w-0 p-0" aria-labelledby="selected-alert-heading">
+      <div className="border-b border-border p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 ref={headingRef} id="selected-alert-heading" tabIndex={-1} className="scroll-mt-28 text-xs font-semibold uppercase tracking-wide text-muted">{t("selectedAlert")}</h2>
-            <p className="mt-2 break-words text-xl font-semibold leading-tight">
+            <p className="mt-2 break-words text-xl font-semibold leading-tight sm:text-2xl">
               {caseRecord?.merchant ?? t("noAlertSelected")}
             </p>
             <p className="mt-2 break-all text-xs text-muted">
               <span className="font-semibold text-foreground">{t("caseId")}</span>{" "}
-              <span>{caseRecord?.id ?? "--"}</span>
+              <span className="select-text">{caseRecord?.id ?? "--"}</span>
             </p>
           </div>
+          <Button type="button" variant="secondary" size="touch" className="shrink-0 md:hidden" onClick={onReturnToList}>
+            <ArrowLeft aria-hidden className="h-4 w-4" />{t("viewCaseList")}
+          </Button>
         </div>
 
-        <dl className="mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-          <SummaryItem label={t("status")} value={caseRecord ? statusLabel(caseRecord.status, t) : "--"} />
-          <SummaryItem label={t("assignment")} value={caseRecord?.assignee_name ?? t("unassigned")} />
+        <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-3 text-sm">
+          <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted">{t("status")}</dt><dd className="mt-1 inline-flex rounded-full border border-accent/30 bg-accent/10 px-2.5 py-1 font-semibold">{caseRecord ? statusLabel(caseRecord.status, t) : "--"}</dd></div>
+          <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted">{t("assignment")}</dt><dd className="mt-2 font-medium">{caseRecord?.assignee_name ?? t("unassigned")}</dd></div>
         </dl>
       </div>
 
-      <div className="space-y-5 p-4">
-        <section aria-labelledby="signal-heading">
-          <h3 id="signal-heading" className="text-sm font-semibold">{t("whyFlagged")}</h3>
-          <p className="mt-1 text-base font-semibold">{caseRecord?.category ?? t("awaitingSelection")}</p>
-          <p className="mt-2 text-sm leading-6 text-muted">
-            {caseRecord?.description ?? t("selectCaseForInvestigation")}
-          </p>
-        </section>
+      <div className="grid min-w-0 lg:grid-cols-[minmax(0,1.05fr)_minmax(300px,0.95fr)]">
+        <div className="min-w-0 space-y-6 p-4 sm:p-5">
+          <section aria-labelledby="signal-heading" className="border-l-[3px] border-accent pl-4">
+            <h3 id="signal-heading" className="text-sm font-semibold">{t("whyFlagged")}</h3>
+            <p className="mt-2 break-words text-lg font-semibold leading-snug">{caseRecord?.category ?? t("awaitingSelection")}</p>
+            <p className="mt-2 break-words text-sm leading-6 text-muted">{caseRecord?.description ?? t("selectCaseForInvestigation")}</p>
+          </section>
 
-        <section aria-labelledby="financial-context-heading">
-          <h3 id="financial-context-heading" className="text-sm font-semibold">{t("financialContext")}</h3>
-          <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
-            <SummaryItem label={t("exposure")} value={caseRecord ? formatAmount(caseRecord, locale) : "--"} />
-            <SummaryItem label={t("posted")} value={caseRecord?.posted_at ?? "--"} />
-            <SummaryItem label={t("detectionSource")} value={caseRecord?.source ?? "--"} />
-          </dl>
-        </section>
+          <div className="space-y-6 border-t border-border pt-5">
+            <section aria-labelledby="financial-context-heading">
+              <h3 id="financial-context-heading" className="text-sm font-semibold">{t("financialContext")}</h3>
+              <dl className="mt-3 grid grid-cols-2 gap-x-5 gap-y-4 text-sm">
+                <CaseFactItem label={t("exposure")} value={caseRecord ? formatAmount(caseRecord, locale) : "--"} />
+                <CaseFactItem label={t("posted")} value={caseRecord?.posted_at ?? "--"} />
+                <CaseFactItem label={t("detectionSource")} value={caseRecord?.source ?? "--"} />
+              </dl>
+            </section>
 
-        <section aria-labelledby="supporting-documents-heading">
-          <div className="flex items-center justify-between gap-3">
-            <h3 id="supporting-documents-heading" className="text-sm font-semibold">{t("supportingDocuments")}</h3>
-            <button
-              type="button"
-              className="text-sm font-semibold text-accent underline-offset-4 hover:underline"
-              onClick={(event) => onDrawerChange("upload", event.currentTarget)}
-            >
-              {t("uploadDocument")}
-            </button>
+            <section aria-labelledby="supporting-documents-heading" className="border-t border-border pt-5">
+              <h3 id="supporting-documents-heading" className="text-sm font-semibold">{t("supportingDocuments")}</h3>
+              <p className="mt-2 text-sm leading-6 text-muted">{t("caseLinkedDocumentsUnavailable")}</p>
+              <button type="button" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent underline-offset-4 hover:underline" onClick={(event) => onDrawerChange("upload", event.currentTarget)}>
+                {t("uploadDocument")}
+              </button>
+            </section>
           </div>
-          <p className="mt-2 text-sm leading-6 text-muted">
-            {t("caseLinkedDocumentsUnavailable")}
-          </p>
-        </section>
+        </div>
 
-        {caseRecord ? (
+        {caseRecord ? <section aria-labelledby="case-actions-heading" className="min-w-0 border-t border-border bg-background/60 p-4 sm:p-5 lg:border-l lg:border-t-0">
+          <h3 id="case-actions-heading" className="mb-4 text-xs font-semibold uppercase tracking-wide text-muted">{t("caseActions")}</h3>
           <CaseWorkflow
             key={`${caseRecord.id}:${canMutate}:${userDataEpoch}`}
             caseRecord={caseRecord}
@@ -524,10 +536,14 @@ function AlertDetailPanel({
             isDetailError={caseDetail.isError}
             onRetryDetail={() => void caseDetail.refetch()}
           />
-        ) : null}
+        </section> : null}
       </div>
     </Panel>
   );
+}
+
+function CaseFactItem({ label, value }: { label: string; value: string }) {
+  return <div className="min-w-0"><dt className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</dt><dd className="mt-1 break-words font-semibold">{value}</dd></div>;
 }
 
 function SummaryItem({ label, value, tone }: { label: string; value: string; tone?: "danger" }) {
