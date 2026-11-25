@@ -1,7 +1,9 @@
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -29,8 +31,81 @@ from app.services.case_workflow import (
     ensure_case_not_closed,
     validate_case_update,
 )
+from app.services.dossier import (
+    FORMAT_VERSION,
+    build_snapshot,
+    canonical_bytes,
+    digest_bytes,
+    render_pdf,
+)
 
 router = APIRouter(prefix="/cases", tags=["cases"])
+
+
+def _export_dossier(case_id: UUID, user: User, db: Session, export_format: str) -> Response:
+    owner_id = user.id
+    exporter_name = user.full_name
+    # Authentication may already have opened a READ COMMITTED transaction. End it
+    # before beginning the multi-query repeatable-read snapshot on PostgreSQL.
+    db.rollback()
+    if db.bind is not None and db.bind.dialect.name == "postgresql":
+        db.connection(execution_options={"isolation_level": "REPEATABLE READ"})
+    try:
+        snapshot = build_snapshot(db, case_id, owner_id)
+        if snapshot is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Case not found")
+        body = canonical_bytes(snapshot)
+        digest = digest_bytes(body)
+        if export_format == "pdf":
+            payload = render_pdf(snapshot, digest, exporter_name, datetime.now(UTC))
+            media_type = "application/pdf"
+        else:
+            payload = body
+            media_type = "application/json"
+        AuditService(db).record(
+            f"case.dossier_export_{export_format}",
+            owner_id,
+            {
+                "case_id": str(case_id),
+                "format": export_format,
+                "sha256": digest,
+                "format_version": FORMAT_VERSION,
+            },
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    # UUID parsing is the filename trust boundary; no user-provided path text.
+    return Response(
+        content=payload,
+        media_type=media_type,
+        headers={
+            "X-Dossier-SHA256": digest,
+            "X-Dossier-Format-Version": FORMAT_VERSION,
+            "Content-Disposition": f'attachment; filename="case-{case_id}-dossier.{export_format}"',
+            "Cache-Control": "private, no-store, max-age=0",
+            "Pragma": "no-cache",
+        },
+    )
+
+
+@router.get("/{case_id}/dossier.pdf")
+def export_dossier_pdf(
+    case_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> Response:
+    return _export_dossier(case_id, user, db, "pdf")
+
+
+@router.get("/{case_id}/dossier.json")
+def export_dossier_json(
+    case_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> Response:
+    return _export_dossier(case_id, user, db, "json")
 
 
 def _case_response(record: CaseRecord, user: User) -> CaseResponse:

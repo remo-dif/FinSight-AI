@@ -15,6 +15,7 @@ import {
   CaseStatus,
   caseDetailQueryKey,
   caseListQueryKey,
+  fetchCaseDossier,
   InvestigationCase,
   updateCase
 } from "@/lib/api";
@@ -127,6 +128,8 @@ export function CaseWorkflow({
         onSubmit={recordDecision}
       />
 
+      {canMutate ? <DossierDownloads key={caseRecord.id} caseId={caseRecord.id} /> : null}
+
       <CaseFollowUpSection key={caseRecord.id} caseRecord={caseRecord} detail={detail} canMutate={canMutate} blocked={updatePending || noteMutation.isPending || isDetailLoading || isDetailError} />
 
       <CaseNotesSection
@@ -148,6 +151,49 @@ export function CaseWorkflow({
       ) : null}
     </div>
   );
+}
+
+function DossierDownloads({ caseId }: { caseId: string }) {
+  const t = useTranslations();
+  const userDataEpoch = useSessionStore((state) => state.userDataEpoch);
+  const [pending, setPending] = useState<"pdf" | "json" | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  async function download(format: "pdf" | "json") {
+    setPending(format);
+    setMessage(null);
+    setError(false);
+    try {
+      const { bytes, filename } = await fetchCaseDossier(caseId, format, userDataEpoch);
+      const url = URL.createObjectURL(bytes);
+      try {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } finally {
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      setMessage(t("dossierReady"));
+    } catch (cause) {
+      setError(true);
+      setMessage(cause instanceof Error ? cause.message : t("dossierDownloadError"));
+    } finally {
+      setPending(null);
+    }
+  }
+
+  return <section aria-labelledby="dossier-download-heading" className="space-y-2">
+    <h3 id="dossier-download-heading" className="text-sm font-semibold">{t("caseDossier")}</h3>
+    <div className="flex flex-wrap gap-2">
+      <Button type="button" variant="secondary" disabled={pending !== null} onClick={() => void download("pdf")}>{pending === "pdf" ? t("preparingDossier") : t("exportDossierPdf")}</Button>
+      <Button type="button" variant="secondary" disabled={pending !== null} onClick={() => void download("json")}>{pending === "json" ? t("preparingDossier") : t("downloadCanonicalJson")}</Button>
+    </div>
+    {message ? <p role={error ? "alert" : "status"} className={error ? "text-sm text-danger" : "text-sm text-muted"}>{message}</p> : null}
+  </section>;
 }
 
 function CaseStateControls({

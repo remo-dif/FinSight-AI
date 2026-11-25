@@ -1,14 +1,31 @@
 # FinSight-AI
 
-Portfolio application for an AI-assisted financial fraud-risk investigation workspace.
-The current detection layer provides explainable, rule-based anomaly indicators; it does
-not determine that fraud occurred or claim measured fraud-detection accuracy. Local and
-CI checks provide evidence for individual features, not production readiness.
+Build an auditable investigation dossier with evidence and decisions.
 
-**Deployment status:** the previous AWS account is closed. No AWS infrastructure is
-currently asserted operational or verified. AWS diagrams/workflows preserve historical
-architecture and a repository-supported deployment design; no cloud deployment or
-paid infrastructure work is authorized. Future hosting and its cost budget are separate decisions.
+## What it does today
+
+- Authenticates users and keeps investigation cases scoped to their transaction owner.
+- Imports explicitly denominated CSV transactions and evaluates explainable rule-based indicators.
+- Records case notes, decisions, follow-ups, and audit events.
+- Stores user-scoped documents and extracts text from supported PDFs for document Q&A.
+- Exports a case dossier as PDF and canonical JSON with a matching SHA-256 digest when facts are unchanged.
+
+## What it does NOT do
+
+- It does not determine that fraud occurred or claim measured fraud-detection accuracy.
+- It does not perform OCR; image uploads have metadata but no extracted text.
+- Some risk, graph, and timeline panels are illustrative UI rather than detection pipelines.
+- The dossier hash is not a digital signature or proof of the PDF's authenticity.
+
+## Three-step demo quick start
+
+1. Complete the [detailed local prerequisites and environment setup](#technical-reference-detailed-setup), including Docker Compose, distinct secrets, and a non-secret provider placeholder for offline-only features. Keep `APP_ENV=development`, `STORAGE_BACKEND=local`, and `EMBEDDING_BACKEND=local`.
+2. Run the documented Compose build, database/Redis startup, and Alembic migration commands below; then start the backend and frontend containers.
+3. Seed local synthetic cases with `docker compose exec backend python -m scripts.seed_demo`. Sign in using the development-only credentials in [the dossier guide](docs/dossier-export.md). No model-provider call is needed for the seed.
+
+**Deployment status:** current deployed infrastructure has not been verified. AWS files describe historical and repository-supported designs, not evidence of a live deployment.
+
+## Technical reference
 
 ## What Is Included
 
@@ -30,7 +47,7 @@ paid infrastructure work is authorized. Future hosting and its cost budget are s
 - Changed production frontend API routing to same-origin requests so deployed browsers call `/api/...` through the Application Load Balancer instead of `localhost:8000`.
 - Configured AWS deployment primitives for ECS Fargate, RDS PostgreSQL, CloudWatch Logs, Secrets Manager, GitHub OIDC, and per-commit GHCR image deployment.
 
-## Quick Start
+## Technical reference: detailed setup
 
 Requirements: Docker Engine/Desktop with a current Compose v2 supporting
 `env_file.required` and `up --wait`. Run commands from the repository root.
@@ -183,7 +200,7 @@ CI publishes immutable images tagged by commit SHA:
 
 The `deploy-aws` workflow is **manual-only** (`workflow_dispatch`), requires
 `AWS_DEPLOY_ENABLED=true` and targets the protected `production` environment. CI completion
-or an ordinary merge cannot trigger it. Do not dispatch it while the account is closed;
+or an ordinary merge cannot trigger it. Do not dispatch it without separately verifying the account and deployment prerequisites;
 all infrastructure, permissions, origins, proxy CIDRs and cost controls must be reviewed
 again before any separately authorized future deployment. No GitHub secrets/environment
 settings were changed by this maintenance cycle.

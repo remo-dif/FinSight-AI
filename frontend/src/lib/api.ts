@@ -143,6 +143,7 @@ type ApiFetchInit = RequestInit & {
   expectedUserDataEpoch?: number;
   refreshOnUnauthorized?: boolean;
   expectedStatus?: number;
+  rawResponse?: boolean;
 };
 
 export type ApiErrorKind = "http" | "network" | "timeout";
@@ -282,6 +283,7 @@ async function requestWithToken(path: string, init: ApiFetchInit | undefined, to
   delete requestInit.expectedUserDataEpoch;
   delete requestInit.refreshOnUnauthorized;
   delete requestInit.expectedStatus;
+  delete requestInit.rawResponse;
   const isFormData = requestInit.body instanceof FormData;
   return fetchWithTimeout(`${API_URL}${path}`, {
     ...requestInit,
@@ -374,7 +376,7 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
   if (response.status === 204) {
     return undefined as T;
   }
-  const data = await response.json() as T;
+  const data = init?.rawResponse ? response as T : await response.json() as T;
   assertSameSession();
   return data;
 }
@@ -478,6 +480,18 @@ export function fetchCases(limit = 50): Promise<InvestigationCase[]> {
 
 export function fetchCaseDetail(caseId: string): Promise<CaseDetail> {
   return apiFetch<CaseDetail>(`/api/cases/${caseId}`, { requireAuth: true });
+}
+
+export async function fetchCaseDossier(caseId: string, format: "pdf" | "json", expectedUserDataEpoch: number) {
+  const response = await apiFetch<Response>(`/api/cases/${encodeURIComponent(caseId)}/dossier.${format}`, {
+    requireAuth: true,
+    expectedUserDataEpoch,
+    rawResponse: true
+  });
+  const bytes = await response.blob();
+  assertUserDataEpoch(expectedUserDataEpoch);
+  const provided = response.headers.get("Content-Disposition")?.match(/filename="([A-Za-z0-9._-]+)"/)?.[1];
+  return { bytes, filename: provided ?? `case-${caseId.replace(/[^A-Za-z0-9-]/g, "")}-dossier.${format}` };
 }
 
 export function updateCase(caseId: string, update: CaseUpdate, expectedUserDataEpoch: number): Promise<InvestigationCase> {
