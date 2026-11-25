@@ -53,7 +53,7 @@ test.describe("internationalization", () => {
 
     await expect(page.getByText("Coda dimostrativa. Accedi per caricare i casi in tempo reale.")).toBeVisible();
     await expect(page.getByRole("link", { name: "Accedi", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Chiedi al copilota" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Chiedi a Copilot" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Carica evidenze" })).toBeVisible();
     await expect(page.getByText("Stato", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Assegnazione", { exact: true }).first()).toBeVisible();

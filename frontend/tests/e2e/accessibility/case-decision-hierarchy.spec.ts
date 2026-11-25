@@ -46,10 +46,12 @@ test("case navigation prioritizes the reason for review without presenting expos
 
   await expect(highExposureCase).toContainText(weakHighExposure.merchant);
   await expect(highExposureCase).toContainText("Routine review");
-  await expect(highExposureCase).toContainText("New · Unassigned");
+  await expect(highExposureCase).toContainText("New");
+  await expect(highExposureCase).toContainText("Unassigned");
   await expect(highExposureCase).not.toContainText("9,500,000");
   await expect(lowExposureCase).toContainText("Velocity spike");
-  await expect(lowExposureCase).toContainText("Escalated · Risk Operations");
+  await expect(lowExposureCase).toContainText("Escalated");
+  await expect(lowExposureCase).toContainText("Risk Operations");
   await expect(lowExposureCase).not.toContainText("1.25");
 
   await lowExposureCase.click();
@@ -92,5 +94,36 @@ test("long case content reflows without horizontal page overflow", async ({ page
 
   await navigator.getByRole("button").filter({ hasText: strongLowExposure.id }).click();
   await expect(page.getByRole("heading", { name: "Selected alert" })).toBeFocused();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+});
+
+test("mobile case selection and return preserve the deep link and keyboard focus", async ({ page }) => {
+  await page.setViewportSize({ width: 412, height: 915 });
+  await openLiveCases(page);
+
+  const navigator = page.getByRole("navigation", { name: "Case navigator" });
+  const target = navigator.getByRole("button").filter({ hasText: strongLowExposure.id });
+  await target.click();
+  await expect(page).toHaveURL(/case=CASE-LOW-EXPOSURE-STRONG-SIGNAL/);
+  await expect(page.getByRole("heading", { name: "Selected alert" })).toBeFocused();
+  await expect(page.getByRole("region", { name: "Selected alert" })).toContainText("Velocity spike");
+
+  await page.getByRole("button", { name: "View case list" }).click();
+  await expect(navigator.getByRole("heading", { name: "Cases" })).toBeFocused();
+  await expect(target).toHaveAttribute("aria-current", "true");
+  await expect(page).toHaveURL(/case=CASE-LOW-EXPOSURE-STRONG-SIGNAL/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+});
+
+test("tablet keeps case navigation and detail visible side by side", async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await openLiveCases(page);
+  const navigator = page.getByRole("navigation", { name: "Case navigator" });
+  const selected = page.getByRole("region", { name: "Selected alert" });
+  const navBox = await navigator.boundingBox();
+  const selectedBox = await selected.boundingBox();
+  expect(navBox).not.toBeNull();
+  expect(selectedBox).not.toBeNull();
+  expect(selectedBox!.x).toBeGreaterThan(navBox!.x + navBox!.width);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });

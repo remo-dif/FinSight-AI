@@ -295,18 +295,30 @@ function QueueStatus({ status, loginHref, onRetry, onSession }: { status: "demo"
 
 function CaseNavigator({ headingRef, cases, selectedId, status, onRetry, onSelect }: { headingRef: { current: HTMLHeadingElement | null }; cases: InvestigationCase[]; selectedId?: string; status: "demo" | "loading" | "live" | "error"; onRetry: () => void; onSelect: (item: InvestigationCase) => void }) {
   const t = useTranslations();
+  const listRef = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list || !selectedId || window.matchMedia("(min-width: 768px)").matches) return;
+    const selected = list.querySelector<HTMLElement>('[aria-current="true"]');
+    if (!selected) return;
+    const listBox = list.getBoundingClientRect();
+    const selectedBox = selected.getBoundingClientRect();
+    if (selectedBox.left < listBox.left || selectedBox.right > listBox.right) {
+      list.scrollLeft += selectedBox.left - listBox.left;
+    }
+  }, [selectedId]);
   return <Panel as="nav" className="h-fit min-w-0 p-3 md:sticky md:top-[96px]" aria-label={t("caseNavigator")}>
     <div className="flex items-center justify-between gap-2"><h2 ref={headingRef} id="case-list-heading" tabIndex={-1} className="scroll-mt-28 text-sm font-semibold">{t("cases")}</h2><span className="text-xs text-muted">{cases.length}</span></div>
     {status === "loading" && cases.length === 0 ? <p className="mt-3 text-sm text-muted" role="status">{t("loadingCases")}</p> : null}
     {status === "error" && cases.length === 0 ? <div className="mt-3 text-sm" role="alert"><p className="text-danger">{t("casesUnavailable")}</p><button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>{t("retry")}</button></div> : null}
     {status === "error" && cases.length > 0 ? <div className="mt-3 text-sm" role="status"><p className="font-semibold text-warning">{t("refreshFailed")}</p><button type="button" className="mt-2 font-semibold text-accent" onClick={onRetry}>{t("retry")}</button></div> : null}
     {status !== "loading" && status !== "error" && cases.length === 0 ? <p className="mt-3 text-sm text-muted">{t("noCases")}</p> : null}
-    <ul className="mt-3 divide-y divide-border border-t border-border">
+    <ul ref={listRef} className="mt-3 flex gap-2 overflow-x-auto pb-2 md:block md:divide-y md:divide-border md:overflow-visible md:border-t md:pb-0">
       {cases.map((item) => (
-        <li key={item.id}>
+        <li key={item.id} className="w-64 shrink-0 md:w-auto">
           <button
             type="button"
-            className={`my-1 w-full min-w-0 rounded-md border-l-[3px] px-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 ${item.id === selectedId ? "border-accent bg-accent/10" : "border-transparent hover:bg-background"}`}
+            className={`h-full w-full min-w-0 rounded-md border-l-[3px] px-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 md:my-1 md:h-auto ${item.id === selectedId ? "border-accent bg-accent/10" : "border-transparent hover:bg-background"}`}
             aria-current={item.id === selectedId ? "true" : undefined}
             onClick={() => onSelect(item)}
           >
