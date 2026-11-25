@@ -78,10 +78,14 @@ test("case queue distinguishes loading and empty live states", async ({ page }) 
   await page.goto("/cases");
   await page.getByRole("link", { name: "Sign in", exact: true }).click();
   await page.getByRole("region", { name: "Analyst session" }).locator("form button[type='submit']").click();
-  await expect(page.getByText("Loading cases...", { exact: true })).toBeVisible();
+  const loadingAnnouncement = page.getByRole("status").filter({ hasText: "Loading cases..." });
+  await expect(loadingAnnouncement).toBeVisible();
+  await expect(page.getByRole("status")).toHaveCount(1);
 
   release();
-  await expect(page.getByRole("heading", { name: "No cases need attention" })).toBeVisible();
+  const emptyAnnouncement = page.getByRole("status").filter({ hasText: "No cases need attention" });
+  await expect(emptyAnnouncement).toBeVisible();
+  await expect(page.getByRole("status")).toHaveCount(1);
   await expect(page.getByText("No case selected")).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "Case navigator" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Ask copilot" })).toHaveCount(0);

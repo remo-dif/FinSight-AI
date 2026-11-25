@@ -412,7 +412,13 @@ function QueueStatePanel({
         : t("emptyCasesDescription");
 
   return (
-    <Panel as="section" className="px-5 py-12 text-center" aria-labelledby={`${workspace}-queue-state-heading`}>
+    <Panel
+      as="section"
+      className="px-5 py-12 text-center"
+      aria-labelledby={`${workspace}-queue-state-heading`}
+      role={workspace === "cases" && !failed ? "status" : undefined}
+      aria-live={workspace === "cases" && !failed ? "polite" : undefined}
+    >
       <span className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${failed ? "bg-danger/10 text-danger" : "bg-accent/10 text-accent"}`}>
         <Icon aria-hidden className={`h-7 w-7 ${loading ? "animate-spin" : ""}`} />
       </span>
