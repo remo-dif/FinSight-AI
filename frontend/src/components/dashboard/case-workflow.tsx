@@ -15,6 +15,7 @@ import {
   CaseStatus,
   caseDetailQueryKey,
   caseListQueryKey,
+  fetchCaseDossier,
   InvestigationCase,
   updateCase
 } from "@/lib/api";
@@ -142,12 +143,57 @@ export function CaseWorkflow({
         onSubmit={recordNote}
       />
 
+      {canMutate ? <DossierDownloads key={caseRecord.id} caseId={caseRecord.id} /> : null}
+
       {errorMessage ? <p className="text-sm text-danger" role="alert">{errorMessage}</p> : null}
       {updatePending || noteMutation.isPending ? (
         <p className="sr-only" role="status" aria-live="polite">{t("savingChanges")}</p>
       ) : null}
     </div>
   );
+}
+
+function DossierDownloads({ caseId }: { caseId: string }) {
+  const t = useTranslations();
+  const userDataEpoch = useSessionStore((state) => state.userDataEpoch);
+  const [pending, setPending] = useState<"pdf" | "json" | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  async function download(format: "pdf" | "json") {
+    setPending(format);
+    setMessage(null);
+    setError(false);
+    try {
+      const { bytes, filename } = await fetchCaseDossier(caseId, format, userDataEpoch);
+      const url = URL.createObjectURL(bytes);
+      try {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } finally {
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      setMessage(t("dossierReady"));
+    } catch (cause) {
+      setError(true);
+      setMessage(cause instanceof Error ? cause.message : t("dossierDownloadError"));
+    } finally {
+      setPending(null);
+    }
+  }
+
+  return <section aria-labelledby="dossier-download-heading" className="space-y-2 border-t border-border pt-5">
+    <h4 id="dossier-download-heading" className="text-sm font-semibold">{t("caseDossier")}</h4>
+    <div className="flex flex-wrap gap-2">
+      <Button type="button" variant="secondary" disabled={pending !== null} onClick={() => void download("pdf")}>{pending === "pdf" ? t("preparingDossier") : t("exportDossierPdf")}</Button>
+      <Button type="button" variant="secondary" disabled={pending !== null} onClick={() => void download("json")}>{pending === "json" ? t("preparingDossier") : t("downloadCanonicalJson")}</Button>
+    </div>
+    {message ? <p role={error ? "alert" : "status"} className={error ? "text-sm text-danger" : "text-sm text-muted"}>{message}</p> : null}
+  </section>;
 }
 
 function CaseStateControls({
@@ -170,7 +216,7 @@ function CaseStateControls({
   };
   return (
     <section aria-labelledby="case-state-heading">
-      <h3 id="case-state-heading" className="text-sm font-semibold">{t("caseState")}</h3>
+      <h4 id="case-state-heading" className="text-sm font-semibold">{t("caseState")}</h4>
       <label className="mt-3 block text-sm font-medium" htmlFor="case-status">
         {t("status")}
         <select
@@ -227,8 +273,8 @@ function CaseDecisionSection({
     false_positive: t("falsePositiveDecision")
   };
   return (
-    <section aria-labelledby="case-decision-heading">
-      <h3 id="case-decision-heading" className="text-sm font-semibold">{t("investigationDecision")}</h3>
+    <section aria-labelledby="case-decision-heading" className="border-t border-border pt-5">
+      <h4 id="case-decision-heading" className="text-sm font-semibold">{t("investigationDecision")}</h4>
       {caseRecord.decision ? (
         <div className="mt-3 rounded-md border border-border bg-background p-3">
           <p className="text-sm font-semibold">{decisionLabels[caseRecord.decision]}</p>
@@ -305,8 +351,8 @@ function CaseNotesSection({
   const t = useTranslations();
   const locale = useLocale();
   return (
-    <section aria-labelledby="case-notes-heading">
-      <h3 id="case-notes-heading" className="text-sm font-semibold">{t("analystNotes")}</h3>
+    <section aria-labelledby="case-notes-heading" className="border-t border-border pt-5">
+      <h4 id="case-notes-heading" className="text-sm font-semibold">{t("analystNotes")}</h4>
       {isDetailLoading ? <p className="mt-2 text-sm text-muted" role="status">{t("loadingCaseNotes")}</p> : null}
       {isDetailError ? (
         <div className="mt-2 flex items-center gap-3 text-sm" role="alert">
@@ -395,8 +441,8 @@ function CaseFollowUpSection({ caseRecord, detail, canMutate, blocked }: {
   if (caseRecord.decision !== "escalate" && caseRecord.decision !== "request_verification") return null;
   const disabled = !canMutate || blocked || mutation.isPending || detail?.id !== caseRecord.id || detail?.revision === undefined;
   return (
-    <section aria-labelledby="case-follow-up-heading" className="space-y-3">
-      <h3 id="case-follow-up-heading" className="text-sm font-semibold">{t("followUpInvestigation")}</h3>
+    <section aria-labelledby="case-follow-up-heading" className="space-y-3 border-t border-border pt-5">
+      <h4 id="case-follow-up-heading" className="text-sm font-semibold">{t("followUpInvestigation")}</h4>
       {detail?.follow_ups?.length ? (
         <ol className="space-y-2">
           {detail.follow_ups.map((item) => (

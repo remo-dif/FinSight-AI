@@ -13,6 +13,7 @@ for (const width of [1440, 768, 375, 320]) {
     await page.getByRole("link", { name: "Sign in", exact: true }).click();
     await page.getByRole("region", { name: "Analyst session" }).locator("form button[type=submit]").click();
     await expect(page.getByText(/Live queue is active/)).toBeVisible();
+    await page.getByRole("navigation", { name: "Case navigator" }).getByRole("button", { name: new RegExp(record.id) }).click();
     await page.addStyleTag({ content: "* { line-height: 1.5 !important; letter-spacing: .12em !important; word-spacing: .16em !important; } p { margin-bottom: 2em !important; }" });
     const selected = page.getByRole("region", { name: "Selected alert" });
     await expect(selected).toContainText(record.id);

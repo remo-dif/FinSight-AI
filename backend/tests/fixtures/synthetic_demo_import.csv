@@ -1,0 +1,25 @@
+date,merchant,amount,currency
+2026-04-01,Demo Market,-10.00,EUR
+2026-04-02,Demo Market,-11.00,EUR
+2026-04-03,Demo Market,-12.00,EUR
+2026-04-04,Demo Market,-13.00,EUR
+2026-04-05,Demo Market,-14.00,EUR
+2026-04-06,Demo Market,-15.00,EUR
+2026-04-07,Demo Transit,-8.00,EUR
+2026-04-08,Demo Cafe,-9.00,EUR
+2026-04-09,Demo Pharmacy,-16.00,EUR
+2026-04-10,Demo Market,-17.00,EUR
+2026-04-11,Demo Transit,-18.00,EUR
+2026-04-12,Demo Cafe,-19.00,EUR
+2026-04-13,Demo Pharmacy,-20.00,EUR
+2026-04-14,Demo Market,-21.00,EUR
+2026-04-15,Demo Transit,-22.00,EUR
+2026-04-16,Demo Cafe,-23.00,EUR
+2026-04-17,Demo Pharmacy,-24.00,EUR
+2026-04-18,Demo Market,-25.00,EUR
+2026-04-19,Demo Duplicate,-26.00,EUR
+2026-04-20,Demo Duplicate,-26.00,EUR
+2026-04-21,Demo New Merchant,-27.00,EUR
+2026-04-22,Demo Market,-500.00,EUR
+2026-04-22,Demo Transit,-29.00,EUR
+2026-04-22,Demo Cafe,-30.00,EUR

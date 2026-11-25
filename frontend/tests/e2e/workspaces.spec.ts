@@ -26,16 +26,23 @@ test("an explicit unknown case URL never falls back and browser history restores
   await expect(requested).toContainText("not in the current list");
   await expect(page.getByRole("region", { name: "Selected alert" })).toHaveCount(0);
 
+  const returnToList = page.getByRole("button", { name: "View case list" });
+  const separateViews = await returnToList.isVisible();
+  if (separateViews) await returnToList.click();
   await page.getByRole("navigation", { name: "Case navigator" }).getByRole("button", { name: /CASE-1038/ }).click();
   await expect(page).toHaveURL(/case=CASE-1038/);
   await expect(page.getByRole("region", { name: "Selected alert" })).toContainText("CASE-1038");
 
+  if (separateViews) await returnToList.click();
   await page.getByRole("navigation", { name: "Case navigator" }).getByRole("button", { name: /CASE-1042/ }).click();
   await page.goBack();
+  if (separateViews) await page.goBack();
   await expect(page.getByRole("region", { name: "Selected alert" })).toContainText("CASE-1038");
   await page.goBack();
+  if (separateViews) await page.goBack();
   await expect(requested).toContainText("CASE-UNKNOWN");
   await page.goForward();
+  if (separateViews) await page.goForward();
   await expect(page.getByRole("region", { name: "Selected alert" })).toContainText("CASE-1038");
 });
 

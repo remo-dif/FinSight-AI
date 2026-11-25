@@ -1,16 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { json, mockDashboardData, mockLogin, mockRefreshFailure } from "../fixtures/api";
 
-test("assistant requests require authentication before live tools run", async ({ page, isMobile }) => {
-  test.skip(isMobile, "assistant authentication failure is viewport-independent and covered on desktop");
-
+test("Cases hides the copilot for signed-out users", async ({ page }) => {
   await mockRefreshFailure(page);
 
   await page.goto("/cases");
-  await page.getByRole("button", { name: "Ask copilot" }).click();
-  await page.getByRole("button", { name: "Send message" }).click();
-
-  await expect(page.getByText("Authentication is required before using live finance tools")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ask copilot" })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Investigation copilot" })).toHaveCount(0);
 });
 
 const chatFailures = [

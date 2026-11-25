@@ -24,6 +24,8 @@ test("display preserves decimal strings, signs, precision and currency units", a
   await expect(page.getByText(/Live queue is active/)).toBeVisible();
   const selected = page.getByRole("region", { name: "Selected alert" });
   for (const record of records) {
+    const returnToList = page.getByRole("button", { name: "View case list" });
+    if (await returnToList.isVisible()) await returnToList.click();
     const button = page.getByRole("navigation", { name: "Case navigator" }).getByRole("button").filter({ hasText: record.id });
     await button.click();
     const exposure = selected.locator("dt").filter({ hasText: /^Exposure$/ }).locator("..").locator("dd");

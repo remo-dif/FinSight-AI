@@ -23,10 +23,10 @@ const strongLowExposure = {
   assignee_name: "Risk Operations"
 };
 
-async function openLiveCases(page: import("@playwright/test").Page) {
+async function openLiveCases(page: import("@playwright/test").Page, queue = [weakHighExposure, strongLowExposure]) {
   await mockRefreshFailure(page);
   await mockLogin(page);
-  await page.route("**/api/cases?limit=50", (route) => json(route, 200, [weakHighExposure, strongLowExposure]));
+  await page.route("**/api/cases?limit=50", (route) => json(route, 200, queue));
   await page.route(/\/api\/cases\/CASE-(?:HIGH|LOW)-EXPOSURE-/, (route) => {
     const record = route.request().url().includes("HIGH") ? weakHighExposure : strongLowExposure;
     return json(route, 200, { ...record, notes: [], follow_ups: [], revision: 0 });
@@ -46,14 +46,16 @@ test("case navigation prioritizes the reason for review without presenting expos
 
   await expect(highExposureCase).toContainText(weakHighExposure.merchant);
   await expect(highExposureCase).toContainText("Routine review");
-  await expect(highExposureCase).toContainText("New · Unassigned");
+  await expect(highExposureCase).toContainText("New");
+  await expect(highExposureCase).toContainText("Unassigned");
   await expect(highExposureCase).not.toContainText("9,500,000");
   await expect(lowExposureCase).toContainText("Velocity spike");
-  await expect(lowExposureCase).toContainText("Escalated · Risk Operations");
+  await expect(lowExposureCase).toContainText("Escalated");
+  await expect(lowExposureCase).toContainText("Risk Operations");
   await expect(lowExposureCase).not.toContainText("1.25");
 
   await lowExposureCase.click();
-  await expect(lowExposureCase).toHaveAttribute("aria-current", "true");
+  await expect(page.getByRole("region", { name: "Selected alert" })).toContainText(strongLowExposure.id);
   await expect(page).toHaveURL(/case=CASE-LOW-EXPOSURE-STRONG-SIGNAL/);
 });
 
@@ -61,6 +63,7 @@ test("selected case explains the signal before showing financial context", async
   await openLiveCases(page);
 
   const selected = page.getByRole("region", { name: "Selected alert" });
+  await page.getByRole("navigation", { name: "Case navigator" }).getByRole("button", { name: new RegExp(weakHighExposure.id) }).click();
   await expect(selected).toContainText(weakHighExposure.merchant);
   await expect(selected).toContainText(weakHighExposure.id);
   await expect(selected.getByText("Case ID", { exact: true })).toBeVisible();
@@ -93,4 +96,59 @@ test("long case content reflows without horizontal page overflow", async ({ page
   await navigator.getByRole("button").filter({ hasText: strongLowExposure.id }).click();
   await expect(page.getByRole("heading", { name: "Selected alert" })).toBeFocused();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+});
+
+test("mobile case selection supports history and returns focus to the selected row", async ({ page }) => {
+  await page.setViewportSize({ width: 412, height: 915 });
+  await openLiveCases(page, [
+    ...Array.from({ length: 23 }, (_, index) => ({ ...weakHighExposure, id: `CASE-DEMO-${index}` })),
+    strongLowExposure
+  ]);
+
+  const navigator = page.getByRole("navigation", { name: "Case navigator" });
+  const target = navigator.getByRole("button").filter({ hasText: strongLowExposure.id });
+  await target.focus();
+  const listTop = await page.evaluate(() => window.scrollY);
+  expect(listTop).toBeGreaterThan(0);
+  await target.press("Enter");
+  await expect(page).toHaveURL(/case=CASE-LOW-EXPOSURE-STRONG-SIGNAL/);
+  await expect(page.getByRole("heading", { name: "Selected alert" })).toBeFocused();
+  await expect(page.getByRole("region", { name: "Selected alert" })).toContainText("Velocity spike");
+
+  await page.getByRole("button", { name: "View case list" }).click();
+  await expect(target).toBeFocused();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(listTop);
+  await expect(page).toHaveURL(/\/cases$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/case=CASE-LOW-EXPOSURE-STRONG-SIGNAL/);
+  await expect(page.getByRole("heading", { name: "Selected alert" })).toBeFocused();
+  await page.goForward();
+  await expect(target).toBeFocused();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+});
+
+test("tablet shows one view at a time and desktop keeps the two views side by side", async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await openLiveCases(page, [
+    strongLowExposure,
+    ...Array.from({ length: 22 }, (_, index) => ({ ...weakHighExposure, id: `CASE-DEMO-${index}` })),
+    weakHighExposure
+  ]);
+  const navigator = page.getByRole("navigation", { name: "Case navigator" });
+  const selected = page.getByRole("region", { name: "Selected alert" });
+  await expect(navigator).toBeVisible();
+  await expect(selected).toBeHidden();
+  await navigator.getByRole("button", { name: new RegExp(strongLowExposure.id) }).click();
+  await expect(selected).toBeVisible();
+  await expect(navigator).toBeHidden();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const navBox = await navigator.boundingBox();
+  const selectedBox = await selected.boundingBox();
+  expect(navBox).not.toBeNull();
+  expect(selectedBox).not.toBeNull();
+  expect(selectedBox!.x).toBeGreaterThan(navBox!.x + navBox!.width);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await navigator.getByRole("button", { name: new RegExp(weakHighExposure.id) }).click();
+  await expect(selected).toContainText(weakHighExposure.id);
+  expect(await navigator.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
 });
