@@ -84,6 +84,8 @@ export async function mockDashboardData(page: Page) {
   const notes = new Map<string, Array<{ id: string; author_name: string; content: string; created_at: string }>>();
 
   await page.route("**/api/cases?limit=50", async (route) => json(route, 200, cases));
+  await page.route(/\/api\/cases\/[^/?]+\/documents$/, async (route) => json(route, 200, []));
+  await page.route("**/api/uploads?*", async (route) => json(route, 200, []));
   await page.route(/\/api\/cases\/[^/?]+(?:\/notes)?$/, async (route) => {
     const request = route.request();
     const segments = new URL(request.url()).pathname.split("/").filter(Boolean);

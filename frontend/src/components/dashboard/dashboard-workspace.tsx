@@ -18,6 +18,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatAmount, TransactionsTable } from "@/components/dashboard/transactions-table";
 import { CaseWorkflow } from "@/components/dashboard/case-workflow";
+import { CaseDocuments } from "@/components/dashboard/case-documents";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import {
@@ -563,7 +564,8 @@ function AlertDetailPanel({
 
             <section aria-labelledby="supporting-documents-heading" className="border-t border-border pt-5">
               <h3 id="supporting-documents-heading" className="text-sm font-semibold">{t("supportingDocuments")}</h3>
-              <p className="mt-2 text-sm leading-6 text-muted">{t("caseLinkedDocumentsUnavailable")}</p>
+              <p className="mt-2 text-sm leading-6 text-muted">{t("caseDocumentsScope")}</p>
+              {caseRecord ? <CaseDocuments key={`${caseRecord.id}:${userDataEpoch}`} caseId={caseRecord.id} canMutate={canMutate} isClosed={caseRecord.status === "resolved" && (caseRecord.decision === "escalate" || caseRecord.decision === "request_verification")} /> : null}
               <button type="button" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent underline-offset-4 hover:underline" onClick={(event) => onDrawerChange("upload", event.currentTarget)}>
                 {t("uploadDocument")}
               </button>

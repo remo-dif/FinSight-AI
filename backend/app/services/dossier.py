@@ -23,8 +23,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.audit import AuditLog
-from app.models.case import CaseFollowUp, CaseNote
-from app.models.finance import Transaction
+from app.models.case import CaseDocumentLink, CaseFollowUp, CaseNote
+from app.models.finance import Transaction, UploadedFile
 from app.models.user import User
 from app.repositories.cases import CaseRepository
 from app.services.risk_signals import RiskSignalConfig, evaluate_risk_signals
@@ -131,8 +131,14 @@ def build_snapshot(db: Session, case_id: UUID, owner_id: UUID) -> dict[str, Any]
             .order_by(CaseFollowUp.created_at, CaseFollowUp.revision, CaseFollowUp.id)
         )
     )
-    # Until explicit case links exist, no account-library upload is case evidence.
-    evidence: list[dict[str, Any]] = []
+    evidence = list(
+        db.execute(
+            select(CaseDocumentLink, UploadedFile)
+            .join(UploadedFile, UploadedFile.id == CaseDocumentLink.uploaded_file_id)
+            .where(CaseDocumentLink.case_id == case_id, UploadedFile.user_id == owner_id)
+            .order_by(CaseDocumentLink.linked_at, CaseDocumentLink.uploaded_file_id)
+        )
+    )
     audit = list(
         db.scalars(
             select(AuditLog)
@@ -168,7 +174,18 @@ def build_snapshot(db: Session, case_id: UUID, owner_id: UUID) -> dict[str, Any]
         },
         "risk_signals": {"status": signal_status, "results": signals},
         "evidence_scope": "Only documents explicitly linked to this case are listed.",
-        "evidence": evidence,
+        "evidence": [
+            {
+                "id": upload.id,
+                "filename": upload.filename,
+                "content_type": upload.content_type,
+                "uploaded_at": upload.created_at,
+                "extracted_text_status": upload.status,
+                "linked_at": link.linked_at,
+                "linked_by": link.linked_by,
+            }
+            for link, upload in evidence
+        ],
         "notes": [
             {
                 "id": note.id,
@@ -292,7 +309,9 @@ def render_pdf(
     for item in snapshot["evidence"]:
         line(
             "Document",
-            f"{item['filename']} | {item['content_type']} | {_utc(item['uploaded_at'])} | {item['extracted_text_status']}",
+            f"{item['filename']} | {item['content_type']} | {_utc(item['uploaded_at'])} | "
+            f"{item['extracted_text_status']} | linked {_utc(item['linked_at'])} by "
+            f"{item['linked_by'] or 'Former analyst'}",
         )
     section("Notes and decision history")
     line("Initial decision", case["decision"])

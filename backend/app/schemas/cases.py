@@ -54,6 +54,21 @@ class CaseNoteCreate(BaseModel):
         return value
 
 
+class CaseDocumentLinkCreate(BaseModel):
+    uploaded_file_id: UUID
+
+
+class CaseDocumentResponse(BaseModel):
+    id: UUID
+    filename: str
+    content_type: str
+    status: str
+    uploaded_at: datetime
+    linked_at: datetime
+    linked_by: UUID | None
+    linked_by_name: str
+
+
 class CaseResponse(BaseModel):
     revision: int = 0
     id: UUID
