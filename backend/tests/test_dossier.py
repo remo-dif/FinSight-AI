@@ -121,9 +121,9 @@ def test_exports_share_hash_exclude_export_events_and_track_changes(db: Session)
         )
     )
     db.commit()
-    evidence_changed = export_dossier_json(transaction.id, user, db)
-    assert evidence_changed.headers["x-dossier-sha256"] != changed.headers["x-dossier-sha256"]
-    assert b"private/path" not in evidence_changed.body
+    unlinked_upload = export_dossier_json(transaction.id, user, db)
+    assert unlinked_upload.headers["x-dossier-sha256"] == changed.headers["x-dossier-sha256"]
+    assert b"private/path" not in unlinked_upload.body
 
     db.add(
         Transaction(
@@ -139,7 +139,7 @@ def test_exports_share_hash_exclude_export_events_and_track_changes(db: Session)
     )
     db.commit()
     usd_changed = export_dossier_json(transaction.id, user, db)
-    assert usd_changed.headers["x-dossier-sha256"] == evidence_changed.headers["x-dossier-sha256"]
+    assert usd_changed.headers["x-dossier-sha256"] == unlinked_upload.headers["x-dossier-sha256"]
     assert json.loads(usd_changed.body)["transaction"]["currency"] == "EUR"
 
     usd_row = db.scalar(select(Transaction).where(Transaction.merchant == "USD shop"))
@@ -157,6 +157,33 @@ def test_exports_share_hash_exclude_export_events_and_track_changes(db: Session)
     db.commit()
     decision_changed = export_dossier_json(transaction.id, user, db)
     assert decision_changed.headers["x-dossier-sha256"] != usd_changed.headers["x-dossier-sha256"]
+
+
+def test_unlinked_owner_upload_is_absent_from_both_exports(db: Session):
+    user, transaction = add_case(db)
+    db.add(
+        UploadedFile(
+            user_id=user.id,
+            filename="other-client-secret.pdf",
+            content_type="application/pdf",
+            storage_path="private/other-client",
+            status="indexed",
+        )
+    )
+    db.commit()
+
+    json_response = export_dossier_json(transaction.id, user, db)
+    data = json.loads(json_response.body)
+    assert data["dossier_format_version"] == "2"
+    assert data["evidence_scope"] == "Only documents explicitly linked to this case are listed."
+    assert data["evidence"] == []
+    assert "other-client-secret.pdf" not in json_response.body.decode("utf-8")
+
+    pdf_response = export_dossier_pdf(transaction.id, user, db)
+    with pdfplumber.open(io.BytesIO(pdf_response.body)) as pdf:
+        text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+    assert "other-client-secret.pdf" not in text
+    assert "Only documents explicitly linked to this case are listed." in text
 
 
 def test_pdf_unicode_long_note_all_pages_have_complete_footer(db: Session):

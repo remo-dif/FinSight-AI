@@ -8,7 +8,7 @@ Build an auditable investigation dossier with evidence and decisions.
 - Imports explicitly denominated CSV transactions and evaluates explainable rule-based indicators.
 - Records case notes, decisions, follow-ups, and audit events.
 - Stores user-scoped documents and extracts text from supported PDFs for document Q&A.
-- Exports a case dossier as PDF and canonical JSON with a matching SHA-256 digest when facts are unchanged.
+- Exports a case dossier as PDF and canonical JSON with a matching SHA-256 digest when facts are unchanged. Only documents explicitly linked to the case may appear as dossier evidence; the current account library is excluded.
 
 ## What it does NOT do
 

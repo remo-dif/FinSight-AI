@@ -24,12 +24,12 @@ from sqlalchemy.orm import Session
 
 from app.models.audit import AuditLog
 from app.models.case import CaseFollowUp, CaseNote
-from app.models.finance import Transaction, UploadedFile
+from app.models.finance import Transaction
 from app.models.user import User
 from app.repositories.cases import CaseRepository
 from app.services.risk_signals import RiskSignalConfig, evaluate_risk_signals
 
-FORMAT_VERSION = "1"
+FORMAT_VERSION = "2"
 MAX_SIGNAL_TRANSACTIONS = 5000
 DISCLAIMER = (
     "Rule-based indicators only. This document does not determine that fraud occurred. "
@@ -131,14 +131,8 @@ def build_snapshot(db: Session, case_id: UUID, owner_id: UUID) -> dict[str, Any]
             .order_by(CaseFollowUp.created_at, CaseFollowUp.revision, CaseFollowUp.id)
         )
     )
-    # Uploads have no case foreign key. Show only this owner's account library, labeled as such.
-    evidence = list(
-        db.scalars(
-            select(UploadedFile)
-            .where(UploadedFile.user_id == owner_id)
-            .order_by(UploadedFile.created_at, UploadedFile.id)
-        )
-    )
+    # Until explicit case links exist, no account-library upload is case evidence.
+    evidence: list[dict[str, Any]] = []
     audit = list(
         db.scalars(
             select(AuditLog)
@@ -173,17 +167,8 @@ def build_snapshot(db: Session, case_id: UUID, owner_id: UUID) -> dict[str, Any]
             "source": transaction.source,
         },
         "risk_signals": {"status": signal_status, "results": signals},
-        "evidence_scope": "owner account library; documents are not linked to this case",
-        "evidence": [
-            {
-                "id": item.id,
-                "filename": item.filename,
-                "content_type": item.content_type,
-                "uploaded_at": item.created_at,
-                "extracted_text_status": item.status,
-            }
-            for item in evidence
-        ],
+        "evidence_scope": "Only documents explicitly linked to this case are listed.",
+        "evidence": evidence,
         "notes": [
             {
                 "id": note.id,
