@@ -51,6 +51,16 @@ export type CaseFollowUp = {
   created_at: string;
 };
 export type CaseDetail = InvestigationCase & { notes: CaseNote[]; follow_ups?: CaseFollowUp[] };
+export type CaseDocument = {
+  id: string;
+  filename: string;
+  content_type: string;
+  status: string;
+  uploaded_at: string;
+  linked_at: string;
+  linked_by: string | null;
+  linked_by_name: string;
+};
 
 export type CaseUpdate = {
   status?: CaseStatus;
@@ -483,6 +493,27 @@ export function fetchCases(limit = 50): Promise<InvestigationCase[]> {
 
 export function fetchCaseDetail(caseId: string): Promise<CaseDetail> {
   return apiFetch<CaseDetail>(`/api/cases/${caseId}`, { requireAuth: true });
+}
+
+export function fetchCaseDocuments(caseId: string, expectedUserDataEpoch: number): Promise<CaseDocument[]> {
+  return apiFetch<CaseDocument[]>(`/api/cases/${caseId}/documents`, { requireAuth: true, expectedUserDataEpoch });
+}
+
+export function linkCaseDocument(caseId: string, fileId: string, expectedUserDataEpoch: number): Promise<CaseDocument> {
+  return apiFetch<CaseDocument>(`/api/cases/${caseId}/documents`, {
+    method: "POST",
+    body: JSON.stringify({ uploaded_file_id: fileId }),
+    requireAuth: true,
+    expectedUserDataEpoch
+  });
+}
+
+export function unlinkCaseDocument(caseId: string, fileId: string, expectedUserDataEpoch: number): Promise<void> {
+  return apiFetch<void>(`/api/cases/${caseId}/documents/${fileId}`, {
+    method: "DELETE",
+    requireAuth: true,
+    expectedUserDataEpoch
+  });
 }
 
 export async function fetchCaseDossier(caseId: string, format: "pdf" | "json", expectedUserDataEpoch: number) {

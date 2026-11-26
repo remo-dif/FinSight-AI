@@ -57,6 +57,25 @@ class CaseNote(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class CaseDocumentLink(Base):
+    __tablename__ = "case_document_links"
+    __table_args__ = (
+        UniqueConstraint("case_id", "uploaded_file_id", name="uq_case_document_link"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    case_id: Mapped[UUID] = mapped_column(
+        ForeignKey("investigation_cases.transaction_id", ondelete="CASCADE"), index=True
+    )
+    uploaded_file_id: Mapped[UUID] = mapped_column(
+        ForeignKey("uploaded_files.id", ondelete="RESTRICT"), index=True
+    )
+    linked_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), default=None
+    )
+    linked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class CaseFollowUp(Base):
     """Append-only business records; no update/delete API is exposed."""
 

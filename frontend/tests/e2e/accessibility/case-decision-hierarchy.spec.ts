@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { json, liveTransactions, mockLogin, mockRefreshFailure } from "../fixtures/api";
+import { json, liveTransactions, mockDashboardData, mockLogin, mockRefreshFailure } from "../fixtures/api";
 
 const weakHighExposure = {
   ...liveTransactions[0],
@@ -26,8 +26,9 @@ const strongLowExposure = {
 async function openLiveCases(page: import("@playwright/test").Page, queue = [weakHighExposure, strongLowExposure]) {
   await mockRefreshFailure(page);
   await mockLogin(page);
+  await mockDashboardData(page);
   await page.route("**/api/cases?limit=50", (route) => json(route, 200, queue));
-  await page.route(/\/api\/cases\/CASE-(?:HIGH|LOW)-EXPOSURE-/, (route) => {
+  await page.route(/\/api\/cases\/CASE-(?:HIGH|LOW)-EXPOSURE-[^/?]+$/, (route) => {
     const record = route.request().url().includes("HIGH") ? weakHighExposure : strongLowExposure;
     return json(route, 200, { ...record, notes: [], follow_ups: [], revision: 0 });
   });
@@ -72,8 +73,8 @@ test("selected case explains the signal before showing financial context", async
   await expect(selected.getByRole("heading", { name: "Why this case was flagged" })).toBeVisible();
   await expect(selected.getByRole("heading", { name: "Financial context" })).toBeVisible();
   await expect(selected.getByText("-$9,500,000.25", { exact: true })).toBeVisible();
-  await expect(selected).toContainText("Case-linked document status is not available in this view");
-  await expect(selected).toContainText("not attached to this case");
+  await expect(selected).toContainText("Only documents explicitly linked to this case appear in its dossier");
+  await expect(selected).toContainText("Uploading a file does not link it automatically");
 
   const order = await selected.locator("#signal-heading, #financial-context-heading").evaluateAll((nodes) =>
     nodes.map((node) => node.id)

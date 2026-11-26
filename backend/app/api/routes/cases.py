@@ -5,17 +5,21 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.case import CaseFollowUp, CaseNote
+from app.models.case import CaseDocumentLink, CaseFollowUp, CaseNote
+from app.models.finance import UploadedFile
 from app.models.user import User
 from app.repositories.cases import CaseRecord, CaseRepository
 from app.schemas.cases import (
     CaseClose,
     CaseDecision,
     CaseDetailResponse,
+    CaseDocumentLinkCreate,
+    CaseDocumentResponse,
     CaseFollowUpCreate,
     CaseFollowUpResponse,
     CaseNoteCreate,
@@ -170,6 +174,121 @@ def get_case(
             for note, author in notes
         ],
     )
+
+
+def _case_document_response(
+    link: CaseDocumentLink, upload: UploadedFile, linked_by: User | None
+) -> CaseDocumentResponse:
+    return CaseDocumentResponse(
+        id=upload.id,
+        filename=upload.filename,
+        content_type=upload.content_type,
+        status=upload.status,
+        uploaded_at=upload.created_at,
+        linked_at=link.linked_at,
+        linked_by=link.linked_by,
+        linked_by_name=linked_by.full_name if linked_by else "Former analyst",
+    )
+
+
+@router.get("/{case_id}/documents", response_model=list[CaseDocumentResponse])
+def list_case_documents(
+    case_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> list[CaseDocumentResponse]:
+    _get_case_record(case_id, user, db)
+    rows = db.execute(
+        select(CaseDocumentLink, UploadedFile, User)
+        .join(UploadedFile, UploadedFile.id == CaseDocumentLink.uploaded_file_id)
+        .outerjoin(User, User.id == CaseDocumentLink.linked_by)
+        .where(CaseDocumentLink.case_id == case_id, UploadedFile.user_id == user.id)
+        .order_by(CaseDocumentLink.linked_at, CaseDocumentLink.uploaded_file_id)
+    )
+    return [_case_document_response(link, upload, actor) for link, upload, actor in rows]
+
+
+@router.post(
+    "/{case_id}/documents", response_model=CaseDocumentResponse, status_code=status.HTTP_201_CREATED
+)
+def link_case_document(
+    case_id: UUID,
+    payload: CaseDocumentLinkCreate,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> CaseDocumentResponse:
+    case, _, _ = _get_case_record(case_id, user, db)
+    upload = db.scalar(
+        select(UploadedFile).where(
+            UploadedFile.id == payload.uploaded_file_id, UploadedFile.user_id == user.id
+        )
+    )
+    if upload is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found")
+    ensure_case_not_closed(case)
+    if db.scalar(
+        select(CaseDocumentLink.id).where(
+            CaseDocumentLink.case_id == case_id,
+            CaseDocumentLink.uploaded_file_id == upload.id,
+        )
+    ):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Document is already linked to this case")
+    link = CaseDocumentLink(case_id=case_id, uploaded_file_id=upload.id, linked_by=user.id)
+    try:
+        if not CaseRepository(db).update_if_unchanged(case, user.id, {}):
+            raise HTTPException(409, "Case changed while saving. Refresh the case and retry")
+        db.add(link)
+        db.flush()
+        AuditService(db).record(
+            "case.document_linked",
+            user.id,
+            {"case_id": str(case_id), "file_id": str(upload.id), "filename": upload.filename},
+        )
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        raise HTTPException(409, "Document could not be linked. Refresh and retry") from error
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(link)
+    return _case_document_response(link, upload, user)
+
+
+@router.delete("/{case_id}/documents/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
+def unlink_case_document(
+    case_id: UUID,
+    file_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> None:
+    case, _, _ = _get_case_record(case_id, user, db)
+    upload = db.scalar(
+        select(UploadedFile).where(UploadedFile.id == file_id, UploadedFile.user_id == user.id)
+    )
+    if upload is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found")
+    link = db.scalar(
+        select(CaseDocumentLink).where(
+            CaseDocumentLink.case_id == case_id, CaseDocumentLink.uploaded_file_id == file_id
+        )
+    )
+    if link is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found")
+    ensure_case_not_closed(case)
+    try:
+        if not CaseRepository(db).update_if_unchanged(case, user.id, {}):
+            raise HTTPException(409, "Case changed while saving. Refresh the case and retry")
+        db.delete(link)
+        AuditService(db).record(
+            "case.document_unlinked",
+            user.id,
+            {"case_id": str(case_id), "file_id": str(file_id), "filename": upload.filename},
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.patch("/{case_id}", response_model=CaseResponse)
