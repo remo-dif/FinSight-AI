@@ -76,7 +76,12 @@ jobs:
         run: npm ci
       - name: Install Chromium for backend cookie integration
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        run: |
+          if ! npx playwright install --with-deps chromium; then
+            echo "::warning::Chromium setup failed. Retrying once after a short delay."
+            sleep 20
+            npx playwright install --with-deps chromium
+          fi
       - name: Test backend
         run: pytest
       - name: Compare offline RAG evaluation baselines

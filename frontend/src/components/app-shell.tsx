@@ -151,19 +151,18 @@ export function AppShell({
         <div className="min-w-0">
           <header className="sticky top-[env(safe-area-inset-top,0px)] z-20 border-b border-border bg-panel/95 backdrop-blur">
             <MobileNavigation activeRoute={activeRoute} items={mobileNavigation.map((item) => ({ ...item, href: localizedHref(item.href), label: t(item.label) })) as MobileNavigationItem[]} />
-            <div className="flex min-h-16 flex-col gap-3 px-4 py-3 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
-              <div>
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-danger">
-                  <Siren aria-hidden className="h-4 w-4" />
+            <div className="grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 px-4 py-3 sm:px-6">
+                <p className="flex items-center gap-2 self-center text-xs font-semibold uppercase tracking-wide text-danger">
+                  <Siren aria-hidden className="h-4 w-4 shrink-0" />
                   {t(copy.eyebrow)}
                 </p>
-                <h1 className="text-xl font-semibold leading-tight sm:text-2xl">{t(copy.title)}</h1>
-                <label className="mt-2 inline-flex items-center gap-2 text-xs text-muted" htmlFor="locale-switcher">{t("language")}
-                  <select id="locale-switcher" className="rounded border border-border bg-white px-2 py-1 text-foreground" value={locale} onChange={(event) => switchLocale(event.target.value as typeof locale)}>
+                <label className="inline-flex items-center gap-2 justify-self-end text-xs text-muted" htmlFor="locale-switcher">
+                  <span className="sr-only sm:not-sr-only">{t("language")}</span>
+                  <select id="locale-switcher" className="min-h-9 rounded border border-border bg-white px-2 py-1 text-foreground" value={locale} onChange={(event) => switchLocale(event.target.value as typeof locale)}>
                     {locales.map((item) => <option key={item} value={item}>{localeLabels[item]}</option>)}
                   </select>
                 </label>
-              </div>
+                <h1 className="col-span-2 text-xl font-semibold leading-tight sm:text-2xl">{t(copy.title)}</h1>
             </div>
           </header>
 
