@@ -31,8 +31,9 @@ async function openDocumentAssistant(page: import("@playwright/test").Page) {
   await signIn(page);
   await page.getByRole("button", { name: "Ask copilot" }).click();
   await page.getByRole("button", { name: "Document Q&A" }).click();
-  await expect(page.getByRole("option", { name: /statement\.pdf · uploaded 2026-10-01 · ID document/ })).toBeVisible();
-  await expect(page.getByRole("option", { name: "not-indexed.csv" })).toHaveCount(0);
+  const selector = page.getByLabel("Select indexed documents");
+  await expect(selector.getByRole("option", { name: /statement\.pdf · uploaded 2026-10-01 · ID document/ })).toBeVisible();
+  await expect(selector.getByRole("option", { name: "not-indexed.csv" })).toHaveCount(0);
   return uploadsAuthorization;
 }
 
@@ -190,12 +191,14 @@ test("document picker loads bounded pages without losing the selected scope", as
   await page.getByRole("button", { name: "Ask copilot" }).click();
   await page.getByRole("button", { name: "Document Q&A" }).click();
   const selector = page.getByLabel("Select indexed documents");
-  await expect(page.getByRole("option", { name: "statement-0.pdf" })).toBeVisible();
+  await expect(selector.getByRole("option", { name: "statement-0.pdf" })).toBeVisible();
   await selector.selectOption("document-0");
   await page.getByRole("button", { name: "Load more documents" }).click();
-  await expect(page.getByRole("option", { name: "final-statement.pdf" })).toBeVisible();
+  await expect(selector.getByRole("option", { name: "final-statement.pdf" })).toBeVisible();
   expect(await selector.inputValue()).toBe("document-0");
-  expect(offsets).toEqual(["0", "100"]);
+  // Cases also loads the owner's first library page for explicit case linking.
+  expect([...new Set(offsets)]).toEqual(["0", "100"]);
+  expect(offsets.filter((offset) => offset === "100")).toHaveLength(1);
 });
 
 test("a newly uploaded indexed document becomes selectable in Document Q&A", async ({ page, isMobile }) => {
